@@ -119,6 +119,50 @@ footer a{word-break:break-all}
 @media(prefers-color-scheme:dark){.privacy-btn.active{background:var(--teal);color:#042f2e}}
 .privacy-note{font-size:12.5px;color:var(--muted);margin:0 0 12px}
 .privacy-note strong{color:var(--ink)}
+/* --- phase1: mode toggle / simple settings --- */
+.mode-toggle{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px;margin-bottom:14px}
+.mode-btn{flex:1;border:none;background:transparent;color:var(--muted);border-radius:999px;padding:9px 10px;font-size:14px;font-weight:900;cursor:pointer}
+.mode-btn.active{background:var(--teal);color:#fff}
+.simple-intro{font-size:13px;color:var(--muted);margin:0 0 12px}
+.age-presets{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+.simple-field{margin-bottom:12px}
+.simple-field label{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;font-weight:700;margin-bottom:5px}
+.simple-field label .unit{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+.simple-field input[type=number]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:17px;font-weight:700;text-align:right}
+.hidden-cond{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:4px 0 6px;background:var(--surface2)}
+.hidden-cond summary{font-size:13px;font-weight:900;cursor:pointer}
+.hidden-cond ul{margin:8px 0 4px;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.hidden-cond p{font-size:12px;color:var(--muted);margin:6px 0 2px}
+/* --- phase1: lifespan hero --- */
+.lifespan{order:1}
+#fanCard{order:2}
+#summaryCard{order:3}
+.results>.grid2{order:4}
+.results>.panel.card:last-of-type{order:5}
+.results>footer{order:6}
+.life-grid{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center;margin-top:8px}
+@media(max-width:560px){.life-grid{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.gauge-wrap{position:relative;width:220px;max-width:70vw}
+.gauge-center{position:absolute;left:0;right:0;top:56%;transform:translateY(-50%);text-align:center}
+.gauge-center .gv{font-size:34px;font-weight:900;line-height:1.1}
+.gauge-center .gk{font-size:12px;color:var(--muted);font-weight:700}
+.life-prob-label{font-size:15px;font-weight:700;color:var(--muted)}
+.life-prob{font-size:clamp(38px,6vw,56px);font-weight:900;line-height:1.15;color:var(--navy)}
+@media(prefers-color-scheme:dark){.life-prob{color:var(--ink)}}
+.life-median{margin-top:10px;font-size:15px;color:var(--muted)}
+.life-median .mv{font-size:clamp(24px,4vw,34px);font-weight:900;color:var(--ink)}
+.life-note{font-size:12.5px;color:var(--muted);margin-top:8px}
+.lifespan .verdict{margin-top:14px}
+/* --- phase1: share help fold --- */
+.share-help{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface2)}
+.share-help summary{font-size:13px;font-weight:900;cursor:pointer}
+.share-help p{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+select.exp-select{width:100%}
+.strat-row{display:flex;flex-wrap:wrap;gap:7px}
+.strat-btn{flex:1 1 90px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:10px;padding:9px 8px;font-weight:900;font-size:13.5px;cursor:pointer;min-height:40px}
+.strat-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media(prefers-color-scheme:dark){.strat-btn.active{background:var(--teal);color:#042f2e;border-color:var(--teal)}}
+.strat-desc{font-size:12px;color:var(--muted);margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -138,9 +182,45 @@ footer a{word-break:break-all}
       <h2>条件を入力する</h2>
       <p class="sub">金額はすべて「万円」単位です。スライダーでも数字でも変更できます。</p>
 
+      <div class="mode-toggle" role="group" aria-label="設定モードの切り替え">
+        <button type="button" class="mode-btn active" id="modeSimpleBtn" aria-pressed="true">かんたん設定</button>
+        <button type="button" class="mode-btn" id="modeDetailBtn" aria-pressed="false">詳細設定</button>
+      </div>
+
+      <div id="simplePanel">
+        <p class="simple-intro">まずは基本の項目だけでも試せます。年代別のサンプルから始めることもできます（年代によって資産額・運用方針が少しずつ違います）。</p>
+        <div class="age-presets" aria-label="年代別サンプル">
+          <button type="button" class="preset age-preset" data-cur="25" data-ret="65" data-sal="26" data-exp="20" data-con="3" data-inv="100" data-save="100" data-strat="oru">20代の例</button>
+          <button type="button" class="preset age-preset" data-cur="35" data-ret="65" data-sal="32" data-exp="26" data-con="5" data-inv="400" data-save="200" data-strat="oru">30代の例</button>
+          <button type="button" class="preset age-preset active" data-cur="45" data-ret="65" data-sal="38" data-exp="25" data-con="6" data-inv="800" data-save="400" data-strat="bal">40代の例</button>
+          <button type="button" class="preset age-preset" data-cur="55" data-ret="65" data-sal="36" data-exp="28" data-con="8" data-inv="1500" data-save="600" data-strat="cons">50代の例</button>
+        </div>
+        <div class="simple-field"><label>現在の年齢 <span class="unit">歳</span></label><input type="number" id="s_curAge" value="45" min="20" max="80"></div>
+        <div class="simple-field"><label>退職予定年齢 <span class="unit">歳</span></label><input type="number" id="s_retAge" value="65" min="50" max="80"></div>
+        <div class="simple-field"><label>収入（手取り月額） <span class="unit">万円／月</span></label><input type="number" id="s_salary" value="38" min="0"></div>
+        <div class="simple-field"><label>支出（月額） <span class="unit">万円／月・現役時と退職後に反映</span></label><input type="number" id="s_exp" value="25" min="0"></div>
+        <div class="simple-field"><label>積立額（月額） <span class="unit">万円／月</span></label><input type="number" id="s_contrib" value="6" min="0"></div>
+        <div class="simple-field"><label>現在の資産額（運用資産） <span class="unit">万円</span></label><input type="number" id="s_invest" value="800" min="0"></div>
+        <div class="simple-field"><label>貯蓄額（預貯金） <span class="unit">万円・年1％で計算</span></label><input type="number" id="s_save" value="400" min="0"></div>
+        <div class="simple-field"><label>運用方針</label>
+          <div class="strat-row" role="group" aria-label="運用方針">
+            <button type="button" class="strat-btn" data-strat="cons">保守</button>
+            <button type="button" class="strat-btn active" data-strat="bal">バランス</button>
+            <button type="button" class="strat-btn" data-strat="oru">オルカン</button>
+          </div>
+          <p class="strat-desc" id="s_stratDesc">バランス：想定リターン 3.5％／リスク 10％</p>
+        </div>
+        <details class="hidden-cond">
+          <summary>計算に使うその他の条件（初期値）を確認する</summary>
+          <ul id="hiddenCondList"></ul>
+          <p>これらを変更したい場合は「詳細設定」に切り替えてください。かんたん設定の「支出」は、詳細設定の現役時・退職後の両方の月間支出に反映されます。詳細設定で現役時と退職後の支出を別々に設定していた場合、かんたん設定に切り替えた時点で、退職後の支出はかんたん設定の支出（現役時と同じ金額）にそろいます。</p>
+        </details>
+      </div>
+
+      <div id="detailPanel" hidden>
       <div class="group">
         <h3>ライフプラン</h3>
-        <div class="field"><label>現在の年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_curAge" min="20" max="80" value="40"><input type="number" id="n_curAge" value="40" min="20" max="80"></div></div>
+        <div class="field"><label>現在の年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_curAge" min="20" max="80" value="45"><input type="number" id="n_curAge" value="45" min="20" max="80"></div></div>
         <div class="field"><label>退職予定年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_retAge" min="50" max="80" value="65"><input type="number" id="n_retAge" value="65" min="50" max="80"></div></div>
         <div class="field"><label>年金受給開始年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_penAge" min="60" max="75" value="65"><input type="number" id="n_penAge" value="65" min="60" max="75"></div></div>
         <div class="field"><label>何歳まで持たせたいか <span class="unit">歳（判定年齢）</span></label><div class="row"><input type="range" id="r_endAge" min="80" max="105" value="95"><input type="number" id="n_endAge" value="95" min="80" max="105"></div></div>
@@ -148,9 +228,9 @@ footer a{word-break:break-all}
 
       <div class="group">
         <h3>収入・年金</h3>
-        <div class="field"><label>給与（手取り月額） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_salary" min="0" max="100" value="35"><input type="number" id="n_salary" value="35" min="0"></div></div>
+        <div class="field"><label>給与（手取り月額） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_salary" min="0" max="100" value="38"><input type="number" id="n_salary" value="38" min="0"></div></div>
         <div class="field"><label>年金支給額（年額） <span class="unit">万円／年</span></label><div class="row"><input type="range" id="r_pension" min="0" max="400" value="180"><input type="number" id="n_pension" value="180" min="0"></div></div>
-        <div class="field"><label>毎月の積立額（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_contrib" min="0" max="30" value="5"><input type="number" id="n_contrib" value="5" min="0"></div></div>
+        <div class="field"><label>毎月の積立額（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_contrib" min="0" max="30" value="6"><input type="number" id="n_contrib" value="6" min="0"></div></div>
       </div>
 
       <div class="group">
@@ -161,8 +241,8 @@ footer a{word-break:break-all}
 
       <div class="group">
         <h3>支出</h3>
-        <div class="field"><label>月間支出（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expW" min="0" max="80" value="28"><input type="number" id="n_expW" value="28" min="0"></div></div>
-        <div class="field"><label>月間支出（退職後） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expR" min="0" max="80" value="24"><input type="number" id="n_expR" value="24" min="0"></div></div>
+        <div class="field"><label>月間支出（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expW" min="0" max="80" value="25"><input type="number" id="n_expW" value="25" min="0"></div></div>
+        <div class="field"><label>月間支出（退職後） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expR" min="0" max="80" value="25"><input type="number" id="n_expR" value="25" min="0"></div></div>
         <div class="field"><label>インフレ率 <span class="unit">％／年</span></label><div class="row"><input type="range" id="r_infl" min="0" max="5" step="0.1" value="1"><input type="number" id="n_infl" value="1" min="0" step="0.1"></div></div>
       </div>
 
@@ -170,13 +250,13 @@ footer a{word-break:break-all}
         <h3>運用方針</h3>
         <div class="presets" id="presets">
           <button type="button" class="preset" data-r="1" data-s="2">保守的</button>
-          <button type="button" class="preset" data-r="3.5" data-s="10">バランス</button>
-          <button type="button" class="preset active" data-r="5.5" data-s="17">オルカン（全世界株）</button>
+          <button type="button" class="preset active" data-r="3.5" data-s="10">バランス</button>
+          <button type="button" class="preset" data-r="5.5" data-s="17">オルカン（全世界株）</button>
           <button type="button" class="preset" data-r="6.5" data-s="18">S&amp;P500</button>
           <button type="button" class="preset" data-r="7" data-s="21">積極的</button>
         </div>
-        <div class="field"><label>想定リターン <span class="unit">％／年</span></label><div class="row"><input type="range" id="r_ret" min="-2" max="12" step="0.1" value="5.5"><input type="number" id="n_ret" value="5.5" step="0.1"></div></div>
-        <div class="field"><label>リスク（標準偏差） <span class="unit">％</span></label><div class="row"><input type="range" id="r_risk" min="0" max="30" step="0.5" value="17"><input type="number" id="n_risk" value="17" step="0.5" min="0"></div></div>
+        <div class="field"><label>想定リターン <span class="unit">％／年</span></label><div class="row"><input type="range" id="r_ret" min="-2" max="12" step="0.1" value="3.5"><input type="number" id="n_ret" value="3.5" step="0.1"></div></div>
+        <div class="field"><label>リスク（標準偏差） <span class="unit">％</span></label><div class="row"><input type="range" id="r_risk" min="0" max="30" step="0.5" value="10"><input type="number" id="n_risk" value="10" step="0.5" min="0"></div></div>
         <div class="field"><label>試行回数</label>
           <select id="n_sims" style="width:100%">
             <option value="1000">1,000回（速い）</option>
@@ -187,25 +267,71 @@ footer a{word-break:break-all}
         </div>
       </div>
 
+      <div class="group">
+        <h3>追加の試算条件</h3>
+        <div class="field"><label>退職後の最初の10年の相場環境 <span class="unit">リターンを内部で調整</span></label>
+          <select id="n_earlyMode" class="exp-select">
+            <option value="0" selected>変えない（通常どおり）</option>
+            <option value="1">強気で試す（リターン＋2％）</option>
+            <option value="-1">弱気で試す（リターン−2％）</option>
+          </select>
+          <p class="note" style="margin-top:6px">退職直後の10年は相場の影響を受けやすい期間です。その期間だけリターンを上下させて、持つ確率の変化を見られます。「変えない」のときは従来どおりの計算です。</p>
+        </div>
+        <div class="field"><label>老後の追加支出（年額） <span class="unit">万円／年・退職後のみ</span></label><div class="row"><input type="range" id="r_extraExp" min="0" max="200" step="5" value="0"><input type="number" id="n_extraExp" value="0" min="0"></div>
+          <p class="note" style="margin-top:6px">旅行・趣味・臨時の出費など、毎月の支出とは別に毎年かかる分です。退職後の支出に年額で上乗せし、インフレ率で毎年増加させます。0のときは従来どおりの計算です。</p>
+        </div>
+      </div>
+
+      </div><!-- /detailPanel -->
       <button class="run" id="runBtn" type="button">シミュレーション実行</button>
       <p class="note">計算の前提：給与は退職まで横ばい、年金は金額固定（物価スライドなし）、貯金は年1％、支出はインフレ率で毎年増加。運用リターンは毎年、想定リターンとリスクから正規分布でランダムに発生させます。</p>
     </section>
 
     <!-- RESULTS -->
     <div class="results">
-      <section class="panel card">
-        <div class="bar-row"><h2>結果サマリー</h2><span class="hist-note" id="condSummary"></span></div>
-        <div class="kpis" style="margin-top:12px">
-          <div class="kpi hero"><div class="k" id="kpiSuccessLabel">資産が持つ確率</div><div class="v" id="kSuccess">—</div><div class="d" id="kSuccessD">—</div></div>
-          <div class="kpi"><div class="k">最終資産（中央値）</div><div class="v" id="kMedian">—</div><div class="d">半数のケースはこれ以上</div></div>
-          <div class="kpi"><div class="k">最終資産（平均値）</div><div class="v" id="kMean">—</div><div class="d">上振れに引っ張られ高め</div></div>
-          <div class="kpi"><div class="k">枯渇する年齢（中央値）</div><div class="v" id="kRuin">—</div><div class="d" id="kRuinD">—</div></div>
+      <section class="panel card lifespan" id="lifespanCard">
+        <h2>資産寿命の結果</h2>
+        <div class="life-grid">
+          <div class="gauge-wrap" aria-hidden="true">
+            <svg viewBox="0 0 200 120" role="img" aria-label="資産が持つ確率の円弧ゲージ">
+              <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--surface2)" stroke-width="16" stroke-linecap="round"/>
+              <path id="gaugeArc" d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--teal)" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251.3"/>
+            </svg>
+            <div class="gauge-center"><div class="gv" id="gaugeCenter">—</div><div class="gk">持つ確率</div></div>
+          </div>
+          <div>
+            <div class="life-prob-label" id="lifeProbLabel">資産が持つ確率</div>
+            <div class="life-prob" id="lifeProb">—</div>
+            <div class="life-median">最終資産の中央値 <span class="mv" id="lifeMedianVal">—</span></div>
+            <p class="life-note">数千通りの試算のうち、判定年齢まで資産が残った割合です。将来を保証するものではなく、条件を変えたときの変化を見るための目安です。</p>
+          </div>
         </div>
         <div class="verdict" id="verdict">条件を入力して「シミュレーション実行」を押してください。</div>
+      </section>
+
+      <section class="panel card" id="fanCard">
+        <h2>資産推移 — 数千通りの未来の幅</h2>
+        <p class="sub">濃い帯が「真ん中50％」、薄い帯が「真ん中80％」のケースが収まる範囲。線は中央値です。</p>
+        <div id="fanChart"></div>
+        <div class="legend">
+          <span><i style="background:var(--band90)"></i>10〜90パーセンタイル</span>
+          <span><i style="background:var(--band75)"></i>25〜75パーセンタイル</span>
+          <span><i style="background:var(--median)"></i>中央値</span>
+        </div>
+      </section>
+
+      <section class="panel card" id="summaryCard">
+        <div class="bar-row"><h2>詳細指標</h2><span class="hist-note" id="condSummary"></span></div>
+        <p class="sub" style="margin-top:6px">持つ確率と最終資産の中央値は上の「資産寿命の結果」にまとめています。ここでは内訳の指標だけを表示します。</p>
+        <div class="kpis" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="k">最終資産（平均値）</div><div class="v" style="font-size:20px" id="kMean">—</div><div class="d">上振れに引っ張られ高め</div></div>
+          <div class="kpi"><div class="k">10パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP10">—</div><div class="d">悪い相場が続いた場合の目安</div></div>
+          <div class="kpi"><div class="k">90パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP90">—</div><div class="d">相場に恵まれた場合の目安</div></div>
+        </div>
         <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
-          <div class="kpi"><div class="k">下位10％の最終資産</div><div class="v" style="font-size:20px" id="kP10">—</div><div class="d">悪い相場が続いた場合</div></div>
-          <div class="kpi"><div class="k">上位10％の最終資産</div><div class="v" style="font-size:20px" id="kP90">—</div><div class="d">相場に恵まれた場合</div></div>
-          <div class="kpi"><div class="k">元本総額（初期＋積立）</div><div class="v" style="font-size:20px" id="kPrincipal">—</div><div class="d" id="kLossD">—</div></div>
+          <div class="kpi"><div class="k">枯渇する年齢（中央値）</div><div class="v" style="font-size:20px" id="kRuin">—</div><div class="d" id="kRuinD">—</div></div>
+          <div class="kpi"><div class="k">元本総額（初期＋積立）</div><div class="v" style="font-size:20px" id="kPrincipal">—</div><div class="d">初期資産と現役時の積立の合計</div></div>
+          <div class="kpi"><div class="k">元本割れ確率</div><div class="v" style="font-size:20px" id="kLoss">—</div><div class="d">最終資産が元本を下回る確率</div></div>
         </div>
         <div class="share-box">
           <div class="privacy-row">
@@ -220,7 +346,12 @@ footer a{word-break:break-all}
             <button type="button" class="btn-save" id="saveImgBtn">結果を画像で保存する（PNG）</button>
             <a class="btn-x" id="shareXBtn" href="#" target="_blank" rel="noopener">Xで結果をポストする</a>
           </div>
-          <p class="share-note">画像はこの結果サマリーと資産推移の帯グラフを1枚（1200×630）にまとめたものです。上の設定は画像とXポストの両方に適用されます。Xのポスト画面は文章入りで開きます。画像は自動では添付されないので、先に保存した画像をポスト画面で添付してください。</p>
+          <p class="share-note">結果を1枚の画像（PNG）にまとめられます。Xでは画像は自動で付かないため、保存した画像をポスト画面で添付してください。</p>
+          <details class="share-help">
+            <summary>保存方法・うまくいかないとき</summary>
+            <p>画像は資産寿命の結果と資産推移の帯グラフを1枚（1200×630）にまとめたものです。上の年齢表示の設定は、画像とXポストの両方に適用されます。</p>
+            <p>自動ダウンロードが始まらない場合や、保存したファイルがHTML（.html）になってしまう場合は、生成後に表示される「このPNGをダウンロードする」ボタンを押すか、スマホではプレビュー画像を長押しして保存してください。「共有／保存先を選ぶ」が表示される環境では、そこから写真・ファイルへの保存も選べます。広告ブロック機能がダウンロードやポップアップを止めることがあるため、その場合はこのページで広告ブロックをオフにしてから、もう一度お試しください。Xのポスト画面が開かない場合も同様です。</p>
+          </details>
           <p class="share-status" id="shareStatus" aria-live="polite"></p>
           <div class="share-preview-wrap" id="sharePreviewWrap" hidden>
             <img class="share-preview" id="sharePreview" alt="シミュレーション結果をまとめた共有用画像のプレビュー">
@@ -228,19 +359,8 @@ footer a{word-break:break-all}
               <a class="btn-dl" id="downloadPngLink" href="#" download="simulation-result.png">このPNGをダウンロードする</a>
               <button type="button" class="btn-share-file" id="shareFileBtn" hidden>画像を共有／保存先を選ぶ</button>
             </div>
-            <p>↑ 生成された画像（PNG）です。自動ダウンロードが始まらない場合や、保存したファイルがHTML（.html）になってしまう場合は、上の「このPNGをダウンロードする」ボタンを押すか、スマホではこの画像を長押しして保存してください。「共有／保存先を選ぶ」が表示される環境では、そこから写真・ファイルへの保存も選べます。広告ブロック機能がダウンロードやポップアップを止めてファイルがHTMLになることがあるため、その場合はこのページで広告ブロックをオフにしてから、もう一度お試しください。</p>
+            <p>↑ 生成された画像（PNG）です。保存できない場合は上の「保存方法・うまくいかないとき」をご覧ください。</p>
           </div>
-        </div>
-      </section>
-
-      <section class="panel card">
-        <h2>資産推移 — 数千通りの未来の幅</h2>
-        <p class="sub">濃い帯が「真ん中50％」、薄い帯が「真ん中80％」のケースが収まる範囲。線は中央値です。</p>
-        <div id="fanChart"></div>
-        <div class="legend">
-          <span><i style="background:var(--band90)"></i>10〜90パーセンタイル</span>
-          <span><i style="background:var(--band75)"></i>25〜75パーセンタイル</span>
-          <span><i style="background:var(--median)"></i>中央値</span>
         </div>
       </section>
 
@@ -270,7 +390,7 @@ footer a{word-break:break-all}
         <h2>年ごとの内訳（中央値のケース）</h2>
         <p class="sub">各年齢で「真ん中だったケース」の貯金・運用資産・収支です。取り崩し元の元ページと同じ形式の表に、モンテカルロの中央値を入れています。</p>
         <div class="tablewrap"><table id="yearTable">
-          <thead><tr><th>年齢</th><th>年間支出</th><th>給与収入</th><th>年金収入</th><th>貯金額</th><th>運用資産</th><th>総資産</th><th>下位10％の総資産</th></tr></thead>
+          <thead><tr><th>年齢</th><th>年間支出</th><th>給与収入</th><th>年金収入</th><th>貯金額</th><th>運用資産</th><th>総資産</th><th>10パーセンタイルの総資産</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </section>
@@ -330,7 +450,7 @@ function setHideCurAgeShare(hide){
 }
 
 // ---- input binding (range <-> number) ----
-var pairs=[["curAge"],["retAge"],["penAge"],["endAge"],["salary"],["pension"],["contrib"],["invest"],["save"],["expW"],["expR"],["infl"],["ret"],["risk"]];
+var pairs=[["curAge"],["retAge"],["penAge"],["endAge"],["salary"],["pension"],["contrib"],["invest"],["save"],["expW"],["expR"],["infl"],["ret"],["risk"],["extraExp"]];
 var keys={curAge:"curAge",retAge:"retAge",penAge:"penAge",endAge:"endAge",salary:"salary",pension:"pension",contrib:"contrib",invest:"invest",save:"save",expW:"expW",expR:"expR",infl:"infl",ret:"ret",risk:"risk"};
 pairs.forEach(function(pr){
   var k=pr[0]; var r=$("r_"+k), n=$("n_"+k);
@@ -345,6 +465,7 @@ document.querySelectorAll(".preset").forEach(function(b){
     b.classList.add("active");
     $("n_ret").value=b.dataset.r; $("r_ret").value=b.dataset.r;
     $("n_risk").value=b.dataset.s; $("r_risk").value=b.dataset.s;
+    if(typeof syncStrategyFromDetail==="function") syncStrategyFromDetail();
     run();
   });
 });
@@ -355,6 +476,7 @@ function getInputs(){
     salary:num("n_salary"), pension:num("n_pension"), contrib:num("n_contrib"),
     invest:num("n_invest"), save:num("n_save"), expW:num("n_expW"), expR:num("n_expR"),
     infl:num("n_infl")/100, ret:num("n_ret")/100, risk:num("n_risk")/100,
+    extraExp:num("n_extraExp"), earlyMode:parseInt(($("n_earlyMode")||{}).value||"0",10)||0,
     sims:parseInt($("n_sims").value,10)||3000
   };
   if(o.endAge<=o.curAge) o.endAge=o.curAge+10;
@@ -372,14 +494,18 @@ function simulatePath(o, random){
     var age=o.curAge+t;
     rows.push({age:age, inv:inv, sav:sav, total:inv+sav, exp:0, sal:0, pen:0});
     if(t===years) break;
-    // returns for next year
-    var r = random ? (o.ret + o.risk*randn()) : o.ret;
+    // returns for next year (experiment A: adjust return during the first
+    // 10 years after retirement when earlyMode is on; 0 = unchanged)
+    var adj = (o.earlyMode && age>=o.retAge && age<o.retAge+10) ? o.earlyMode*0.02 : 0;
+    var r = random ? (o.ret + adj + o.risk*randn()) : (o.ret + adj);
     inv = inv*(1+r);
     sav = sav*1.01;
     var inflF=Math.pow(1+o.infl,t);
     var isWorking = age < o.retAge;
     var monthlyExp = isWorking ? o.expW : o.expR;
     var exp = monthlyExp*12*inflF;
+    // experiment B: extra annual spending after retirement (0 = unchanged)
+    if(!isWorking && o.extraExp) exp += o.extraExp*inflF;
     var sal = isWorking ? o.salary*12 : 0;
     var pen = age >= o.penAge ? o.pension : 0;
     var net = sal + pen - exp;
@@ -403,7 +529,7 @@ function buildVerdictText(o,success,medianF,fP10,fP90,medianRuin,ruinCount,princ
   var head="";
   if(success>=95){ head="非常に堅い計画です。"+endAge+"歳まで資産が持つ確率は "+success.toFixed(1)+"% と高く、悪い相場が続いても底をつきにくい水準です。"; }
   else if(success>=80){ head="かなり堅い計画です。"+endAge+"歳まで持つ確率は "+success.toFixed(1)+"% で、中央値でも "+fmtMan(medianF)+" が残ります。"; }
-  else if(success>=60){ head="おおむね持つ計画ですが、余裕は相場次第です。持つ確率は "+success.toFixed(1)+"% で、中央値では "+fmtMan(medianF)+" が残る一方、下位10％では "+fmtMan(fP10)+" まで下がります。"; }
+  else if(success>=60){ head="おおむね持つ計画ですが、余裕は相場次第です。持つ確率は "+success.toFixed(1)+"% で、中央値では "+fmtMan(medianF)+" が残る一方、10パーセンタイルでは "+fmtMan(fP10)+" まで下がります。"; }
   else if(success>=40){ head="五分五分に近い計画です。持つ確率は "+success.toFixed(1)+"% で、平均リターンどおりなら持っても、相場の順序が悪いと途中で尽きるケースが半数近くあります。"; }
   else if(success>=20){ head="厳しい計画です。持つ確率は "+success.toFixed(1)+"% にとどまり、資産が尽きるケースが多数派になっています。"; }
   else { head="この条件では、資産が尽きるケースが大半を占めます。持つ確率は "+success.toFixed(1)+"% で、今の収入と支出のバランスのままでは長生きした場合に備えきれません。"; }
@@ -431,16 +557,16 @@ function buildVerdictText(o,success,medianF,fP10,fP90,medianRuin,ruinCount,princ
   } else if(medianRuin){
     tail="枯渇するケースの年齢の中央値は "+Math.round(medianRuin)+"歳と早く、退職後のかなり早い段階で不足するリスクがあります。まず退職後の月支出、退職年齢、積立額の3つを動かして、改善幅を確認してください。";
   } else {
-    tail="下位10％は "+fmtMan(fP10)+" です。退職年齢・積立・退職後支出のいずれかを少し動かして、確率の変化を見てください。";
+    tail="10パーセンタイル値は "+fmtMan(fP10)+" です。退職年齢・積立・退職後支出のいずれかを少し動かして、確率の変化を見てください。";
   }
   if(success>=80 && ruinCount>0 && fP10<=0){
-    tail+=" なお下位10％では資産が尽きているため、堅い計画でも最悪のケースへの備えは切り分けて考えてください。";
+    tail+=" なお10パーセンタイルでは資産が尽きているため、堅い計画でも最悪のケースへの備えは切り分けて考えてください。";
   } else if(success>=60 && success<80 && fP10>0){
-    tail+=" 下位10％でも "+fmtMan(fP10)+" が残る点は、安心材料の一つです。";
+    tail+=" 10パーセンタイルでも "+fmtMan(fP10)+" が残る点は、安心材料の一つです。";
   } else if(success<40 && belowPrincipal>=80){
     tail+=" 最終資産が元本を下回る確率は "+belowPrincipal.toFixed(1)+"% と高く、運用の上振れに頼る形になっています。";
   } else if(success>=95 && fP90>=medianF*2 && medianF>0){
-    tail+=" 上位10％では "+fmtMan(fP90)+" まで伸びるため、結果の幅自体は大きい点も知っておいてください。";
+    tail+=" 90パーセンタイルでは "+fmtMan(fP90)+" まで伸びるため、結果の幅自体は大きい点も知っておいてください。";
   }
   return head+body+tail;
 }
@@ -480,18 +606,21 @@ function run(){
   var principal=o.invest+o.save+o.contrib*12*workYears;
   var belowPrincipal = finals.filter(function(v){return v<principal;}).length/N*100;
 
-  // KPIs
-  $("kpiSuccessLabel").textContent=o.endAge+"歳まで資産が持つ確率";
-  $("kSuccess").textContent=success.toFixed(1)+"%";
-  $("kSuccessD").textContent=N.toLocaleString()+"通り中 "+(N-ruinCount).toLocaleString()+"通りで残存";
-  $("kMedian").textContent=fmtMan(medianF);
+  // KPIs (詳細指標のみ。持つ確率と最終資産の中央値は資産寿命カードに一本化)
   $("kMean").textContent=fmtMan(mean);
   $("kRuin").textContent= medianRuin? Math.round(medianRuin)+"歳":"枯渇なし";
   $("kRuinD").textContent= ruinCount? ("枯渇したケースは "+(ruinCount/N*100).toFixed(1)+"%") : "全ケースで判定年齢まで残存";
   $("kP10").textContent=fmtMan(fP10);
   $("kP90").textContent=fmtMan(fP90);
   $("kPrincipal").textContent=fmtMan(principal);
-  $("kLossD").textContent="最終資産が元本を下回る確率 "+belowPrincipal.toFixed(1)+"%";
+  $("kLoss").textContent=belowPrincipal.toFixed(1)+"%";
+  // lifespan hero (gauge + headline probability + median)
+  var lpEl=$("lifeProb"); if(lpEl) lpEl.textContent=success.toFixed(1)+"%";
+  var llEl=$("lifeProbLabel"); if(llEl) llEl.textContent=o.endAge+"歳まで資産が持つ確率";
+  var lmEl=$("lifeMedianVal"); if(lmEl) lmEl.textContent=fmtMan(medianF);
+  var gcEl=$("gaugeCenter"); if(gcEl) gcEl.textContent=success.toFixed(1)+"%";
+  var gaEl=$("gaugeArc"); if(gaEl){ var GL=251.3; gaEl.setAttribute("stroke-dasharray",(success/100*GL).toFixed(1)+" "+GL); gaEl.setAttribute("stroke", success>=60 ? "#0f766e" : (success>=40 ? "#b45309" : "#b91c1c")); }
+  refreshHiddenCond(o);
   $("condSummary").textContent=o.curAge+"歳 → "+o.endAge+"歳 ／ 退職"+o.retAge+"歳 ／ リターン"+(o.ret*100).toFixed(1)+"%・リスク"+(o.risk*100).toFixed(1)+"%";
   $("histSub").textContent=o.endAge+"歳時点の資産額のばらつき（"+N.toLocaleString()+"通り）";
 
@@ -618,8 +747,8 @@ function drawShareCanvas(r){
   var stats=[
     ["最終資産（中央値）",fmtMan(r.medianF)],
     ["最終資産（平均値）",fmtMan(r.mean)],
-    ["下位10%（悪い相場）",fmtMan(r.fP10)],
-    ["上位10%（良い相場）",fmtMan(r.fP90)]
+    ["10パーセンタイル（悪い相場）",fmtMan(r.fP10)],
+    ["90パーセンタイル（良い相場）",fmtMan(r.fP90)]
   ];
   stats.forEach(function(s,i){
     var col=i%2, rowI=Math.floor(i/2);
@@ -713,7 +842,7 @@ function saveResultImage(){
     sfb.hidden=!canShareFile;
     // Kick off the download from the real link, still within this tap.
     dl.click();
-    if(status) status.textContent="画像（PNG）を生成し、ダウンロードを開始しました。始まらない場合やファイルがHTMLになる場合は、プレビュー下の「このPNGをダウンロードする」ボタン、共有ボタン、またはプレビュー画像の長押しで保存してください。";
+    if(status) status.textContent="画像（PNG）を生成し、ダウンロードを開始しました。始まらない場合は「保存方法・うまくいかないとき」をご覧ください。";
   }catch(e){
     if(status) status.textContent="画像の生成に失敗しました。もう一度「シミュレーション実行」を押してからお試しください。";
   }
@@ -740,6 +869,154 @@ var saveBtn=$("saveImgBtn"); if(saveBtn) saveBtn.addEventListener("click",saveRe
 var xBtn=$("shareXBtn"); if(xBtn) xBtn.addEventListener("click",shareToX);
 var fileBtn=$("shareFileBtn"); if(fileBtn) fileBtn.addEventListener("click",shareResultFile);
 
+// ---- simple / detail modes (values stay in sync via the detail inputs) ----
+function refreshHiddenCond(o){
+  var el=$("hiddenCondList"); if(!el) return;
+  o=o||getInputs();
+  var items=[
+    "現在の金融資産：運用 "+Math.round(o.invest).toLocaleString("ja-JP")+"万円 ＋ 貯金 "+Math.round(o.save).toLocaleString("ja-JP")+"万円",
+    "年金：年 "+Math.round(o.pension).toLocaleString("ja-JP")+"万円（"+o.penAge+"歳から）",
+    "何歳まで持たせたいか："+o.endAge+"歳",
+    "退職後の月間支出："+o.expR+"万円",
+    "想定リターン "+(o.ret*100).toFixed(1)+"% ／ リスク "+(o.risk*100).toFixed(1)+"% ／ インフレ率 "+(o.infl*100).toFixed(1)+"%",
+    "試行回数："+o.sims.toLocaleString("ja-JP")+"回"
+  ];
+  if(o.extraExp) items.push("老後の追加支出：年 "+Math.round(o.extraExp).toLocaleString("ja-JP")+"万円");
+  if(o.earlyMode) items.push("退職後の最初の10年：リターンを"+(o.earlyMode>0?"+2":"−2")+"％で試算中");
+  el.innerHTML=items.map(function(t){return "<li>"+t+"</li>";}).join("");
+}
+function setDetailValue(key,val){
+  var n=$("n_"+key), r=$("r_"+key);
+  if(n) n.value=val;
+  if(r) r.value=val;
+}
+var simpleMap={s_curAge:"curAge",s_retAge:"retAge",s_salary:"salary",s_exp:"expW",s_contrib:"contrib",s_invest:"invest",s_save:"save"};
+var detailToSimple={curAge:"s_curAge",retAge:"s_retAge",salary:"s_salary",expW:"s_exp",contrib:"s_contrib",invest:"s_invest",save:"s_save"};
+// Simple-mode investment policy: three named strategies writing through
+// to the detail return/risk inputs (the single source of truth).
+var strategies={
+  cons:{r:1,s:2,label:"保守：想定リターン 1.0％／リスク 2％"},
+  bal:{r:3.5,s:10,label:"バランス：想定リターン 3.5％／リスク 10％"},
+  oru:{r:5.5,s:17,label:"オルカン（全世界株）：想定リターン 5.5％／リスク 17％"}
+};
+function markStrategy(key){
+  document.querySelectorAll(".strat-btn").forEach(function(b){
+    var on=b.dataset.strat===key;
+    b.classList.toggle("active",on);
+    b.setAttribute("aria-pressed",on?"true":"false");
+  });
+  var d=$("s_stratDesc");
+  if(d){
+    if(key&&strategies[key]) d.textContent=strategies[key].label;
+    else { var o=getInputs(); d.textContent="カスタム設定（詳細設定の値）：想定リターン "+(o.ret*100).toFixed(1)+"％／リスク "+(o.risk*100).toFixed(1)+"％"; }
+  }
+}
+function applyStrategy(key){
+  var st=strategies[key]; if(!st) return;
+  setDetailValue("ret",st.r);
+  setDetailValue("risk",st.s);
+  markStrategy(key);
+}
+function syncStrategyFromDetail(){
+  var o=getInputs();
+  var r=o.ret*100, s=o.risk*100, found=null;
+  Object.keys(strategies).forEach(function(k){
+    if(Math.abs(strategies[k].r-r)<0.001&&Math.abs(strategies[k].s-s)<0.001) found=k;
+  });
+  markStrategy(found);
+}
+document.querySelectorAll(".strat-btn").forEach(function(b){
+  b.addEventListener("click",function(){ applyStrategy(b.dataset.strat); run(); });
+});
+["n_ret","r_ret","n_risk","r_risk"].forEach(function(id){
+  var el=$(id); if(el) el.addEventListener("input",syncStrategyFromDetail);
+});
+// The detail inputs (n_*) are the single source of truth: getInputs()
+// reads only them, in both modes. The simple inputs are a view onto the
+// same values — every edit in either mode writes through to the other,
+// so the calculation can never depend on which mode is showing.
+function syncSimpleFromDetail(){
+  Object.keys(detailToSimple).forEach(function(k){
+    var n=$("n_"+k), s=$(detailToSimple[k]);
+    if(n&&s) s.value=n.value;
+  });
+}
+function syncDetailFromSimple(){
+  Object.keys(simpleMap).forEach(function(sid){
+    var el=$(sid); if(!el) return;
+    setDetailValue(simpleMap[sid], el.value);
+    // Simple mode has one spending field, defined as applying to both
+    // working and retired life, so it always writes both detail fields.
+    if(sid==="s_exp") setDetailValue("expR", el.value);
+  });
+}
+Object.keys(simpleMap).forEach(function(sid){
+  var el=$(sid); if(!el) return;
+  el.addEventListener("input",function(){
+    setDetailValue(simpleMap[sid], el.value);
+    if(sid==="s_exp") setDetailValue("expR", el.value);
+  });
+});
+// Listen to BOTH the number box and the slider of each shared detail
+// field. Moving a slider only rewrites the number box's value property,
+// which fires no "input" event on the box itself — listening to the box
+// alone left the simple inputs stale, so the displayed simple values
+// and the values actually calculated could disagree.
+Object.keys(detailToSimple).forEach(function(k){
+  ["n_","r_"].forEach(function(prefix){
+    var d=$(prefix+k);
+    if(d) d.addEventListener("input",syncSimpleFromDetail);
+  });
+});
+function setMode(simple){
+  var before=JSON.stringify(getInputs());
+  if(simple){
+    // Pull the latest detail values into the simple view first, then
+    // unify spending: detail mode may hold a separate retired spending,
+    // which simple mode cannot represent. Align it to the simple
+    // spending (the working-life value) so the conditions the user sees
+    // in simple mode are exactly the conditions calculated with.
+    syncSimpleFromDetail();
+    var se=$("s_exp"); if(se) setDetailValue("expR", se.value);
+  } else {
+    // Push the simple values through once more before showing detail,
+    // so the detail form opens on exactly the conditions just used.
+    syncDetailFromSimple();
+    syncSimpleFromDetail();
+  }
+  var sp=$("simplePanel"), dp=$("detailPanel");
+  if(sp) sp.hidden=!simple;
+  if(dp) dp.hidden=simple;
+  var bs=$("modeSimpleBtn"), bd=$("modeDetailBtn");
+  if(bs){ bs.classList.toggle("active",simple); bs.setAttribute("aria-pressed",simple?"true":"false"); }
+  if(bd){ bd.classList.toggle("active",!simple); bd.setAttribute("aria-pressed",simple?"false":"true"); }
+  refreshHiddenCond();
+  // Re-run only when the sync actually changed an input (the spending
+  // unification). Switching modes with unchanged conditions keeps the
+  // existing result untouched, instead of redrawing the Monte Carlo
+  // samples and shifting the percentages for no reason.
+  if(JSON.stringify(getInputs())!==before) run();
+}
+var msb=$("modeSimpleBtn"); if(msb) msb.addEventListener("click",function(){ setMode(true); });
+var mdb=$("modeDetailBtn"); if(mdb) mdb.addEventListener("click",function(){ setMode(false); });
+document.querySelectorAll(".age-preset").forEach(function(b){
+  b.addEventListener("click",function(){
+    document.querySelectorAll(".age-preset").forEach(function(x){x.classList.remove("active");});
+    b.classList.add("active");
+    var vals={s_curAge:b.dataset.cur,s_retAge:b.dataset.ret,s_salary:b.dataset.sal,s_exp:b.dataset.exp,s_contrib:b.dataset.con,s_invest:b.dataset.inv,s_save:b.dataset.save};
+    Object.keys(vals).forEach(function(sid){
+      var el=$(sid); if(el) el.value=vals[sid];
+      setDetailValue(simpleMap[sid], vals[sid]);
+      if(sid==="s_exp") setDetailValue("expR", vals[sid]);
+    });
+    // Age presets also carry a (slightly different) investment policy:
+    // younger examples stay with Orukan, 40s balance, 50s conservative.
+    if(b.dataset.strat) applyStrategy(b.dataset.strat);
+    run();
+  });
+});
+var emSel=$("n_earlyMode"); if(emSel) emSel.addEventListener("change",run);
+
 $("runBtn").addEventListener("click",run);
 // live re-run on select change (light), and debounce number changes
 $("n_sims").addEventListener("change",run);
@@ -747,6 +1024,12 @@ var deb=null;
 document.querySelectorAll(".controls input").forEach(function(el){
   el.addEventListener("change",function(){ clearTimeout(deb); deb=setTimeout(run,250); });
 });
+// The page opens in simple mode, so align the detail inputs (the source
+// of truth) with the simple values before the first calculation —
+// including retired spending, which otherwise kept its separate detail
+// default (24) while simple mode displayed a single spending of 28.
+syncDetailFromSimple();
+syncStrategyFromDetail();
 run();
 })();
 </script>
