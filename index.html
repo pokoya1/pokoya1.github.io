@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#17394d" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0f171c" media="(prefers-color-scheme: dark)" />
+<meta name="description" content="現役時代の給与・積立から退職後の年金・取り崩しまでを一続きで計算し、市場変動を加えて数千通りの未来を試す融合シミュレーターです。" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="資産シミュレーション" />
+<title>資産取り崩し・モンテカルロ シミュレーション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Serif+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface2:#eef2f4; --ink:#16232b; --muted:#5b6b74; --line:#dde3e7;
+  --navy:#17394d; --teal:#0f766e; --teal2:#ccfbf1; --amber:#b45309; --red:#b91c1c; --green:#15803d;
+  --band90:#dbeafe; --band75:#93c5fd; --median:#0f766e;
+  --shadow:0 8px 30px rgba(23,57,77,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f171c; --surface:#18242c; --surface2:#202f39; --ink:#e7eef2; --muted:#a9bac2; --line:#2c3f4a; --navy:#dbeafe; --teal:#2dd4bf; --teal2:#134e4a; --band90:#1e3a4a; --band75:#2b5a72; --median:#2dd4bf; --shadow:0 8px 30px rgba(0,0,0,.35); }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans JP",system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;line-height:1.65}
+button,[role="button"],select,input:not([type="checkbox"]){min-height:40px}
+a{color:var(--teal)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 56px}
+.top{padding:22px 0 6px}
+.top h1{font-family:"Noto Serif JP",serif;font-size:clamp(26px,4.4vw,40px);line-height:1.25;margin:0 0 8px;font-weight:900;letter-spacing:.01em}
+.top p{margin:0;color:var(--muted);max-width:760px;font-size:15px}
+.fusion{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700}
+.chip span{color:var(--teal)}
+.layout{display:grid;grid-template-columns:380px 1fr;gap:18px;margin-top:20px;align-items:start}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.controls{padding:18px;position:sticky;top:14px}
+@media(max-width:900px){.controls{position:static}}
+.controls h2,.results h2{font-size:17px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.group{border-top:1px solid var(--line);padding:14px 0 4px}
+.group:first-of-type{border-top:none;padding-top:4px}
+.group h3{font-size:13px;letter-spacing:.06em;color:var(--teal);margin:0 0 10px;font-weight:900}
+.field{margin-bottom:12px}
+.field label{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;font-weight:700;margin-bottom:5px}
+.field label .unit{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+.row{display:flex;gap:8px;align-items:center}
+.row input[type=number]{width:104px;flex:0 0 104px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:16px;font-weight:700;text-align:right}
+.row input[type=range]{flex:1;accent-color:var(--teal);min-height:36px}
+.presets{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0 10px}
+.preset{border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:999px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer;min-height:38px}
+.preset.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media(prefers-color-scheme:dark){.preset.active{background:var(--teal);color:#042f2e;border-color:var(--teal)}}
+.run{width:100%;background:var(--teal);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:900;cursor:pointer;margin-top:8px}
+.run:active{transform:translateY(1px)}
+.note{font-size:12px;color:var(--muted);margin-top:10px}
+.results{display:flex;flex-direction:column;gap:18px;min-width:0}
+.card{padding:18px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:var(--surface2);border-radius:12px;padding:13px 12px}
+.kpi .k{font-size:12px;color:var(--muted);font-weight:700}
+.kpi .v{font-size:clamp(20px,3vw,28px);font-weight:900;line-height:1.2;margin-top:2px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi.hero{background:var(--navy);color:#fff}
+.kpi.hero .k,.kpi.hero .d{color:rgba(255,255,255,.75)}
+@media(prefers-color-scheme:dark){.kpi.hero{background:#0f766e;color:#fff}}
+.verdict{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f0fdf9;border:1px solid #99f6e4;color:#134e4a;font-size:14px}
+@media(prefers-color-scheme:dark){.verdict{background:#0b2e2a;color:#ccfbf1;border-color:#115e59}}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
+th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{background:var(--surface2);font-size:12px}
+th:first-child,td:first-child{text-align:left;font-weight:700}
+tr.ruined td{color:var(--red)}
+.details{font-size:14px}
+.details h3{margin:16px 0 6px;font-size:15px}
+.details p,.details li{color:var(--muted)}
+.details ul{padding-left:20px;margin:6px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-weight:700}
+.hist-note{font-size:12.5px;color:var(--muted)}
+footer{margin-top:20px;color:var(--muted);font-size:12.5px}
+footer a{word-break:break-all}
+.bar-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.share-box{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+.share-actions{display:flex;flex-wrap:wrap;gap:10px}
+.btn-save{flex:1 1 200px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:12px 14px;font-size:14.5px;font-weight:900;cursor:pointer}
+@media(prefers-color-scheme:dark){.btn-save{background:#e7eef2;color:#0f171c}}
+.btn-x{flex:1 1 200px;background:#000;color:#fff;border:1px solid #000;border-radius:10px;padding:12px 14px;font-size:14.5px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;text-align:center}
+@media(prefers-color-scheme:dark){.btn-x{border-color:#3f4a52}}
+.btn-save:active,.btn-x:active{transform:translateY(1px)}
+.export-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.btn-dl{flex:1 1 200px;background:var(--teal);color:#fff;border-radius:10px;padding:12px 14px;font-size:14.5px;font-weight:900;display:flex;align-items:center;justify-content:center;text-decoration:none;text-align:center}
+.btn-share-file{flex:1 1 200px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14.5px;font-weight:900;cursor:pointer}
+.btn-dl:active,.btn-share-file:active{transform:translateY(1px)}
+.share-note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.share-preview-wrap{margin-top:12px}
+.share-preview-wrap p{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.share-preview{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:12px;background:#fff}
+.share-status{font-size:13px;font-weight:700;color:var(--teal);margin:8px 0 0;min-height:1.4em}
+.privacy-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:12px}
+.privacy-label{font-size:13.5px;font-weight:900}
+.privacy-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px}
+.privacy-btn{border:none;background:transparent;color:var(--muted);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:900;cursor:pointer;min-height:36px}
+.privacy-btn.active{background:var(--navy);color:#fff}
+@media(prefers-color-scheme:dark){.privacy-btn.active{background:var(--teal);color:#042f2e}}
+.privacy-note{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.privacy-note strong{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>資産は、何歳まで持つのか。<br>確率で確かめる。</h1>
+    <p>現役時代の給与・積立から、退職後の年金・取り崩しまでを一続きで計算し、さらに市場変動を加えて数千通りの未来を試す融合シミュレーターです。「平均どおりなら持つ」ではなく、「悪い相場が来ても持つ確率は何％か」まで分かります。</p>
+    <div class="fusion">
+      <span class="chip"><span>●</span> 資産取り崩し計算（年齢・給与・年金・支出）</span>
+      <span class="chip"><span>●</span> モンテカルロ法（リターンとリスクで数千回試行）</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- CONTROLS -->
+    <section class="panel controls" aria-label="条件入力">
+      <h2>条件を入力する</h2>
+      <p class="sub">金額はすべて「万円」単位です。スライダーでも数字でも変更できます。</p>
+
+      <div class="group">
+        <h3>ライフプラン</h3>
+        <div class="field"><label>現在の年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_curAge" min="20" max="80" value="40"><input type="number" id="n_curAge" value="40" min="20" max="80"></div></div>
+        <div class="field"><label>退職予定年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_retAge" min="50" max="80" value="65"><input type="number" id="n_retAge" value="65" min="50" max="80"></div></div>
+        <div class="field"><label>年金受給開始年齢 <span class="unit">歳</span></label><div class="row"><input type="range" id="r_penAge" min="60" max="75" value="65"><input type="number" id="n_penAge" value="65" min="60" max="75"></div></div>
+        <div class="field"><label>何歳まで持たせたいか <span class="unit">歳（判定年齢）</span></label><div class="row"><input type="range" id="r_endAge" min="80" max="105" value="95"><input type="number" id="n_endAge" value="95" min="80" max="105"></div></div>
+      </div>
+
+      <div class="group">
+        <h3>収入・年金</h3>
+        <div class="field"><label>給与（手取り月額） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_salary" min="0" max="100" value="35"><input type="number" id="n_salary" value="35" min="0"></div></div>
+        <div class="field"><label>年金支給額（年額） <span class="unit">万円／年</span></label><div class="row"><input type="range" id="r_pension" min="0" max="400" value="180"><input type="number" id="n_pension" value="180" min="0"></div></div>
+        <div class="field"><label>毎月の積立額（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_contrib" min="0" max="30" value="5"><input type="number" id="n_contrib" value="5" min="0"></div></div>
+      </div>
+
+      <div class="group">
+        <h3>いまの資産</h3>
+        <div class="field"><label>運用資産 <span class="unit">万円</span></label><div class="row"><input type="range" id="r_invest" min="0" max="10000" step="50" value="800"><input type="number" id="n_invest" value="800" min="0"></div></div>
+        <div class="field"><label>貯金額 <span class="unit">万円・年1％で計算</span></label><div class="row"><input type="range" id="r_save" min="0" max="5000" step="50" value="400"><input type="number" id="n_save" value="400" min="0"></div></div>
+      </div>
+
+      <div class="group">
+        <h3>支出</h3>
+        <div class="field"><label>月間支出（現役時） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expW" min="0" max="80" value="28"><input type="number" id="n_expW" value="28" min="0"></div></div>
+        <div class="field"><label>月間支出（退職後） <span class="unit">万円／月</span></label><div class="row"><input type="range" id="r_expR" min="0" max="80" value="24"><input type="number" id="n_expR" value="24" min="0"></div></div>
+        <div class="field"><label>インフレ率 <span class="unit">％／年</span></label><div class="row"><input type="range" id="r_infl" min="0" max="5" step="0.1" value="1"><input type="number" id="n_infl" value="1" min="0" step="0.1"></div></div>
+      </div>
+
+      <div class="group">
+        <h3>運用方針</h3>
+        <div class="presets" id="presets">
+          <button type="button" class="preset" data-r="1" data-s="2">保守的</button>
+          <button type="button" class="preset" data-r="3.5" data-s="10">バランス</button>
+          <button type="button" class="preset active" data-r="5.5" data-s="17">オルカン（全世界株）</button>
+          <button type="button" class="preset" data-r="6.5" data-s="18">S&amp;P500</button>
+          <button type="button" class="preset" data-r="7" data-s="21">積極的</button>
+        </div>
+        <div class="field"><label>想定リターン <span class="unit">％／年</span></label><div class="row"><input type="range" id="r_ret" min="-2" max="12" step="0.1" value="5.5"><input type="number" id="n_ret" value="5.5" step="0.1"></div></div>
+        <div class="field"><label>リスク（標準偏差） <span class="unit">％</span></label><div class="row"><input type="range" id="r_risk" min="0" max="30" step="0.5" value="17"><input type="number" id="n_risk" value="17" step="0.5" min="0"></div></div>
+        <div class="field"><label>試行回数</label>
+          <select id="n_sims" style="width:100%">
+            <option value="1000">1,000回（速い）</option>
+            <option value="3000" selected>3,000回（標準）</option>
+            <option value="5000">5,000回</option>
+            <option value="10000">10,000回（精密・少し時間がかかります）</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="run" id="runBtn" type="button">シミュレーション実行</button>
+      <p class="note">計算の前提：給与は退職まで横ばい、年金は金額固定（物価スライドなし）、貯金は年1％、支出はインフレ率で毎年増加。運用リターンは毎年、想定リターンとリスクから正規分布でランダムに発生させます。</p>
+    </section>
+
+    <!-- RESULTS -->
+    <div class="results">
+      <section class="panel card">
+        <div class="bar-row"><h2>結果サマリー</h2><span class="hist-note" id="condSummary"></span></div>
+        <div class="kpis" style="margin-top:12px">
+          <div class="kpi hero"><div class="k" id="kpiSuccessLabel">資産が持つ確率</div><div class="v" id="kSuccess">—</div><div class="d" id="kSuccessD">—</div></div>
+          <div class="kpi"><div class="k">最終資産（中央値）</div><div class="v" id="kMedian">—</div><div class="d">半数のケースはこれ以上</div></div>
+          <div class="kpi"><div class="k">最終資産（平均値）</div><div class="v" id="kMean">—</div><div class="d">上振れに引っ張られ高め</div></div>
+          <div class="kpi"><div class="k">枯渇する年齢（中央値）</div><div class="v" id="kRuin">—</div><div class="d" id="kRuinD">—</div></div>
+        </div>
+        <div class="verdict" id="verdict">条件を入力して「シミュレーション実行」を押してください。</div>
+        <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="k">下位10％の最終資産</div><div class="v" style="font-size:20px" id="kP10">—</div><div class="d">悪い相場が続いた場合</div></div>
+          <div class="kpi"><div class="k">上位10％の最終資産</div><div class="v" style="font-size:20px" id="kP90">—</div><div class="d">相場に恵まれた場合</div></div>
+          <div class="kpi"><div class="k">元本総額（初期＋積立）</div><div class="v" style="font-size:20px" id="kPrincipal">—</div><div class="d" id="kLossD">—</div></div>
+        </div>
+        <div class="share-box">
+          <div class="privacy-row">
+            <span class="privacy-label" id="privacyLabel">共有するときの現在の年齢</span>
+            <div class="privacy-toggle" role="group" aria-labelledby="privacyLabel">
+              <button type="button" class="privacy-btn" id="ageShowBtn" aria-pressed="false">現在の年齢を出す</button>
+              <button type="button" class="privacy-btn active" id="ageHideBtn" aria-pressed="true">現在の年齢を隠す</button>
+            </div>
+          </div>
+          <p class="privacy-note" id="privacyNote">現在は <strong>現在の年齢を隠す</strong> 設定です。共有用画像とXポストには現在の年齢を出さず、画像のグラフの始点は「現在」と表示します。退職予定年齢・年金受給開始年齢・判定年齢（何歳まで持たせたいか）は、これまでどおり含めます。このページ上での計算と表示は、年齢で計算します。</p>
+          <div class="share-actions">
+            <button type="button" class="btn-save" id="saveImgBtn">結果を画像で保存する（PNG）</button>
+            <a class="btn-x" id="shareXBtn" href="#" target="_blank" rel="noopener">Xで結果をポストする</a>
+          </div>
+          <p class="share-note">画像はこの結果サマリーと資産推移の帯グラフを1枚（1200×630）にまとめたものです。上の設定は画像とXポストの両方に適用されます。Xのポスト画面は文章入りで開きます。画像は自動では添付されないので、先に保存した画像をポスト画面で添付してください。</p>
+          <p class="share-status" id="shareStatus" aria-live="polite"></p>
+          <div class="share-preview-wrap" id="sharePreviewWrap" hidden>
+            <img class="share-preview" id="sharePreview" alt="シミュレーション結果をまとめた共有用画像のプレビュー">
+            <div class="export-actions">
+              <a class="btn-dl" id="downloadPngLink" href="#" download="simulation-result.png">このPNGをダウンロードする</a>
+              <button type="button" class="btn-share-file" id="shareFileBtn" hidden>画像を共有／保存先を選ぶ</button>
+            </div>
+            <p>↑ 生成された画像（PNG）です。自動ダウンロードが始まらない場合や、保存したファイルがHTML（.html）になってしまう場合は、上の「このPNGをダウンロードする」ボタンを押すか、スマホではこの画像を長押しして保存してください。「共有／保存先を選ぶ」が表示される環境では、そこから写真・ファイルへの保存も選べます。広告ブロック機能がダウンロードやポップアップを止めてファイルがHTMLになることがあるため、その場合はこのページで広告ブロックをオフにしてから、もう一度お試しください。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <h2>資産推移 — 数千通りの未来の幅</h2>
+        <p class="sub">濃い帯が「真ん中50％」、薄い帯が「真ん中80％」のケースが収まる範囲。線は中央値です。</p>
+        <div id="fanChart"></div>
+        <div class="legend">
+          <span><i style="background:var(--band90)"></i>10〜90パーセンタイル</span>
+          <span><i style="background:var(--band75)"></i>25〜75パーセンタイル</span>
+          <span><i style="background:var(--median)"></i>中央値</span>
+        </div>
+      </section>
+
+      <div class="grid2">
+        <section class="panel card">
+          <h2>最終資産の分布</h2>
+          <p class="sub" id="histSub">判定年齢時点の資産額のばらつき</p>
+          <div id="histChart"></div>
+          <p class="hist-note">左端の赤い棒は、判定年齢までに資産が尽きたケースです。山が右にあるほど、余裕のある結果が多いことを示します。</p>
+        </section>
+        <section class="panel card details">
+          <h2 style="margin-bottom:2px">結果の読み方</h2>
+          <h3>まず見るのは「持つ確率」</h3>
+          <p>判定年齢まで資産が残る確率です。80％以上なら比較的堅く、50％前後なら支出・積立・退職年齢のどれかを動かして感度を見てください。</p>
+          <h3>中央値と平均値の違い</h3>
+          <p>平均値は一部の大成功ケースに引っ張られます。現実的な目安は中央値（真ん中のケース）です。</p>
+          <h3>試しに変えてみると効果的な条件</h3>
+          <ul>
+            <li>退職年齢を＋2歳／積立を＋1万円</li>
+            <li>退職後の支出を−2万円</li>
+            <li>リスクだけを上げても確率は改善しにくい点に注意</li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="panel card">
+        <h2>年ごとの内訳（中央値のケース）</h2>
+        <p class="sub">各年齢で「真ん中だったケース」の貯金・運用資産・収支です。取り崩し元の元ページと同じ形式の表に、モンテカルロの中央値を入れています。</p>
+        <div class="tablewrap"><table id="yearTable">
+          <thead><tr><th>年齢</th><th>年間支出</th><th>給与収入</th><th>年金収入</th><th>貯金額</th><th>運用資産</th><th>総資産</th><th>下位10％の総資産</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </section>
+
+      <footer>
+        <p>※ 本シミュレーションは確率的な計算に基づく目安であり、将来の運用成果や生活の持続を保証するものではありません。税金・社会保険料の変動、介護・医療費、住宅費の大きな支出などは含んでいません。</p>
+        <p>融合元のページ：資産取り崩しシミュレーション（<a href="https://kabulife21.com/%e8%b3%87%e7%94%a3%e5%8f%96%e3%82%8a%e5%b4%a9%e3%81%97%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）／ モンテカルロシミュレーション（<a href="https://kabulife21.com/%e3%83%a2%e3%83%b3%e3%83%86%e3%82%ab%e3%83%ab%e3%83%ad%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）。プリセットのリターン／リスクは過去データに基づく一般的な概算値です。</p>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+// ---- helpers ----
+function $(id){return document.getElementById(id);}
+function fmtMan(v){ // 万円 -> 表示
+  if(!isFinite(v)) return "—";
+  if(v<=0) return "0円";
+  if(v>=10000){ var oku=v/10000; return (oku>=10?oku.toFixed(1):oku.toFixed(2)).replace(/\.?0+$/,'')+"億円"; }
+  return Math.round(v).toLocaleString("ja-JP")+"万円";
+}
+function fmtManShort(v){ if(v>=10000) return (v/10000).toFixed(1)+"億"; return Math.round(v).toLocaleString("ja-JP")+"万"; }
+var spare=null;
+function randn(){
+  if(spare!==null){var v=spare;spare=null;return v;}
+  var u=0,v2=0,s=0;
+  do{u=Math.random()*2-1;v2=Math.random()*2-1;s=u*u+v2*v2;}while(s>=1||s===0);
+  var m=Math.sqrt(-2*Math.log(s)/s);
+  spare=v2*m;
+  return u*m;
+}
+function percentile(sorted,p){ if(!sorted.length) return 0; var i=(sorted.length-1)*p; var lo=Math.floor(i),hi=Math.ceil(i); if(lo===hi) return sorted[lo]; return sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo); }
+var lastResult=null;
+var hideCurAgeShare=true;
+var lastImageUrl=null, lastImageFile=null, lastImageName="simulation-result.png";
+function refreshShareLink(){
+  var xl=$("shareXBtn");
+  if(xl && lastResult) xl.href="https://twitter.com/intent/tweet?text="+encodeURIComponent(buildShareText(lastResult));
+}
+function setHideCurAgeShare(hide){
+  hideCurAgeShare=!!hide;
+  var showBtn=$("ageShowBtn"), hideBtn=$("ageHideBtn"), note=$("privacyNote");
+  if(showBtn){ showBtn.classList.toggle("active",!hideCurAgeShare); showBtn.setAttribute("aria-pressed", hideCurAgeShare?"false":"true"); }
+  if(hideBtn){ hideBtn.classList.toggle("active",hideCurAgeShare); hideBtn.setAttribute("aria-pressed", hideCurAgeShare?"true":"false"); }
+  if(note){
+    if(hideCurAgeShare) note.innerHTML="現在は <strong>現在の年齢を隠す</strong> 設定です。共有用画像とXポストには現在の年齢を出さず、画像のグラフの始点は「現在」と表示します。退職予定年齢・年金受給開始年齢・判定年齢（何歳まで持たせたいか）は、これまでどおり含めます。このページ上での計算と表示は、年齢で計算します。";
+    else note.innerHTML="現在は <strong>現在の年齢を出す</strong> 設定です。共有用画像とXポストに、現在の年齢から判定年齢までの表記がそのまま入ります。公開したくない場合は「現在の年齢を隠す」に切り替えてから、画像を作り直してください。";
+  }
+  refreshShareLink();
+  // A previously generated preview may contain the other mode, so drop it
+  // and make the user regenerate — never silently keep a leaky image around.
+  var sp=$("sharePreviewWrap"); if(sp && !sp.hidden){ sp.hidden=true; }
+  var ss=$("shareStatus");
+  if(ss && lastResult) ss.textContent=hideCurAgeShare?"現在の年齢を隠す設定にしました。画像は作り直すと、現在の年齢なしで生成されます。":"現在の年齢を出す設定にしました。画像は作り直すと、現在の年齢入りで生成されます。";
+}
+
+// ---- input binding (range <-> number) ----
+var pairs=[["curAge"],["retAge"],["penAge"],["endAge"],["salary"],["pension"],["contrib"],["invest"],["save"],["expW"],["expR"],["infl"],["ret"],["risk"]];
+var keys={curAge:"curAge",retAge:"retAge",penAge:"penAge",endAge:"endAge",salary:"salary",pension:"pension",contrib:"contrib",invest:"invest",save:"save",expW:"expW",expR:"expR",infl:"infl",ret:"ret",risk:"risk"};
+pairs.forEach(function(pr){
+  var k=pr[0]; var r=$("r_"+k), n=$("n_"+k);
+  if(!r||!n) return;
+  r.addEventListener("input",function(){ n.value=r.value; clearPresets(); });
+  n.addEventListener("input",function(){ r.value=n.value; clearPresets(); });
+});
+function clearPresets(){ if(event && event.target && (event.target.id==="r_ret"||event.target.id==="n_ret"||event.target.id==="r_risk"||event.target.id==="n_risk")){ document.querySelectorAll(".preset").forEach(function(b){b.classList.remove("active");}); } }
+document.querySelectorAll(".preset").forEach(function(b){
+  b.addEventListener("click",function(){
+    document.querySelectorAll(".preset").forEach(function(x){x.classList.remove("active");});
+    b.classList.add("active");
+    $("n_ret").value=b.dataset.r; $("r_ret").value=b.dataset.r;
+    $("n_risk").value=b.dataset.s; $("r_risk").value=b.dataset.s;
+    run();
+  });
+});
+function getInputs(){
+  function num(id){ var v=parseFloat($(id).value); return isFinite(v)?v:0; }
+  var o={
+    curAge:num("n_curAge"), retAge:num("n_retAge"), penAge:num("n_penAge"), endAge:Math.round(num("n_endAge")),
+    salary:num("n_salary"), pension:num("n_pension"), contrib:num("n_contrib"),
+    invest:num("n_invest"), save:num("n_save"), expW:num("n_expW"), expR:num("n_expR"),
+    infl:num("n_infl")/100, ret:num("n_ret")/100, risk:num("n_risk")/100,
+    sims:parseInt($("n_sims").value,10)||3000
+  };
+  if(o.endAge<=o.curAge) o.endAge=o.curAge+10;
+  if(o.retAge<o.curAge) o.retAge=o.curAge;
+  return o;
+}
+
+// ---- one path simulation ----
+// mode: "mc" random returns, "fixed" expected return
+function simulatePath(o, random){
+  var years=o.endAge-o.curAge;
+  var inv=o.invest, sav=o.save;
+  var rows=[]; var ruinAge=null;
+  for(var t=0;t<=years;t++){
+    var age=o.curAge+t;
+    rows.push({age:age, inv:inv, sav:sav, total:inv+sav, exp:0, sal:0, pen:0});
+    if(t===years) break;
+    // returns for next year
+    var r = random ? (o.ret + o.risk*randn()) : o.ret;
+    inv = inv*(1+r);
+    sav = sav*1.01;
+    var inflF=Math.pow(1+o.infl,t);
+    var isWorking = age < o.retAge;
+    var monthlyExp = isWorking ? o.expW : o.expR;
+    var exp = monthlyExp*12*inflF;
+    var sal = isWorking ? o.salary*12 : 0;
+    var pen = age >= o.penAge ? o.pension : 0;
+    var net = sal + pen - exp;
+    if(isWorking){
+      inv += o.contrib*12;
+      sav += net - o.contrib*12;
+    } else {
+      sav += net;
+    }
+    if(sav<0){ inv += sav; sav=0; }
+    if(inv<0){ sav += inv; inv=0; }
+    rows[rows.length-1].exp=exp; rows[rows.length-1].sal=sal; rows[rows.length-1].pen=pen;
+    if(inv+sav<=0 && ruinAge===null){ ruinAge=age+1; inv=0; sav=0; }
+    if(ruinAge!==null){ inv=0; sav=0; }
+  }
+  return {rows:rows, final:inv+sav, ruinAge:ruinAge};
+}
+
+function run(){
+  var o=getInputs();
+  var years=o.endAge-o.curAge;
+  var N=o.sims;
+  // per-year collectors
+  var totals=[], invs=[], savs=[];
+  for(var t=0;t<=years;t++){ totals.push([]); invs.push([]); savs.push([]); }
+  var finals=[], ruins=[], ruinCount=0;
+  var medRowsTemplate=null;
+  // store all paths' finals for stats; for median table we use per-year medians
+  for(var i=0;i<N;i++){
+    var p=simulatePath(o,true);
+    for(var t2=0;t2<=years;t2++){ totals[t2].push(p.rows[t2].total); invs[t2].push(p.rows[t2].inv); savs[t2].push(p.rows[t2].sav); }
+    finals.push(p.final);
+    if(p.ruinAge!==null){ ruinCount++; ruins.push(p.ruinAge); }
+  }
+  var det=simulatePath(o,false);
+  // per-year percentiles
+  var medTotal=[],p10=[],p25=[],p75=[],p90=[],medInv=[],medSav=[];
+  for(var t3=0;t3<=years;t3++){
+    var s=totals[t3].slice().sort(function(a,b){return a-b;});
+    medTotal.push(percentile(s,0.5)); p10.push(percentile(s,0.10)); p25.push(percentile(s,0.25)); p75.push(percentile(s,0.75)); p90.push(percentile(s,0.90));
+    var si=invs[t3].slice().sort(function(a,b){return a-b;}); medInv.push(percentile(si,0.5));
+    var ss=savs[t3].slice().sort(function(a,b){return a-b;}); medSav.push(percentile(ss,0.5));
+  }
+  var sf=finals.slice().sort(function(a,b){return a-b;});
+  var mean=finals.reduce(function(a,b){return a+b;},0)/N;
+  var medianF=percentile(sf,0.5), fP10=percentile(sf,0.10), fP90=percentile(sf,0.90);
+  var success=(N-ruinCount)/N*100;
+  ruins.sort(function(a,b){return a-b;});
+  var medianRuin = ruins.length? percentile(ruins,0.5) : null;
+  var workYears=Math.max(0, Math.min(o.retAge,o.endAge)-o.curAge);
+  var principal=o.invest+o.save+o.contrib*12*workYears;
+  var belowPrincipal = finals.filter(function(v){return v<principal;}).length/N*100;
+
+  // KPIs
+  $("kpiSuccessLabel").textContent=o.endAge+"歳まで資産が持つ確率";
+  $("kSuccess").textContent=success.toFixed(1)+"%";
+  $("kSuccessD").textContent=N.toLocaleString()+"通り中 "+(N-ruinCount).toLocaleString()+"通りで残存";
+  $("kMedian").textContent=fmtMan(medianF);
+  $("kMean").textContent=fmtMan(mean);
+  $("kRuin").textContent= medianRuin? Math.round(medianRuin)+"歳":"枯渇なし";
+  $("kRuinD").textContent= ruinCount? ("枯渇したケースは "+(ruinCount/N*100).toFixed(1)+"%") : "全ケースで判定年齢まで残存";
+  $("kP10").textContent=fmtMan(fP10);
+  $("kP90").textContent=fmtMan(fP90);
+  $("kPrincipal").textContent=fmtMan(principal);
+  $("kLossD").textContent="最終資産が元本を下回る確率 "+belowPrincipal.toFixed(1)+"%";
+  $("condSummary").textContent=o.curAge+"歳 → "+o.endAge+"歳 ／ 退職"+o.retAge+"歳 ／ リターン"+(o.ret*100).toFixed(1)+"%・リスク"+(o.risk*100).toFixed(1)+"%";
+  $("histSub").textContent=o.endAge+"歳時点の資産額のばらつき（"+N.toLocaleString()+"通り）";
+
+  var v=$("verdict");
+  if(success>=80){ v.textContent="かなり堅い計画です。中央値でも"+o.endAge+"歳時点で "+fmtMan(medianF)+" が残ります。ただし下位10％では "+fmtMan(fP10)+" まで下がるため、大きな支出や介護費の備えは別に考えておくと安心です。"; }
+  else if(success>=60){ v.textContent="おおむね持つ計画ですが、相場次第で際どくなります。下位10％は "+fmtMan(fP10)+" です。退職年齢・積立・退職後支出のいずれかを少し動かすと確率がどう変わるか試してみてください。"; }
+  else if(success>=40){ v.textContent="コイン投げに近い確率です。平均リターンどおりなら持っても、悪い相場の順序が来ると途中で尽きます。支出の見直しか、働く期間・積立の上乗せを検討する価値があります。"; }
+  else { v.textContent="この条件では資産が尽きるケースが多数派です。まず退職後の月支出、退職年齢、積立額の3つを動かして、確率がどう改善するか確認してください。"; }
+
+  lastResult={o:o,success:success,medianF:medianF,mean:mean,fP10:fP10,fP90:fP90,principal:principal,medianRuin:medianRuin,ruinCount:ruinCount,belowPrincipal:belowPrincipal,p10:p10.slice(),p25:p25.slice(),medTotal:medTotal.slice(),p75:p75.slice(),p90:p90.slice(),verdict:v.textContent};
+  lastImageFile=null;
+  var xl=$("shareXBtn"); if(xl) xl.href="https://twitter.com/intent/tweet?text="+encodeURIComponent(buildShareText(lastResult));
+  var sp=$("sharePreviewWrap"); if(sp) sp.hidden=true;
+  var ss=$("shareStatus"); if(ss) ss.textContent="";
+
+  drawFan(o, p10,p25,medTotal,p75,p90, det);
+  drawHist(finals, principal);
+  buildTable(o, det, medInv, medSav, medTotal, p10);
+}
+
+function drawFan(o,p10,p25,med,p75,p90,det){
+  var W=720,H=340,pl=64,pr=14,pt=14,pb=34;
+  var years=o.endAge-o.curAge;
+  var maxY=Math.max.apply(null,p90.concat([100]))*1.08;
+  function X(t){return pl+(W-pl-pr)*(t/years);}
+  function Y(v){return pt+(H-pt-pb)*(1-v/maxY);}
+  function path(arr){ var d=""; for(var i=0;i<arr.length;i++){ d+=(i===0?"M":"L")+X(i).toFixed(1)+","+Y(Math.max(0,arr[i])).toFixed(1)+" "; } return d; }
+  function band(lo,hi){ var d=path(hi); for(var i=lo.length-1;i>=0;i--){ d+="L"+X(i).toFixed(1)+","+Y(Math.max(0,lo[i])).toFixed(1)+" "; } return d+"Z"; }
+  var grid="";
+  var steps=4;
+  for(var g=0;g<=steps;g++){ var val=maxY*g/steps; var y=Y(val); grid+='<line x1="'+pl+'" y1="'+y+'" x2="'+(W-pr)+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/><text x="'+(pl-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="var(--muted)">'+fmtManShort(val)+'</text>'; }
+  var xticks="";
+  for(var t=0;t<=years;t+=Math.max(1,Math.round(years/6))){ xticks+='<text x="'+X(t)+'" y="'+(H-10)+'" text-anchor="middle" font-size="11" fill="var(--muted)">'+(o.curAge+t)+'歳</text>'; }
+  // retirement marker
+  var rt=o.retAge-o.curAge; var retireLine="";
+  if(rt>0&&rt<years){ retireLine='<line x1="'+X(rt)+'" y1="'+pt+'" x2="'+X(rt)+'" y2="'+(H-pb)+'" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(X(rt)+4)+'" y="'+(pt+12)+'" font-size="11" fill="var(--amber)" font-weight="700">退職 '+o.retAge+'歳</text>'; }
+  var detPath=path(det.rows.map(function(r){return r.total;}));
+  $("fanChart").innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="資産推移のモンテカルロ帯グラフ">'+grid+
+    '<path d="'+band(p10,p90)+'" fill="var(--band90)" opacity="0.55"/>'+
+    '<path d="'+band(p25,p75)+'" fill="var(--band75)" opacity="0.6"/>'+
+    '<path d="'+detPath+'" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="5 4"/>'+
+    '<path d="'+path(med)+'" fill="none" stroke="var(--median)" stroke-width="2.5"/>'+
+    retireLine+xticks+'</svg><div class="legend"><span><i style="background:var(--amber)"></i>破線：リターンが毎年平均どおりだった場合</span></div>';
+}
+
+function drawHist(finals, principal){
+  var bins=26;
+  var ruined=finals.filter(function(v){return v<=0;}).length;
+  var positives=finals.filter(function(v){return v>0;});
+  var maxV=positives.length? Math.max.apply(null,positives):100;
+  // cap at 98th percentile for readability
+  var sorted=positives.slice().sort(function(a,b){return a-b;});
+  var cap=sorted.length? percentile(sorted,0.98):maxV;
+  var counts=new Array(bins).fill(0);
+  positives.forEach(function(v){ var idx=Math.min(bins-1, Math.floor(v/cap*bins)); counts[idx]++; });
+  var maxC=Math.max.apply(null,counts.concat([ruined,1]));
+  var W=420,H=240,pl=8,pr=8,pt=10,pb=30, bw=(W-pl-pr)/(bins+1);
+  var bars="";
+  // ruined bar
+  var rh=(H-pt-pb)*(ruined/maxC);
+  bars+='<rect x="'+pl+'" y="'+(H-pb-rh)+'" width="'+(bw-2)+'" height="'+rh+'" fill="#dc2626" rx="2"/><text x="'+(pl+bw/2)+'" y="'+(H-16)+'" text-anchor="middle" font-size="10" fill="var(--muted)">枯渇</text>';
+  for(var i=0;i<bins;i++){ var h=(H-pt-pb)*(counts[i]/maxC); var x=pl+bw*(i+1);
+    bars+='<rect x="'+x+'" y="'+(H-pb-h)+'" width="'+(bw-2)+'" height="'+h+'" fill="var(--teal)" opacity="0.85" rx="2"/>'; }
+  var labels='<text x="'+(pl+bw)+'" y="'+(H-16)+'" font-size="10" fill="var(--muted)">0</text><text x="'+(W-pr)+'" y="'+(H-16)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+fmtManShort(cap)+'〜</text>';
+  // principal marker
+  var px = principal>0 && principal<cap ? pl+bw+bw*(principal/cap*bins) : null;
+  var pmark = px? '<line x1="'+px+'" y1="'+pt+'" x2="'+px+'" y2="'+(H-pb)+'" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+px+'" y="'+(pt+2)+'" text-anchor="middle" font-size="10" fill="var(--amber)" font-weight="700">元本</text>':"";
+  $("histChart").innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="最終資産の分布ヒストグラム">'+bars+pmark+labels+'</svg>';
+}
+
+function buildTable(o, det, medInv, medSav, medTotal, p10){
+  var tb=document.querySelector("#yearTable tbody"); tb.innerHTML="";
+  for(var t=0;t<det.rows.length;t++){
+    var r=det.rows[t];
+    var tr=document.createElement("tr");
+    if(medTotal[t]<=0) tr.className="ruined";
+    tr.innerHTML="<td>"+r.age+"歳</td><td>"+(r.exp?fmtMan(r.exp):"—")+"</td><td>"+(r.sal?fmtMan(r.sal):"—")+"</td><td>"+(r.pen?fmtMan(r.pen):"—")+"</td><td>"+fmtMan(medSav[t])+"</td><td>"+fmtMan(medInv[t])+"</td><td><strong>"+fmtMan(medTotal[t])+"</strong></td><td>"+fmtMan(p10[t])+"</td>";
+    tb.appendChild(tr);
+  }
+}
+
+// ---- share: image (PNG) + X post ----
+function buildShareText(r){
+  var o=r.o;
+  var cond = hideCurAgeShare
+    ? "条件："+o.endAge+"歳まで／退職"+o.retAge+"歳／積立月"+o.contrib+"万円／退職後月"+o.expR+"万円／リターン"+(o.ret*100).toFixed(1)+"%"
+    : "条件："+o.curAge+"→"+o.endAge+"歳／退職"+o.retAge+"歳／積立月"+o.contrib+"万円／退職後月"+o.expR+"万円／リターン"+(o.ret*100).toFixed(1)+"%";
+  var lines=[
+    o.endAge+"歳まで資産が持つ確率："+r.success.toFixed(1)+"%",
+    "最終資産（中央値）："+fmtMan(r.medianF),
+    cond,
+    "#資産運用 #モンテカルロ"
+  ];
+  return lines.join("\n");
+}
+function rr(ctx,x,y,w,h,rad){ ctx.beginPath(); ctx.moveTo(x+rad,y); ctx.arcTo(x+w,y,x+w,y+h,rad); ctx.arcTo(x+w,y+h,x,y+h,rad); ctx.arcTo(x,y+h,x,y,rad); ctx.arcTo(x,y,x+w,y,rad); ctx.closePath(); }
+function drawShareCanvas(r){
+  var scale=2, W=1200, H=630;
+  var canvas=document.createElement("canvas"); canvas.width=W*scale; canvas.height=H*scale;
+  var ctx=canvas.getContext("2d"); ctx.scale(scale,scale);
+  var o=r.o;
+  // background
+  ctx.fillStyle="#f4f6f8"; ctx.fillRect(0,0,W,H);
+  // header
+  ctx.fillStyle="#17394d"; ctx.fillRect(0,0,W,104);
+  ctx.fillStyle="#ffffff"; ctx.font="900 27px 'Noto Sans JP',sans-serif"; ctx.textBaseline="alphabetic";
+  ctx.fillText("資産取り崩し・モンテカルロ シミュレーション",48,46);
+  ctx.fillStyle="rgba(255,255,255,.78)"; ctx.font="500 16px 'Noto Sans JP',sans-serif";
+  ctx.fillText("資産は、何歳まで持つのか。確率で確かめる。",48,76);
+  ctx.fillStyle="#2dd4bf"; ctx.font="900 15px 'Noto Sans JP',sans-serif"; ctx.textAlign="right";
+  ctx.fillText(o.sims.toLocaleString("ja-JP")+"通りを試算",W-48,46);
+  ctx.textAlign="left";
+  // main card
+  ctx.fillStyle="#ffffff"; rr(ctx,32,120,W-64,478,16); ctx.fill();
+  // success (left)
+  ctx.fillStyle="#5b6b74"; ctx.font="700 17px 'Noto Sans JP',sans-serif";
+  ctx.fillText(o.endAge+"歳まで資産が持つ確率",56,168);
+  ctx.fillStyle= r.success>=60 ? "#0f766e" : (r.success>=40 ? "#b45309" : "#b91c1c");
+  ctx.font="900 92px 'Noto Sans JP',sans-serif";
+  ctx.fillText(r.success.toFixed(1)+"%",52,262);
+  ctx.fillStyle="#5b6b74"; ctx.font="500 14.5px 'Noto Sans JP',sans-serif";
+  var ruinLine = r.ruinCount ? ("枯渇したケース "+(r.ruinCount/o.sims*100).toFixed(1)+"%／枯渇年齢の中央値 "+(r.medianRuin?Math.round(r.medianRuin)+"歳":"—")) : "全ケースで"+o.endAge+"歳まで残存";
+  ctx.fillText(ruinLine,56,292);
+  // divider
+  ctx.strokeStyle="#dde3e7"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(430,148); ctx.lineTo(430,306); ctx.stroke();
+  // stats (right, 2x2)
+  var stats=[
+    ["最終資産（中央値）",fmtMan(r.medianF)],
+    ["最終資産（平均値）",fmtMan(r.mean)],
+    ["下位10%（悪い相場）",fmtMan(r.fP10)],
+    ["上位10%（良い相場）",fmtMan(r.fP90)]
+  ];
+  stats.forEach(function(s,i){
+    var col=i%2, rowI=Math.floor(i/2);
+    var x=462+col*350, y=168+rowI*84;
+    ctx.fillStyle="#5b6b74"; ctx.font="700 14px 'Noto Sans JP',sans-serif"; ctx.fillText(s[0],x,y);
+    ctx.fillStyle="#16232b"; ctx.font="900 30px 'Noto Sans JP',sans-serif"; ctx.fillText(s[1],x,y+38);
+  });
+  ctx.fillStyle="#5b6b74"; ctx.font="500 13.5px 'Noto Sans JP',sans-serif";
+  ctx.fillText("元本総額（初期＋積立） "+fmtMan(r.principal)+"　／　元本を下回る確率 "+r.belowPrincipal.toFixed(1)+"%",462,322);
+  // mini fan chart
+  var cx=56, cy=348, cw=W-112, ch=168;
+  var years=o.endAge-o.curAge;
+  var maxY=Math.max.apply(null,r.p90.concat([100]))*1.08;
+  function CX(t){ return cx+cw*(t/Math.max(1,years)); }
+  function CY(v){ return cy+ch*(1-Math.max(0,v)/maxY); }
+  ctx.strokeStyle="#eef2f4"; ctx.lineWidth=1;
+  for(var g=0;g<=3;g++){ var gy=cy+ch*g/3; ctx.beginPath(); ctx.moveTo(cx,gy); ctx.lineTo(cx+cw,gy); ctx.stroke(); }
+  function traceBand(lo,hi,color){
+    ctx.fillStyle=color; ctx.beginPath();
+    hi.forEach(function(v,i){ var x=CX(i),y=CY(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    for(var i2=lo.length-1;i2>=0;i2--){ ctx.lineTo(CX(i2),CY(lo[i2])); }
+    ctx.closePath(); ctx.fill();
+  }
+  traceBand(r.p10,r.p90,"rgba(147,197,253,.45)");
+  traceBand(r.p25,r.p75,"rgba(147,197,253,.75)");
+  ctx.strokeStyle="#0f766e"; ctx.lineWidth=2.5; ctx.beginPath();
+  r.medTotal.forEach(function(v,i){ var x=CX(i),y=CY(v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  // retire marker
+  var rt=o.retAge-o.curAge;
+  if(rt>0&&rt<years){ ctx.strokeStyle="#b45309"; ctx.lineWidth=1.5; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(CX(rt),cy); ctx.lineTo(CX(rt),cy+ch); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle="#b45309"; ctx.font="700 12px 'Noto Sans JP',sans-serif"; ctx.fillText("退職 "+o.retAge+"歳",CX(rt)+6,cy+14); }
+  ctx.fillStyle="#5b6b74"; ctx.font="500 12px 'Noto Sans JP',sans-serif";
+  ctx.fillText(hideCurAgeShare ? "現在" : o.curAge+"歳",cx,cy+ch+20);
+  var endLabel=o.endAge+"歳"; ctx.textAlign="right"; ctx.fillText(endLabel,cx+cw,cy+ch+20); ctx.textAlign="left";
+  ctx.fillText("資産推移：薄い帯 10〜90%／濃い帯 25〜75%／線は中央値（最大 "+fmtManShort(maxY/1.08)+"）",cx+70,cy+ch+20);
+  // conditions + footer inside card
+  ctx.fillStyle="#16232b"; ctx.font="700 14.5px 'Noto Sans JP',sans-serif";
+  if(hideCurAgeShare){
+    ctx.fillText("条件："+o.endAge+"歳まで ／ 退職"+o.retAge+"歳・年金"+o.penAge+"歳開始 ／ 給与 月"+o.salary+"万円・年金 年"+o.pension+"万円・積立 月"+o.contrib+"万円",56,566);
+  } else {
+    ctx.fillText("条件："+o.curAge+"歳→"+o.endAge+"歳 ／ 退職"+o.retAge+"歳・年金"+o.penAge+"歳開始 ／ 給与 月"+o.salary+"万円・年金 年"+o.pension+"万円・積立 月"+o.contrib+"万円",56,566);
+  }
+  ctx.fillStyle="#5b6b74"; ctx.font="500 13px 'Noto Sans JP',sans-serif";
+  ctx.fillText("資産：運用 "+Math.round(o.invest).toLocaleString("ja-JP")+"万円＋貯金 "+Math.round(o.save).toLocaleString("ja-JP")+"万円 ／ 支出：現役 月"+o.expW+"万円・退職後 月"+o.expR+"万円 ／ リターン "+(o.ret*100).toFixed(1)+"%・リスク "+(o.risk*100).toFixed(1)+"%・インフレ "+(o.infl*100).toFixed(1)+"%",56,588);
+  // page footer
+  ctx.fillStyle="#5b6b74"; ctx.font="500 12px 'Noto Sans JP',sans-serif";
+  ctx.fillText("※ 確率計算に基づく目安です。将来の運用成果や生活の持続を保証するものではありません。",32,622);
+  return canvas;
+}
+function ensureResult(){
+  if(lastResult) return lastResult;
+  run(); return lastResult;
+}
+function dataUrlToBlob(dataUrl){
+  var comma=dataUrl.indexOf(",");
+  var mimeMatch=/:(.*?);/.exec(dataUrl.slice(0,comma));
+  var mime=mimeMatch?mimeMatch[1]:"image/png";
+  var bin=atob(dataUrl.slice(comma+1));
+  var u8=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++){ u8[i]=bin.charCodeAt(i); }
+  return new Blob([u8],{type:mime});
+}
+function saveResultImage(){
+  var r=ensureResult(); if(!r) return;
+  var status=$("shareStatus");
+  try{
+    // Generate everything synchronously inside this click, so the download
+    // stays tied to the user's tap (async generation + synthetic clicks are
+    // what popup/ad blockers and in-app browsers tend to intercept, which can
+    // leave the user with the page HTML instead of the PNG).
+    var canvas=drawShareCanvas(r);
+    var dataUrl=canvas.toDataURL("image/png");
+    var blob=dataUrlToBlob(dataUrl);
+    if(lastImageUrl){ URL.revokeObjectURL(lastImageUrl); }
+    lastImageUrl=URL.createObjectURL(blob);
+    lastImageName="simulation-result-"+r.o.endAge+"sai-"+r.success.toFixed(1)+".png";
+    lastImageFile=null;
+    try{ lastImageFile=new File([blob],lastImageName,{type:"image/png"}); }catch(fe){ lastImageFile=null; }
+    // Preview now points at a real PNG blob, so long-press / right-click
+    // "save image" saves the PNG itself rather than the page.
+    $("sharePreview").src=lastImageUrl;
+    $("sharePreviewWrap").hidden=false;
+    // A real, visible download link the user can tap directly.
+    var dl=$("downloadPngLink");
+    dl.href=lastImageUrl;
+    dl.setAttribute("download",lastImageName);
+    // Offer the OS share/save sheet where file sharing is supported.
+    var sfb=$("shareFileBtn");
+    var canShareFile=false;
+    try{ canShareFile=!!(lastImageFile && navigator.canShare && navigator.canShare({files:[lastImageFile]})); }catch(ce){ canShareFile=false; }
+    sfb.hidden=!canShareFile;
+    // Kick off the download from the real link, still within this tap.
+    dl.click();
+    if(status) status.textContent="画像（PNG）を生成し、ダウンロードを開始しました。始まらない場合やファイルがHTMLになる場合は、プレビュー下の「このPNGをダウンロードする」ボタン、共有ボタン、またはプレビュー画像の長押しで保存してください。";
+  }catch(e){
+    if(status) status.textContent="画像の生成に失敗しました。もう一度「シミュレーション実行」を押してからお試しください。";
+  }
+}
+function shareResultFile(){
+  var status=$("shareStatus");
+  if(lastImageFile && navigator.share){
+    var shareData={files:[lastImageFile],title:"シミュレーション結果"};
+    var p;
+    try{ p=navigator.share(shareData); }catch(e){ p=null; if(status) status.textContent="共有を開けませんでした。「このPNGをダウンロードする」ボタンか、プレビュー画像の長押しで保存してください。"; }
+    if(p && p.catch){ p.catch(function(err){ if(err && err.name!=="AbortError" && status) status.textContent="共有がキャンセルされました。ダウンロードボタンかプレビューの長押しでも保存できます。"; }); }
+  } else {
+    var dl=$("downloadPngLink"); if(dl) dl.click();
+  }
+}
+function shareToX(){
+  var r=ensureResult(); if(!r) return;
+  var status=$("shareStatus");
+  if(status) status.textContent="Xのポスト画面を開きます。画像も付けたい場合は、先に保存したPNGをポスト画面で添付してください。ポップアップが開かない場合は、広告ブロックをこのページでオフにしてお試しください。";
+}
+var ageShowBtn=$("ageShowBtn"); if(ageShowBtn) ageShowBtn.addEventListener("click",function(){ setHideCurAgeShare(false); });
+var ageHideBtn=$("ageHideBtn"); if(ageHideBtn) ageHideBtn.addEventListener("click",function(){ setHideCurAgeShare(true); });
+var saveBtn=$("saveImgBtn"); if(saveBtn) saveBtn.addEventListener("click",saveResultImage);
+var xBtn=$("shareXBtn"); if(xBtn) xBtn.addEventListener("click",shareToX);
+var fileBtn=$("shareFileBtn"); if(fileBtn) fileBtn.addEventListener("click",shareResultFile);
+
+$("runBtn").addEventListener("click",run);
+// live re-run on select change (light), and debounce number changes
+$("n_sims").addEventListener("change",run);
+var deb=null;
+document.querySelectorAll(".controls input").forEach(function(el){
+  el.addEventListener("change",function(){ clearTimeout(deb); deb=setTimeout(run,250); });
+});
+run();
+})();
+</script>
+<script>
+(function(){
+"use strict";
+// ---- PWA: Service Worker registration ----
+// Register ONLY with a scope that covers this page (the shared-URL path).
+// There is deliberately no fallback to the script's own folder scope: a
+// worker scoped to assets/ could never intercept this page's navigation,
+// so silently accepting it would fake offline support that does not exist.
+// If the host refuses the page-wide scope, registration fails, the reason
+// is logged, and the simulator simply keeps working online.
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("/sw.js").then(function(reg){
+      console.info("Service Worker registered, scope:",reg.scope);
+    }).catch(function(err){
+      console.info("Service Worker registration failed (offline support unavailable here):",err && err.name);
+    });
+  });
+}
+})();
+</script>
+</body>
+</html>
