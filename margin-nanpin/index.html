@@ -272,8 +272,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "1.6";
-var SW_CACHE_NAME = "nanpin-planner-v12";
+var APP_VERSION = "1.7";
+var SW_CACHE_NAME = "nanpin-planner-v13";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -305,7 +305,7 @@ function sampleState(){
   return {
     version: DATA_VERSION,
     meta: { isSample: true, updatedAt: "" },
-    account: { broker: "", collateral: 15617481, collateralBasis: "after", cash: 70309, brokerRate: null },
+    account: { broker: "", collateral: 15617481, collateralBasis: "after", collateralMarket: null, collateralHaircut: null, cash: 70309, brokerRate: null },
     positions: [
       { id: uid("pos"), code: "", name: "既存信用建玉（サンプル）", side: "buy", principal: 64800, pnl: null }
     ],
@@ -333,6 +333,10 @@ function sanitizeState(s){
     broker: String(a.broker || "").slice(0, 60),
     collateral: clamp(num(a.collateral, 0), 0, 1e12),
     collateralBasis: a.collateralBasis === "before" ? "before" : "after",
+    /* 掛目入力モードの任意項目（形式v3のまま追加）：時価・掛目は未入力を null とし、新項目のない旧データでは
+       方式＝直接入力（after）・時価と掛目は空で補完され、従来と完全に同じ値・動作で読み込まれる */
+    collateralMarket: (a.collateralMarket === null || a.collateralMarket === "" || a.collateralMarket === undefined || !isFinite(num(a.collateralMarket, NaN))) ? null : clamp(num(a.collateralMarket, 0), 0, 1e12),
+    collateralHaircut: (a.collateralHaircut === null || a.collateralHaircut === "" || a.collateralHaircut === undefined || !isFinite(num(a.collateralHaircut, NaN))) ? null : clamp(num(a.collateralHaircut, 0), 0, 100),
     cash: clamp(num(a.cash, 0), -1e12, 1e12),
     brokerRate: (a.brokerRate === null || a.brokerRate === "" || a.brokerRate === undefined) ? null : clamp(num(a.brokerRate, NaN), 0, 100000)
   };
@@ -699,6 +703,40 @@ function otherPositionsWarningHtml(state){
   var msg = "<strong>計画銘柄以外の既存建玉について：</strong>これらの建玉の評価損は、このシミュレーションでは各建玉自体の価格変動には連動せず、計画銘柄と同じ下落率で一律に変動する概算として扱います。実際の下落時は、建玉ごとの値動きによって損失が表示より大きくなる可能性があります。";
   if (risk.unknownPnl) msg += "評価損益が未入力の建玉があるため、現在の維持率は概算です（未入力分は現在損益0として扱います）。";
   return '<div class="notice warn">' + msg + "</div>";
+}
+
+/* ============================================================
+   代用有価証券の掛目入力モード（任意機能・計算モデルは変更しない）
+   計算に使うのは常に「掛目適用後の評価額」account.collateral であり、入力方式はその入力方法だけを変える。
+   入力方式は account.collateralBasis で表す：
+     "after"  ＝ 適用後の評価額を直接入力（標準・初期値・従来どおり）
+     "before" ＝ 適用前の時価（account.collateralMarket）と掛目（account.collateralHaircut %）から計算
+   時価＋掛目方式では、時価と掛目が両方とも有効なときだけ
+   適用後評価額 ＝ floor（時価 × 掛目/100）を collateral へ反映する。
+   掛目が空欄・無効なときは collateral を変更せず警告フラグを返す（生の時価を担保として流用しない）。
+   時価欄へ適用後評価額を流し込むことは決してしないため、方式を往復しても掛目が累積適用されることはない。
+   ============================================================ */
+var COLLATERAL_HAIRCUT_DEFAULT = 80; /* 時価＋掛目方式へ切り替えた初回の掛目初期値（SBI証券の株式・投信の標準） */
+function collateralHaircutCalc(market, haircut){
+  if (market === null || market === undefined || haircut === null || haircut === undefined) return null;
+  var m = num(market, NaN), h = num(haircut, NaN);
+  if (!isFinite(m) || !isFinite(h) || m < 0 || h < 0 || h > 100) return null;
+  return Math.floor(m * h / 100);
+}
+function collateralHaircutInfo(account){
+  var mode = account && account.collateralBasis === "before" ? "before" : "after";
+  var info = { mode: mode, applied: null, warning: false };
+  if (mode !== "before") return info;
+  info.applied = collateralHaircutCalc(account.collateralMarket, account.collateralHaircut);
+  var h = (account.collateralHaircut === null || account.collateralHaircut === undefined) ? NaN : num(account.collateralHaircut, NaN);
+  info.warning = !(isFinite(h) && h >= 0 && h <= 100);
+  return info;
+}
+/* 時価＋掛目方式で両方が有効なときだけ、計算済みの適用後評価額を collateral へ反映する。それ以外では collateral を変更しない */
+function syncCollateralFromHaircut(account){
+  var info = collateralHaircutInfo(account);
+  if (info.mode === "before" && info.applied !== null) account.collateral = info.applied;
+  return info;
 }
 
 /* ============================================================
@@ -1455,7 +1493,7 @@ function renderDashboard(){
 
   html += '<div class="card"><h2>現在の実口座情報</h2><p class="sub">シミュレーション値ではなく、登録されている現在の口座情報です。</p><dl class="kv">'
     + "<dt>証券会社</dt><dd>" + (state.account.broker ? esc(state.account.broker) : "未登録") + "</dd>"
-    + "<dt>代用有価証券評価額（" + (state.account.collateralBasis === "after" ? "掛目適用後" : "掛目適用前・時価") + "）</dt><dd class='num'>" + fmtYen(state.account.collateral) + "</dd>"
+    + "<dt>代用有価証券評価額（" + (state.account.collateralBasis === "after" ? "掛目適用後" : "時価×掛目で計算した適用後評価額") + "）</dt><dd class='num'>" + fmtYen(state.account.collateral) + "</dd>"
     + "<dt>委託保証金現金</dt><dd class='num'>" + fmtYen(state.account.cash) + "</dd>"
     + "<dt>銘柄別保有の建代金合計</dt><dd class='num'>" + fmtYen(cur.holdingsPrincipal) + "</dd>"
     + "<dt>計画銘柄以外の既存建玉 建代金合計</dt><dd class='num'>" + fmtYen(cur.principal - cur.holdingsPrincipal) + "</dd>"
@@ -1984,15 +2022,26 @@ function refreshMinibar(){
 /* ================= 口座・保有状況 ================= */
 function renderAccount(){
   var el = document.getElementById("view-account"), a = state.account, cur = sim.current;
-  var html = '<div class="card"><h2>口座情報</h2><p class="sub">代用有価証券評価額は<strong>掛目適用後の評価額</strong>を標準入力とします。掛目適用前の時価を入力する場合は、下の区分を切り替えてください（計算では入力値をそのまま代用評価額として扱います）。</p>'
+  var hcInfo = collateralHaircutInfo(a);
+  var html = '<div class="card"><h2>口座情報</h2><p class="sub">代用有価証券評価額は<strong>掛目適用後の評価額を直接入力</strong>する方式が標準です。入力方式を切り替えると、適用前の時価と掛目（%）から適用後評価額を自動計算することもできます。どちらの方式でも、計算には常に適用後の評価額を使います。</p>'
     + '<div class="formgrid c3">'
     + fld("証券会社名", '<input type="text" id="a_broker" value="' + esc(a.broker) + '" placeholder="例：○○証券" autocomplete="off">')
-    + fld("代用有価証券評価額（円）", '<input type="number" id="a_collateral" min="0" step="1" value="' + a.collateral + '">')
-    + fld("代用評価額の区分", '<select id="a_basis"><option value="after"' + (a.collateralBasis === "after" ? " selected" : "") + '>掛目適用後の評価額（標準）</option><option value="before"' + (a.collateralBasis === "before" ? " selected" : "") + ">掛目適用前の時価</option></select>")
+    + fld("代用有価証券の入力方式", '<select id="a_basis"><option value="after"' + (hcInfo.mode === "after" ? " selected" : "") + '>適用後の評価額を直接入力（標準）</option><option value="before"' + (hcInfo.mode === "before" ? " selected" : "") + ">適用前の時価と掛目から計算</option></select>")
+    + (hcInfo.mode === "before"
+      ? fld("代用有価証券の時価（円・掛目適用前）", '<input type="number" id="a_market" min="0" step="1" value="' + (a.collateralMarket === null ? "" : a.collateralMarket) + '" placeholder="未入力">')
+        + fld("掛目（%）", '<input type="number" id="a_haircut" min="0" max="100" step="1" value="' + (a.collateralHaircut === null ? "" : a.collateralHaircut) + '" placeholder="未入力">')
+        + fld("代用有価証券評価額（円・自動計算）", '<input type="number" id="a_collateral" value="' + a.collateral + '" disabled aria-disabled="true">')
+      : fld("代用有価証券評価額（円・掛目適用後）", '<input type="number" id="a_collateral" min="0" step="1" value="' + a.collateral + '">'))
     + fld("委託保証金現金（円）", '<input type="number" id="a_cash" step="1" value="' + a.cash + '">')
     + fld("証券会社表示の保証金維持率（%・任意）", '<input type="number" id="a_brokerRate" min="0" step="0.1" value="' + (a.brokerRate === null ? "" : a.brokerRate) + '" placeholder="未入力">')
     + fld("情報更新日時", '<input type="text" id="a_updated" value="' + esc(state.meta.updatedAt) + '" placeholder="例：2026-11-17 11:30">')
     + "</div>"
+    + (hcInfo.mode === "before"
+      ? '<p class="hint" style="font-size:.92rem">計算に使う代用評価額：<strong class="num">' + fmtYen(a.collateral) + "</strong>"
+        + (hcInfo.applied !== null ? '（時価 ' + fmtYen(a.collateralMarket) + " × 掛目 " + a.collateralHaircut + "% を切り捨てて計算）" : "（時価と掛目がそろうと自動で計算されます）") + "</p>"
+        + (hcInfo.warning ? '<div class="notice warn" style="margin-top:10px">掛目が未設定のため、時価から適用後評価額を計算できません（現在表示されている適用後評価額で計算しています）。</div>' : "")
+        + '<p class="hint">掛目は証券会社・資産の種類によって異なります。この入力は単一の掛目率による簡略化です。入力方式を「直接入力」に戻すと、最後に計算された適用後評価額がそのまま直接編集できる値として残ります。</p>'
+      : "")
     + '<dl class="kv mt"><dt>推計保証金残高（現在・実質保証金）</dt><dd class="num">' + fmtYen(cur.balance) + (cur.belowMinMargin ? '（最低保証金額 ' + fmtYen(state.settings.minMargin) + ' 未満：差し入れが必要になる場合があります）' : '（最低保証金額 ' + fmtYen(state.settings.minMargin) + ' 以上）') + '</dd>'
     + '<dt>推計維持率（現在の保有＋既存建玉）</dt><dd class="num">' + fmtPct(cur.rate) + (cur.pnlApprox ? "（評価損益未入力分あり・概算）" : "") + "</dd>"
     + (a.brokerRate !== null && cur.rate !== null ? '<dt>証券会社表示との差</dt><dd class="num">' + (a.brokerRate - cur.rate >= 0 ? "+" : "−") + Math.abs(a.brokerRate - cur.rate).toFixed(1) + " pt（計算モデルが異なるため差が生じます）</dd>" : "")
@@ -2016,8 +2065,27 @@ function renderAccount(){
 
   function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderAccount(); }); }
   on("#a_broker", function(n){ a.broker = n.value.trim().slice(0, 60); state.meta.isSample = false; });
-  on("#a_collateral", function(n){ a.collateral = clamp(num(n.value, 0), 0, 1e12); state.meta.isSample = false; });
-  on("#a_basis", function(n){ a.collateralBasis = n.value === "before" ? "before" : "after"; });
+  on("#a_collateral", function(n){ if (a.collateralBasis === "before") return; a.collateral = clamp(num(n.value, 0), 0, 1e12); state.meta.isSample = false; });
+  on("#a_basis", function(n){
+    a.collateralBasis = n.value === "before" ? "before" : "after";
+    /* 時価＋掛目方式へ切り替えた初回は掛目に初期値80を表示する。時価欄は空欄から始め、
+       適用後評価額を時価欄へ流し込むことはしない（二重適用の防止）。直接入力へ戻すときは
+       最後に計算された適用後評価額がそのまま残る（sync は直接入力方式では何もしない） */
+    if (a.collateralBasis === "before" && a.collateralHaircut === null) a.collateralHaircut = COLLATERAL_HAIRCUT_DEFAULT;
+    syncCollateralFromHaircut(a);
+  });
+  on("#a_market", function(n){
+    var v = n.value === "" ? NaN : num(n.value, NaN);
+    a.collateralMarket = isFinite(v) ? clamp(v, 0, 1e12) : null;
+    syncCollateralFromHaircut(a);
+    state.meta.isSample = false;
+  });
+  on("#a_haircut", function(n){
+    var v = n.value === "" ? NaN : num(n.value, NaN);
+    a.collateralHaircut = isFinite(v) ? clamp(v, 0, 100) : null;
+    syncCollateralFromHaircut(a);
+    state.meta.isSample = false;
+  });
   on("#a_cash", function(n){ a.cash = clamp(num(n.value, 0), -1e12, 1e12); state.meta.isSample = false; });
   on("#a_brokerRate", function(n){ a.brokerRate = n.value === "" ? null : num(n.value, NaN); if (!isFinite(a.brokerRate)) a.brokerRate = null; });
   on("#a_updated", function(n){ state.meta.updatedAt = n.value.trim(); });
@@ -2575,8 +2643,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.6" && SW_CACHE_NAME === "nanpin-planner-v12",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.6／SW v12");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.7" && SW_CACHE_NAME === "nanpin-planner-v13",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.7／SW v13");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -2634,6 +2702,60 @@ function runSelfTests(){
     && risk47b === null && !!risk47c && risk47c.unknownPnl === false && risk47d === null
     && otherPositionsWarningHtml(sampleState()).indexOf("概算") >= 0 && otherPositionsWarningHtml(s47b) === "",
     "サンプル（建玉64,800円・評価損益未入力）は警告対象で未入力の旨を含む。建玉なし・建代金0のみでは警告しない。評価損益を入力済みの建玉だけなら、未入力の注記なしで警告する");
+  /* 48 直接入力方式（標準・初期値）では既存サンプルの結果が不変 */
+  var s48 = sanitizeState(sampleState());
+  var info48 = collateralHaircutInfo(s48.account);
+  var r48 = MarginSim.simulate(s48);
+  t("直接入力方式ではサンプルの結果が不変", info48.mode === "after" && info48.warning === false
+    && s48.account.collateral === 15617481 && s48.account.collateralMarket === null && s48.account.collateralHaircut === null
+    && r48.planCost === 4493550 && Math.abs(r48.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r48.firstCallPrecise - 77.6) < 0.051,
+    "方式は直接入力（初期値）で、代用評価額15,617,481円がそのまま計算に使われ、実購入予定額4,493,550円・管理基準到達 −76.6%／追証基準到達 −77.6% は従来どおり");
+  /* 49 時価＋掛目方式：時価 10,000,000円 × 掛目80% → 適用後評価額 8,000,000円が計算に使われる */
+  var s49 = sampleState();
+  s49.account.collateralBasis = "before"; s49.account.collateralMarket = 10000000; s49.account.collateralHaircut = 80; s49.account.collateral = 12345;
+  s49 = sanitizeState(s49);
+  var info49 = syncCollateralFromHaircut(s49.account);
+  var r49 = MarginSim.simulate(s49);
+  t("時価と掛目から適用後評価額を計算する", collateralHaircutCalc(10000000, 80) === 8000000 && collateralHaircutCalc(10000001, 80) === 8000000
+    && info49.applied === 8000000 && info49.warning === false
+    && s49.account.collateral === 8000000 && r49.rows[0].collateral === 8000000,
+    "時価10,000,000円×掛目80%＝8,000,000円（円未満切り捨て）が適用後評価額に反映され、シミュレーションの代用評価額（下落率0%時点）にも8,000,000円が使われる");
+  /* 50 方式を往復しても掛目が累積適用されない（時価と掛目が同じなら適用後評価額は同じ値に戻る） */
+  var s50 = sampleState();
+  s50.account.collateralBasis = "before"; s50.account.collateralMarket = 10000000; s50.account.collateralHaircut = 80;
+  s50 = sanitizeState(s50);
+  syncCollateralFromHaircut(s50.account);
+  var applied50first = s50.account.collateral;
+  s50.account.collateralBasis = "after"; /* 直接入力へ戻す：最後に計算された適用後評価額がそのまま残る */
+  syncCollateralFromHaircut(s50.account);
+  var applied50direct = s50.account.collateral;
+  s50.account.collateralBasis = "before"; /* 再び時価＋掛目方式へ：時価・掛目は保持され、適用後評価額は時価欄へ流し込まれない */
+  syncCollateralFromHaircut(s50.account);
+  t("方式を往復しても掛目が二重適用されない", applied50first === 8000000 && applied50direct === 8000000
+    && s50.account.collateralMarket === 10000000 && s50.account.collateralHaircut === 80 && s50.account.collateral === 8000000,
+    "時価10,000,000円・掛目80%のまま往復すると適用後評価額は8,000,000円のままで、6,400,000円（80%を再適用）にはならない。直接入力へ戻した時点でも8,000,000円が保持される");
+  /* 51 掛目が空欄・無効なときは警告フラグが立ち、適用後評価額は変更されない（生の時価を担保として流用しない） */
+  var s51 = sampleState();
+  s51.account.collateralBasis = "before"; s51.account.collateralMarket = 10000000; s51.account.collateralHaircut = null; s51.account.collateral = 5000000;
+  s51 = sanitizeState(s51);
+  var info51 = syncCollateralFromHaircut(s51.account);
+  var s51b = sampleState(); s51b.account.collateralHaircut = "abc";
+  var haircutInvalid51 = sanitizeState(s51b).account.collateralHaircut === null;
+  t("掛目が未設定なら警告し適用後評価額を変更しない", info51.warning === true && info51.applied === null
+    && s51.account.collateral === 5000000 && collateralHaircutCalc(10000000, null) === null && haircutInvalid51,
+    "時価だけが入力されていても掛目が空欄なら警告フラグが立ち、適用後評価額5,000,000円は変更されない（時価10,000,000円をそのまま担保に流用しない）。無効な掛目文字列はサニタイズで未設定（null）になる");
+  /* 52 掛目入力の新項目はJSONで往復し、新項目のない旧データは直接入力方式で読み込まれる */
+  var s52 = sampleState();
+  s52.account.collateralBasis = "before"; s52.account.collateralMarket = 10000000; s52.account.collateralHaircut = 75;
+  var round52 = unpackState(packState(sanitizeState(s52)));
+  var old52 = sampleState();
+  delete old52.account.collateralBasis; delete old52.account.collateralMarket; delete old52.account.collateralHaircut;
+  var mig52 = sanitizeState(old52);
+  t("掛目入力の項目がJSON往復し旧データは直接入力で読み込まれる", round52.ok
+    && round52.state.account.collateralBasis === "before" && round52.state.account.collateralMarket === 10000000 && round52.state.account.collateralHaircut === 75
+    && mig52.account.collateralBasis === "after" && mig52.account.collateralMarket === null && mig52.account.collateralHaircut === null
+    && mig52.account.collateral === 15617481,
+    "入力方式・時価・掛目はJSON書き出し／読み込みで保持される。新項目のない旧データは方式＝直接入力・時価と掛目は空で補完され、代用評価額は従来どおり15,617,481円で読み込まれる");
   return T;
 }
 
