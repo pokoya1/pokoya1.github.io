@@ -163,10 +163,57 @@ select.exp-select{width:100%}
 .strat-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 @media(prefers-color-scheme:dark){.strat-btn.active{background:var(--teal);color:#042f2e;border-color:var(--teal)}}
 .strat-desc{font-size:12px;color:var(--muted);margin:6px 0 0}
+
+/* --- 4-screen navigation --- */
+.screen-nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;top:0;z-index:40;background:var(--bg);padding:10px 0 12px;margin-bottom:6px}
+.snav-btn{position:relative;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:10px 20px;font-size:14.5px;font-weight:900;cursor:pointer;min-height:48px}
+.snav-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media(prefers-color-scheme:dark){.snav-btn.active{background:var(--teal);color:#042f2e;border-color:var(--teal)}}
+.nav-dot{position:absolute;top:8px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--amber)}
+.stale-badge{display:inline-flex;align-items:center;background:var(--amber);color:#fff;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:900}
+@media(max-width:700px){
+  .screen-nav{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(23,57,77,.10);flex-wrap:nowrap;gap:6px}
+  .snav-btn{flex:1;padding:10px 4px;font-size:13px;min-height:52px}
+  .stale-badge.nav-stale{display:none}
+  .wrap{padding-bottom:110px}
+}
+/* --- screens --- */
+[hidden]{display:none!important}
+.screen[hidden]{display:none}
+#screen-conditions .controls{position:static;max-width:800px;margin:0 auto}
+.cond-line{font-size:14px;font-weight:700;margin:4px 0 8px}
+.home-cond-list{margin:8px 0 4px;padding-left:20px;font-size:13.5px;color:var(--muted)}
+.home-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.home-links button{flex:1 1 180px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:12px;padding:13px 12px;font-size:14.5px;font-weight:900;cursor:pointer;min-height:52px}
+.home-links button.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+.stale-note{font-size:13px;color:var(--amber);font-weight:700;margin:10px 0 0}
+.share-state-line{font-size:16px;font-weight:900;margin:4px 0 6px}
+#shareCard .share-box{border-top:none;margin-top:6px;padding-top:0}
+.btn-x.is-disabled{opacity:.45;pointer-events:none}
+/* --- collapsible detail groups (conditions, detail mode) --- */
+#detailPanel .group>h3{cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:4px 0}
+#detailPanel .group>h3::after{content:"＋ 開く";font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:0;white-space:nowrap}
+#detailPanel .group:not(.collapsed)>h3::after{content:"− 閉じる"}
+#detailPanel .group.collapsed>*:not(h3){display:none}
+#detailPanel .group{padding-bottom:10px}
+/* --- collapsible cards (detail results) --- */
+.foldable{position:relative}
+.foldable>h2{padding-right:104px}
+.fold-btn{position:absolute;top:14px;right:14px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:900;cursor:pointer;min-height:44px}
+.foldable.collapsed>*:not(h2):not(.fold-btn){display:none!important}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="screen-nav" aria-label="画面切り替え">
+    <button type="button" class="snav-btn active" data-screen="home" aria-pressed="true">ホーム</button>
+    <button type="button" class="snav-btn" data-screen="conditions" aria-pressed="false">条件設定</button>
+    <button type="button" class="snav-btn" data-screen="detail" aria-pressed="false">詳細結果</button>
+    <button type="button" class="snav-btn" data-screen="share" aria-pressed="false">共有・設定<span class="nav-dot" id="navStaleDot" hidden></span></button>
+    <span class="stale-badge nav-stale" data-stale hidden>条件変更あり</span>
+  </nav>
+
+  <section class="screen" id="screen-home">
   <header class="top">
     <h1>資産は、何歳まで持つのか。<br>確率で確かめる。</h1>
     <p>現役時代の給与・積立から、退職後の年金・取り崩しまでを一続きで計算し、さらに市場変動を加えて数千通りの未来を試す融合シミュレーターです。「平均どおりなら持つ」ではなく、「悪い相場が来ても持つ確率は何％か」まで分かります。</p>
@@ -176,7 +223,40 @@ select.exp-select{width:100%}
     </div>
   </header>
 
-  <div class="layout">
+      <section class="panel card lifespan" id="lifespanCard">
+        <h2>資産寿命の結果</h2>
+        <div class="life-grid">
+          <div class="gauge-wrap" aria-hidden="true">
+            <svg viewBox="0 0 200 120" role="img" aria-label="資産が持つ確率の円弧ゲージ">
+              <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--surface2)" stroke-width="16" stroke-linecap="round"/>
+              <path id="gaugeArc" d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--teal)" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251.3"/>
+            </svg>
+            <div class="gauge-center"><div class="gv" id="gaugeCenter">—</div><div class="gk">持つ確率</div></div>
+          </div>
+          <div>
+            <div class="life-prob-label" id="lifeProbLabel">資産が持つ確率</div>
+            <div class="life-prob" id="lifeProb">—</div>
+            <div class="life-median">最終資産の中央値 <span class="mv" id="lifeMedianVal">—</span></div>
+            <p class="life-note">数千通りの試算のうち、判定年齢まで資産が残った割合です。将来を保証するものではなく、条件を変えたときの変化を見るための目安です。</p>
+          </div>
+        </div>
+        <div class="verdict" id="verdict">条件を入力すると、ここに結果の読み解きが表示されます。</div>
+      </section>
+
+      <section class="panel card" id="homeCondCard">
+        <div class="bar-row"><h2>いまの条件</h2><span class="stale-badge" data-stale hidden>条件変更あり</span></div>
+        <p class="cond-line" id="homeCondSummary">—</p>
+        <ul class="home-cond-list" id="homeCondList"></ul>
+        <p class="stale-note" data-stale hidden>条件が変更されています。まだ結果に反映されていません。「条件設定」で「試算結果を見る」を押すと、最新の条件で計算し直します。</p>
+        <div class="home-links">
+          <button type="button" class="primary" data-goto="conditions">条件を変更する</button>
+          <button type="button" data-goto="detail">詳細結果を見る</button>
+          <button type="button" data-goto="share">結果を共有する</button>
+        </div>
+      </section>
+  </section>
+
+  <section class="screen" id="screen-conditions" hidden>
     <!-- CONTROLS -->
     <section class="panel controls" aria-label="条件入力">
       <h2>条件を入力する</h2>
@@ -283,30 +363,25 @@ select.exp-select{width:100%}
       </div>
 
       </div><!-- /detailPanel -->
-      <button class="run" id="runBtn" type="button">シミュレーション実行</button>
+      <button class="run" id="runBtn" type="button">試算結果を見る</button>
       <p class="note">計算の前提：給与は退職まで横ばい、年金は金額固定（物価スライドなし）、貯金は年1％、支出はインフレ率で毎年増加。運用リターンは毎年、想定リターンとリスクから正規分布でランダムに発生させます。</p>
     </section>
+  </section>
 
-    <!-- RESULTS -->
-    <div class="results">
-      <section class="panel card lifespan" id="lifespanCard">
-        <h2>資産寿命の結果</h2>
-        <div class="life-grid">
-          <div class="gauge-wrap" aria-hidden="true">
-            <svg viewBox="0 0 200 120" role="img" aria-label="資産が持つ確率の円弧ゲージ">
-              <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--surface2)" stroke-width="16" stroke-linecap="round"/>
-              <path id="gaugeArc" d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="var(--teal)" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251.3"/>
-            </svg>
-            <div class="gauge-center"><div class="gv" id="gaugeCenter">—</div><div class="gk">持つ確率</div></div>
-          </div>
-          <div>
-            <div class="life-prob-label" id="lifeProbLabel">資産が持つ確率</div>
-            <div class="life-prob" id="lifeProb">—</div>
-            <div class="life-median">最終資産の中央値 <span class="mv" id="lifeMedianVal">—</span></div>
-            <p class="life-note">数千通りの試算のうち、判定年齢まで資産が残った割合です。将来を保証するものではなく、条件を変えたときの変化を見るための目安です。</p>
-          </div>
+  <section class="screen" id="screen-detail" hidden>
+      <section class="panel card" id="summaryCard">
+        <div class="bar-row"><h2>詳細指標</h2><span class="hist-note" id="condSummary"></span></div>
+        <p class="sub" style="margin-top:6px">持つ確率と最終資産の中央値はホームの「資産寿命の結果」にまとめています。ここでは内訳の指標だけを表示します。</p>
+        <div class="kpis" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="k">最終資産（平均値）</div><div class="v" style="font-size:20px" id="kMean">—</div><div class="d">上振れに引っ張られ高め</div></div>
+          <div class="kpi"><div class="k">10パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP10">—</div><div class="d">悪い相場が続いた場合の目安</div></div>
+          <div class="kpi"><div class="k">90パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP90">—</div><div class="d">相場に恵まれた場合の目安</div></div>
         </div>
-        <div class="verdict" id="verdict">条件を入力して「シミュレーション実行」を押してください。</div>
+        <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="k">枯渇する年齢（中央値）</div><div class="v" style="font-size:20px" id="kRuin">—</div><div class="d" id="kRuinD">—</div></div>
+          <div class="kpi"><div class="k">元本総額（初期＋積立）</div><div class="v" style="font-size:20px" id="kPrincipal">—</div><div class="d">初期資産と現役時の積立の合計</div></div>
+          <div class="kpi"><div class="k">元本割れ確率</div><div class="v" style="font-size:20px" id="kLoss">—</div><div class="d">最終資産が元本を下回る確率</div></div>
+        </div>
       </section>
 
       <section class="panel card" id="fanCard">
@@ -320,19 +395,54 @@ select.exp-select{width:100%}
         </div>
       </section>
 
-      <section class="panel card" id="summaryCard">
-        <div class="bar-row"><h2>詳細指標</h2><span class="hist-note" id="condSummary"></span></div>
-        <p class="sub" style="margin-top:6px">持つ確率と最終資産の中央値は上の「資産寿命の結果」にまとめています。ここでは内訳の指標だけを表示します。</p>
-        <div class="kpis" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
-          <div class="kpi"><div class="k">最終資産（平均値）</div><div class="v" style="font-size:20px" id="kMean">—</div><div class="d">上振れに引っ張られ高め</div></div>
-          <div class="kpi"><div class="k">10パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP10">—</div><div class="d">悪い相場が続いた場合の目安</div></div>
-          <div class="kpi"><div class="k">90パーセンタイル値（最終資産）</div><div class="v" style="font-size:20px" id="kP90">—</div><div class="d">相場に恵まれた場合の目安</div></div>
-        </div>
-        <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
-          <div class="kpi"><div class="k">枯渇する年齢（中央値）</div><div class="v" style="font-size:20px" id="kRuin">—</div><div class="d" id="kRuinD">—</div></div>
-          <div class="kpi"><div class="k">元本総額（初期＋積立）</div><div class="v" style="font-size:20px" id="kPrincipal">—</div><div class="d">初期資産と現役時の積立の合計</div></div>
-          <div class="kpi"><div class="k">元本割れ確率</div><div class="v" style="font-size:20px" id="kLoss">—</div><div class="d">最終資産が元本を下回る確率</div></div>
-        </div>
+      <div class="grid2">
+        <section class="panel card" id="histCard">
+          <h2>最終資産の分布</h2>
+          <p class="sub" id="histSub">判定年齢時点の資産額のばらつき</p>
+          <div id="histChart"></div>
+          <p class="hist-note">左端の赤い棒は、判定年齢までに資産が尽きたケースです。山が右にあるほど、余裕のある結果が多いことを示します。</p>
+        </section>
+        <section class="panel card details" id="howtoCard">
+          <h2 style="margin-bottom:2px">結果の読み方</h2>
+          <h3>まず見るのは「持つ確率」</h3>
+          <p>判定年齢まで資産が残る確率です。80％以上なら比較的堅く、50％前後なら支出・積立・退職年齢のどれかを動かして感度を見てください。</p>
+          <h3>中央値と平均値の違い</h3>
+          <p>平均値は一部の大成功ケースに引っ張られます。現実的な目安は中央値（真ん中のケース）です。</p>
+          <h3>試しに変えてみると効果的な条件</h3>
+          <ul>
+            <li>退職年齢を＋2歳／積立を＋1万円</li>
+            <li>退職後の支出を−2万円</li>
+            <li>リスクだけを上げても確率は改善しにくい点に注意</li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="panel card" id="tableCard">
+        <h2>年ごとの内訳（中央値のケース）</h2>
+        <p class="sub">各年齢で「真ん中だったケース」の貯金・運用資産・収支です。取り崩し元の元ページと同じ形式の表に、モンテカルロの中央値を入れています。</p>
+        <div class="tablewrap"><table id="yearTable">
+          <thead><tr><th>年齢</th><th>年間支出</th><th>給与収入</th><th>年金収入</th><th>貯金額</th><th>運用資産</th><th>総資産</th><th>10パーセンタイルの総資産</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </section>
+
+      <footer>
+        <p>※ 本シミュレーションは確率的な計算に基づく目安であり、将来の運用成果や生活の持続を保証するものではありません。税金・社会保険料の変動、介護・医療費、住宅費の大きな支出などは含んでいません。</p>
+        <p>融合元のページ：資産取り崩しシミュレーション（<a href="https://kabulife21.com/%e8%b3%87%e7%94%a3%e5%8f%96%e3%82%8a%e5%b4%a9%e3%81%97%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）／ モンテカルロシミュレーション（<a href="https://kabulife21.com/%e3%83%a2%e3%83%b3%e3%83%86%e3%82%ab%e3%83%ab%e3%83%ad%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）。プリセットのリターン／リスクは過去データに基づく一般的な概算値です。</p>
+      </footer>
+  </section>
+
+  <section class="screen" id="screen-share" hidden>
+      <section class="panel card" id="shareStateCard">
+        <div class="bar-row"><h2>共有する結果</h2><span class="stale-badge" data-stale hidden>条件変更あり</span></div>
+        <p class="share-state-line" id="shareStateLine">—</p>
+        <p class="cond-line" id="shareCondSummary"></p>
+        <p class="stale-note" data-stale hidden>条件が変更されています。古い結果を共有しないよう、下の共有ボタンは再計算するまで使えません。</p>
+        <button type="button" class="run" id="recalcBtn" data-stale hidden>再計算して最新の結果にする</button>
+      </section>
+
+      <section class="panel card" id="shareCard">
+        <h2>結果を共有・保存する</h2>
         <div class="share-box">
           <div class="privacy-row">
             <span class="privacy-label" id="privacyLabel">共有するときの現在の年齢</span>
@@ -363,46 +473,124 @@ select.exp-select{width:100%}
           </div>
         </div>
       </section>
-
-      <div class="grid2">
-        <section class="panel card">
-          <h2>最終資産の分布</h2>
-          <p class="sub" id="histSub">判定年齢時点の資産額のばらつき</p>
-          <div id="histChart"></div>
-          <p class="hist-note">左端の赤い棒は、判定年齢までに資産が尽きたケースです。山が右にあるほど、余裕のある結果が多いことを示します。</p>
-        </section>
-        <section class="panel card details">
-          <h2 style="margin-bottom:2px">結果の読み方</h2>
-          <h3>まず見るのは「持つ確率」</h3>
-          <p>判定年齢まで資産が残る確率です。80％以上なら比較的堅く、50％前後なら支出・積立・退職年齢のどれかを動かして感度を見てください。</p>
-          <h3>中央値と平均値の違い</h3>
-          <p>平均値は一部の大成功ケースに引っ張られます。現実的な目安は中央値（真ん中のケース）です。</p>
-          <h3>試しに変えてみると効果的な条件</h3>
-          <ul>
-            <li>退職年齢を＋2歳／積立を＋1万円</li>
-            <li>退職後の支出を−2万円</li>
-            <li>リスクだけを上げても確率は改善しにくい点に注意</li>
-          </ul>
-        </section>
-      </div>
-
-      <section class="panel card">
-        <h2>年ごとの内訳（中央値のケース）</h2>
-        <p class="sub">各年齢で「真ん中だったケース」の貯金・運用資産・収支です。取り崩し元の元ページと同じ形式の表に、モンテカルロの中央値を入れています。</p>
-        <div class="tablewrap"><table id="yearTable">
-          <thead><tr><th>年齢</th><th>年間支出</th><th>給与収入</th><th>年金収入</th><th>貯金額</th><th>運用資産</th><th>総資産</th><th>10パーセンタイルの総資産</th></tr></thead>
-          <tbody></tbody>
-        </table></div>
-      </section>
-
-      <footer>
-        <p>※ 本シミュレーションは確率的な計算に基づく目安であり、将来の運用成果や生活の持続を保証するものではありません。税金・社会保険料の変動、介護・医療費、住宅費の大きな支出などは含んでいません。</p>
-        <p>融合元のページ：資産取り崩しシミュレーション（<a href="https://kabulife21.com/%e8%b3%87%e7%94%a3%e5%8f%96%e3%82%8a%e5%b4%a9%e3%81%97%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）／ モンテカルロシミュレーション（<a href="https://kabulife21.com/%e3%83%a2%e3%83%b3%e3%83%86%e3%82%ab%e3%83%ab%e3%83%ad%e3%82%b7%e3%83%9f%e3%83%a5%e3%83%ac%e3%83%bc%e3%82%b7%e3%83%a7%e3%83%b3/" target="_blank" rel="noopener">kabulife21.com</a>）。プリセットのリターン／リスクは過去データに基づく一般的な概算値です。</p>
-      </footer>
-    </div>
-  </div>
+  </section>
 </div>
 
+<script>
+(function(){
+"use strict";
+// ---- 4-screen navigation (single page: inputs and results persist) ----
+function $(id){return document.getElementById(id);}
+var screenNames=["home","conditions","detail","share"];
+function gotoScreen(name){
+  screenNames.forEach(function(n){
+    var s=$("screen-"+n); if(s) s.hidden = (n!==name);
+  });
+  document.querySelectorAll(".snav-btn").forEach(function(b){
+    var on=b.dataset.screen===name;
+    b.classList.toggle("active",on);
+    b.setAttribute("aria-pressed",on?"true":"false");
+  });
+  window.scrollTo(0,0);
+}
+window.__gotoScreen=gotoScreen;
+document.querySelectorAll(".snav-btn").forEach(function(b){
+  b.addEventListener("click",function(){ gotoScreen(b.dataset.screen); });
+});
+document.querySelectorAll("[data-goto]").forEach(function(b){
+  b.addEventListener("click",function(){ gotoScreen(b.dataset.goto); });
+});
+
+// ---- result state: fresh vs. conditions changed (stale) ----
+// Any edit inside the conditions screen marks the result stale until the
+// next run() completes (run() calls window.__onRun). While stale, the
+// share actions are disabled so an old result can never be shared.
+var stale=false;
+window.__isStale=function(){ return stale; };
+function setStale(on){
+  stale=!!on;
+  document.querySelectorAll("[data-stale]").forEach(function(el){ el.hidden=!stale; });
+  var dot=$("navStaleDot"); if(dot) dot.hidden=!stale;
+  var save=$("saveImgBtn"); if(save) save.disabled=stale;
+  var x=$("shareXBtn");
+  if(x){
+    x.classList.toggle("is-disabled",stale);
+    x.setAttribute("aria-disabled",stale?"true":"false");
+    // While stale the X link must carry no share URL at all, so an old
+    // result cannot be posted; run() rebuilds the href before __onRun
+    // clears the stale flag, so a fresh state always has it back.
+    if(stale) x.removeAttribute("href");
+  }
+  if(stale){
+    var sp=$("sharePreviewWrap"); if(sp) sp.hidden=true;
+    var line=$("shareStateLine"); if(line) line.textContent="条件が変更されています（未計算）";
+  }
+}
+function syncResultUI(){
+  var cs=$("condSummary");
+  var txt=cs?cs.textContent:"";
+  var hc=$("homeCondSummary"); if(hc&&txt) hc.textContent=txt;
+  var sc=$("shareCondSummary"); if(sc&&txt) sc.textContent="条件："+txt;
+  var hl=$("hiddenCondList"), home=$("homeCondList");
+  if(hl&&home) home.innerHTML=hl.innerHTML;
+  var lp=$("lifeProb"), ll=$("lifeProbLabel"), lm=$("lifeMedianVal"), line=$("shareStateLine");
+  if(line&&lp&&ll&&lm) line.textContent=ll.textContent+" "+lp.textContent+" ／ 最終資産の中央値 "+lm.textContent;
+}
+window.__onRun=function(){ syncResultUI(); setStale(false); };
+var condScreen=$("screen-conditions");
+if(condScreen){
+  condScreen.addEventListener("input",function(){ setStale(true); });
+}
+var saveBtn=$("saveImgBtn");
+if(saveBtn) saveBtn.addEventListener("click",function(e){
+  if(stale){ e.preventDefault(); e.stopImmediatePropagation();
+    var st=$("shareStatus"); if(st) st.textContent="条件が変更されています。先に「再計算して最新の結果にする」を押してください。"; }
+},true);
+var xBtn=$("shareXBtn");
+if(xBtn) xBtn.addEventListener("click",function(e){
+  if(stale){ e.preventDefault();
+    var st=$("shareStatus"); if(st) st.textContent="条件が変更されています。先に「再計算して最新の結果にする」を押してください。"; }
+},true);
+var recalc=$("recalcBtn");
+if(recalc) recalc.addEventListener("click",function(){ if(window.__recalc) window.__recalc(); });
+
+// ---- collapsible detail-setting groups (start closed) ----
+document.querySelectorAll("#detailPanel .group").forEach(function(g){
+  g.classList.add("collapsed");
+  var h=g.querySelector("h3");
+  if(!h) return;
+  h.setAttribute("role","button");
+  h.setAttribute("tabindex","0");
+  h.setAttribute("aria-expanded","false");
+  function toggle(){
+    var closed=g.classList.toggle("collapsed");
+    h.setAttribute("aria-expanded",closed?"false":"true");
+  }
+  h.addEventListener("click",toggle);
+  h.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); } });
+});
+
+// ---- collapsible detail-result cards (toggling never recalculates) ----
+[["fanCard",false],["histCard",true],["howtoCard",true],["tableCard",true]].forEach(function(pair){
+  var card=$(pair[0]); if(!card) return;
+  card.classList.add("foldable");
+  if(pair[1]) card.classList.add("collapsed");
+  var btn=document.createElement("button");
+  btn.type="button"; btn.className="fold-btn";
+  btn.textContent=pair[1]?"開く":"閉じる";
+  btn.setAttribute("aria-expanded",pair[1]?"false":"true");
+  btn.addEventListener("click",function(){
+    var closed=card.classList.toggle("collapsed");
+    btn.textContent=closed?"開く":"閉じる";
+    btn.setAttribute("aria-expanded",closed?"false":"true");
+  });
+  card.appendChild(btn);
+});
+
+// initial sync from the first automatic run()
+syncResultUI();
+})();
+</script>
 <script>
 (function(){
 "use strict";
@@ -430,6 +618,7 @@ var hideCurAgeShare=true;
 var lastImageUrl=null, lastImageFile=null, lastImageName="simulation-result.png";
 function refreshShareLink(){
   var xl=$("shareXBtn");
+  if(window.__isStale && window.__isStale()){ if(xl) xl.removeAttribute("href"); return; }
   if(xl && lastResult) xl.href="https://twitter.com/intent/tweet?text="+encodeURIComponent(buildShareText(lastResult));
 }
 function setHideCurAgeShare(hide){
@@ -636,6 +825,8 @@ function run(){
   drawFan(o, p10,p25,medTotal,p75,p90, det);
   drawHist(finals, principal);
   buildTable(o, det, medInv, medSav, medTotal, p10);
+  window.__recalc=run;
+  if(window.__onRun) window.__onRun(o,success,medianF);
 }
 
 function drawFan(o,p10,p25,med,p75,p90,det){
@@ -1017,7 +1208,7 @@ document.querySelectorAll(".age-preset").forEach(function(b){
 });
 var emSel=$("n_earlyMode"); if(emSel) emSel.addEventListener("change",run);
 
-$("runBtn").addEventListener("click",run);
+$("runBtn").addEventListener("click",function(){ run(); if(window.__gotoScreen) window.__gotoScreen("home"); });
 // live re-run on select change (light), and debounce number changes
 $("n_sims").addEventListener("change",run);
 var deb=null;
