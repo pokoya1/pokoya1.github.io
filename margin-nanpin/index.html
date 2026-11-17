@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0d3b34" />
+<link rel="icon" href="data:," />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<title>信用ナンピン計画・リスク管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#f2f5f7; --surface:#ffffff; --surface2:#eef2f5; --ink:#182230; --muted:#5a6b7e;
+  --line:#d7dfe7; --line2:#c3cedb;
+  --accent:#0d7a68; --accent-ink:#0a5c4f; --accent-bg:#e2f2ee;
+  --warn:#9a6206; --warn-bg:#fdf0d5; --warn-line:#e8c877;
+  --danger:#b3261e; --danger-bg:#fdecea; --danger-line:#f0b3ae;
+  --info:#1d5fa8; --info-bg:#e6effa;
+  --shadow:0 1px 3px rgba(16,32,48,.08),0 4px 14px rgba(16,32,48,.05);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f141b; --surface:#182029; --surface2:#1f2937; --ink:#e7edf4; --muted:#9db0c4;
+    --line:#2b394c; --line2:#3a4c64;
+    --accent:#2fbf9f; --accent-ink:#7fe3cb; --accent-bg:#123c33;
+    --warn:#f0b95a; --warn-bg:#3d2f0e; --warn-line:#7a5c1c;
+    --danger:#ff8a80; --danger-bg:#421d1a; --danger-line:#7c3833;
+    --info:#8dbdf2; --info-bg:#17334f;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:15px;line-height:1.55}
+button,[role="button"],select,summary,input:not([type="checkbox"],[type="radio"]){min-height:2.25rem}
+input[type="checkbox"]{width:20px;height:20px;accent-color:var(--accent)}
+.num{font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+button{font:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:8px;padding:.45rem .9rem;font-weight:700;font-size:.9rem;min-height:2.5rem}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (prefers-color-scheme: dark){.btn.primary{color:#06231d}}
+.btn.danger-outline{color:var(--danger);border-color:var(--danger-line)}
+.btn.small{min-height:2.25rem;padding:.3rem .65rem;font-size:.82rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type="number"],input[type="text"],input[type="date"],select{background:var(--surface);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:.45rem .6rem;font:inherit;font-size:.95rem;width:100%}
+input[type="number"]{text-align:right;font-variant-numeric:tabular-nums}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+input[type="range"]{width:100%;accent-color:var(--accent);min-height:2rem;padding:0}
+label.flabel{display:block;font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.3rem}
+.field{min-width:0}
+.hint{font-size:.78rem;color:var(--muted);margin-top:.35rem}
+.wrap{max-width:1180px;margin:0 auto;padding:0 14px 96px}
+/* top bar */
+.topbar{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1180px;margin:0 auto;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.apptitle{font-weight:900;font-size:1rem;letter-spacing:.02em;margin-right:auto;display:flex;align-items:center;gap:8px}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:.12rem .6rem;font-size:.72rem;font-weight:700;border:1px solid var(--line2);background:var(--surface2);color:var(--muted)}
+.badge.sample{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tabs{display:none;gap:4px}
+.tabs button{border:1px solid transparent;background:transparent;color:var(--muted);font-weight:700;border-radius:8px;padding:.5rem .9rem;min-height:2.5rem}
+.tabs button[aria-selected="true"]{background:var(--accent-bg);color:var(--accent-ink);border-color:var(--accent)}
+@media(min-width:760px){.tabs{display:flex}.wrap{padding-bottom:40px}}
+/* bottom nav */
+.bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+.bottomnav button{background:none;border:none;color:var(--muted);font-size:.68rem;font-weight:700;padding:.45rem 0 .4rem;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:3.4rem}
+.bottomnav button[aria-selected="true"]{color:var(--accent-ink)}
+.bottomnav svg{width:22px;height:22px}
+@media(min-width:760px){.bottomnav{display:none}}
+/* cards & layout */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-top:14px}
+.card h2{font-size:1.02rem;margin:0 0 4px;font-weight:900}
+.card h3{font-size:.92rem;margin:0 0 8px;font-weight:900}
+.card .sub{color:var(--muted);font-size:.83rem;margin:0 0 10px}
+.grid2{display:grid;gap:14px}
+@media(min-width:900px){.grid2{grid-template-columns:1fr 1fr}.grid2.wide{grid-template-columns:3fr 2fr}}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+@media(min-width:760px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
+.kpi .k-label{font-size:.74rem;font-weight:700;color:var(--muted)}
+.kpi .k-value{font-size:1.45rem;font-weight:900;line-height:1.25;margin-top:2px}
+.kpi .k-value small{font-size:.8rem;font-weight:700;color:var(--muted)}
+.kpi .k-note{font-size:.76rem;color:var(--muted);margin-top:2px}
+.kpi.alert{border-color:var(--danger-line);background:var(--danger-bg)}
+.kpi.caution{border-color:var(--warn-line);background:var(--warn-bg)}
+.hero-rate{background:linear-gradient(135deg,#0d3b34,#0d7a68);color:#fff;border-radius:var(--radius);padding:18px;margin-top:14px;box-shadow:var(--shadow)}
+.hero-rate .h-label{font-size:.8rem;font-weight:700;opacity:.85}
+.hero-rate .h-big{font-size:1.6rem;font-weight:900;line-height:1.35;margin-top:4px}
+.hero-rate .h-sub{font-size:.88rem;opacity:.92;margin-top:6px}
+.hero-rate.danger{background:linear-gradient(135deg,#5f130e,#b3261e)}
+.hero-rate.caution{background:linear-gradient(135deg,#5c3d05,#9a6206)}
+.pill{display:inline-block;border-radius:999px;padding:.1rem .55rem;font-size:.72rem;font-weight:700;vertical-align:middle}
+.pill.safe{background:var(--accent-bg);color:var(--accent-ink)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.danger{background:var(--danger-bg);color:var(--danger)}
+.pill.mute{background:var(--surface2);color:var(--muted)}
+.pill.info{background:var(--info-bg);color:var(--info)}
+/* table */
+.tblwrap{overflow-x:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:.88rem}
+table.dt th,table.dt td{padding:.5rem .55rem;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.dt th{font-size:.74rem;color:var(--muted);font-weight:700;background:var(--surface2);position:sticky;top:0}
+table.dt th:first-child,table.dt td:first-child{text-align:left}
+table.dt tr.sel td{background:var(--accent-bg)}
+table.dt tr.row-danger td{background:var(--danger-bg)}
+table.dt tr.row-warn td{background:var(--warn-bg)}
+table.dt tbody tr{cursor:pointer}
+@media(max-width:640px){
+  .hide-sp{display:none}
+  /* 詳細表はスマホでは行カード形式に組み替える（横スクロールなし） */
+  .tblwrap{overflow-x:visible}
+  table.dt thead{display:none}
+  table.dt,table.dt tbody{display:block}
+  table.dt tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;padding:10px 6px;border-bottom:1px solid var(--line)}
+  table.dt td{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:none;padding:.28rem 0;white-space:normal;text-align:right;font-size:.86rem}
+  table.dt td::before{content:attr(data-label);font-size:.72rem;font-weight:700;color:var(--muted);text-align:left}
+  table.dt td:first-child{grid-column:1 / -1;font-size:1rem;font-weight:900;border-bottom:1px dashed var(--line);padding-bottom:.4rem}
+  table.dt td:first-child::before{content:"下落率"}
+}
+/* chart */
+.chartbox{width:100%}
+.chartbox svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.78rem;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:22px;height:0;border-top:3px solid var(--accent);border-radius:2px}
+.sw.dash{border-top-style:dashed}
+.sw.mgmt{border-color:#d9930d}.sw.call{border-color:var(--danger)}
+.dotkey{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d9930d}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.seg button{border:none;background:var(--surface);color:var(--muted);font-weight:700;padding:.35rem .8rem;min-height:2.25rem}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+/* plan */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chip{border:1px solid var(--line2);background:var(--surface);border-radius:10px;padding:.55rem .8rem;text-align:left;min-height:3rem;box-shadow:var(--shadow)}
+.chip[aria-selected="true"]{border-color:var(--accent);background:var(--accent-bg)}
+.chip .c-code{font-weight:900;font-size:.95rem}
+.chip .c-name{font-size:.72rem;color:var(--muted)}
+.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:760px){.formgrid{grid-template-columns:repeat(4,1fr)}.formgrid.c3{grid-template-columns:repeat(3,1fr)}}
+.stagerow{border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-top:10px;background:var(--surface)}
+.stagerow.off{opacity:.55}
+.stagerow .sr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stagerow .sr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+@media(min-width:760px){.stagerow .sr-grid{grid-template-columns:repeat(4,1fr)}}
+.stagerow .calc{font-size:.86rem}
+.stagerow .calc .cl{font-size:.72rem;color:var(--muted);font-weight:700}
+.stagerow .calc .cv{font-weight:900;font-size:1rem}
+.switchlabel{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.85rem;cursor:pointer;padding:.3rem 0;min-height:2.25rem}
+.minibar{position:sticky;top:57px;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 14px;margin-top:14px;display:flex;gap:8px 18px;flex-wrap:wrap;font-size:.85rem}
+.minibar b{font-size:1rem}
+.posrow{border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-top:10px}
+.posrow .pr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px}
+@media(min-width:760px){.posrow .pr-grid{grid-template-columns:repeat(5,1fr)}}
+.rowflex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mt{margin-top:12px}.mb0{margin-bottom:0}
+.notice{border-radius:var(--radius);padding:12px 14px;font-size:.86rem;margin-top:14px;border:1px solid}
+.notice.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--ink)}
+.notice.info{background:var(--info-bg);border-color:var(--line2)}
+.notice.danger{background:var(--danger-bg);border-color:var(--danger-line)}
+details.more{margin-top:10px}
+details.more summary{font-weight:700;color:var(--accent-ink);cursor:pointer;padding:.4rem 0;min-height:2.25rem}
+.kv{display:grid;grid-template-columns:minmax(150px,auto) 1fr;gap:4px 14px;font-size:.9rem}
+.kv dt{color:var(--muted);font-weight:700}
+.kv dd{margin:0;text-align:right;font-weight:700}
+@media(max-width:640px){
+  .kv{grid-template-columns:1fr;gap:0}
+  .kv dt{margin-top:10px}
+  .kv dd{text-align:left;font-size:1.02rem;border-bottom:1px solid var(--line);padding-bottom:6px}
+}
+/* modal & toast */
+.modalback{position:fixed;inset:0;background:rgba(8,16,24,.55);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border-radius:12px;max-width:440px;width:100%;padding:20px;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 8px;font-size:1.05rem}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:90;background:#182230;color:#fff;padding:.7rem 1.1rem;border-radius:10px;font-size:.88rem;font-weight:700;box-shadow:var(--shadow);max-width:92vw;text-align:center}
+@media(min-width:760px){.toast{bottom:28px}}
+.testlist{list-style:none;margin:8px 0 0;padding:0;font-size:.88rem}
+.testlist li{padding:.45rem 0;border-bottom:1px solid var(--line);display:flex;gap:8px}
+.testlist .ok{color:var(--accent-ink);font-weight:900}
+.testlist .ng{color:var(--danger);font-weight:900}
+footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
+.view[hidden]{display:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="apptitle">信用ナンピン計画・リスク管理 <span class="badge sample" id="sampleBadge">サンプルデータ</span> <span class="badge" id="saveStatus" role="status">自動保存を確認中…</span></div>
+    <nav class="tabs" role="tablist" aria-label="画面切替">
+      <button role="tab" data-view="dashboard" aria-selected="true">ダッシュボード</button>
+      <button role="tab" data-view="plan" aria-selected="false">購入計画</button>
+      <button role="tab" data-view="account" aria-selected="false">口座・保有状況</button>
+      <button role="tab" data-view="settings" aria-selected="false">設定・データ</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="view" id="view-dashboard"></section>
+  <section class="view" id="view-plan" hidden></section>
+  <section class="view" id="view-account" hidden></section>
+  <section class="view" id="view-settings" hidden></section>
+  <footer class="note">
+    本ツールは信用取引の購入計画と保証金維持率の<strong>概算シミュレーション</strong>です。維持率が追証基準に到達することと、実際に追証（追加保証金）が発生することは同一ではありません。証券会社ごとの実際の計算制度・掛目・最低保証金等とは異なる場合があり、制度への適合を保証するものではありません。実際の取引判断は証券会社の表示と制度をご確認ください。口座の認証情報は取得せず、実際の注文も行いません。
+  </footer>
+</main>
+
+<nav class="bottomnav" aria-label="画面切替">
+  <button data-view="dashboard" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h4v8H3zM10 3h4v18h-4zM17 8h4v13h-4z"/></svg>ダッシュボード</button>
+  <button data-view="plan" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>購入計画</button>
+  <button data-view="account" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>口座・保有</button>
+  <button data-view="settings" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2z"/></svg>設定・データ</button>
+</nav>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+<input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-label="JSONファイルを読み込む" />
+<script>
+"use strict";
+/* ============================================================
+   信用ナンピン計画・リスク管理（第一段階）
+   計算モデルは独立モジュール MarginSim に分離。
+   丸め規則：価格は円未満を切り捨てて表示・計算に使用（想定価格＝基準価格×(1−下落率) を円単位に切り捨て）。
+   数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
+   ============================================================ */
+var DATA_VERSION = 1;
+var uidSeq = 100;
+function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
+function num(v, fb){ var n = (typeof v === "string") ? Number(v.replace(/[,，\s]/g,"")) : Number(v); return isFinite(n) ? n : (fb === undefined ? 0 : fb); }
+function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+function fmtYen(v){ if (v === null || v === undefined || !isFinite(v)) return "—"; var r = Math.round(v); return (r < 0 ? "−" : "") + Math.abs(r).toLocaleString("ja-JP") + "円"; }
+function fmtYenShort(v){ if (v === null || v === undefined || !isFinite(v)) return "—"; return (v < 0 ? "−" : "") + Math.abs(Math.round(v)).toLocaleString("ja-JP"); }
+function fmtPct(v, digits){ if (v === null || v === undefined || !isFinite(v)) return "対象外"; return v.toFixed(digits === undefined ? 1 : digits) + "%"; }
+function fmtSignedYen(v){ if (v === null || v === undefined || !isFinite(v)) return "—"; var r = Math.round(v); return (r > 0 ? "+" : (r < 0 ? "−" : "")) + Math.abs(r).toLocaleString("ja-JP") + "円"; }
+function esc(s){ return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+/* ---------- サンプルデータ（指示書 §5） ---------- */
+function sampleStages(){
+  var defs = [[5,100000],[10,100000],[15,100000],[20,200000],[25,437500],[30,437500],[35,437500],[40,437500],[45,437500],[50,437500],[55,437500],[60,437500],[65,500000]];
+  return defs.map(function(d){ return { id: uid("st"), dropPct: d[0], budget: d[1], enabled: true }; });
+}
+function sampleState(){
+  return {
+    version: DATA_VERSION,
+    meta: { isSample: true, updatedAt: "" },
+    account: { broker: "", collateral: 15617481, collateralBasis: "after", cash: 70309, brokerRate: null },
+    positions: [
+      { id: uid("pos"), code: "", name: "既存信用建玉（サンプル）", side: "buy", principal: 64800, pnl: null }
+    ],
+    instruments: [
+      { id: uid("ins"), code: "1308", name: "上場インデックスファンドTOPIX", type: "ETF",
+        basePrice: 3000, currentPrice: 3000, unit: 10, baseIsSample: true,
+        ref: { name: "TOPIX", baseDate: "", baseValue: null, currentValue: null },
+        stages: sampleStages() }
+    ],
+    settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5,
+                collateralMode: "same", collateralCustom: 100, includeProfit: true, fees: 0 }
+  };
+}
+
+/* ---------- 入力サニタイズ（不正値を計算に混入させない） ---------- */
+function sanitizeState(s){
+  if (!s || typeof s !== "object") return null;
+  var out = sampleState();
+  out.meta = { isSample: !!(s.meta && s.meta.isSample), updatedAt: String((s.meta && s.meta.updatedAt) || "") };
+  var a = s.account || {};
+  out.account = {
+    broker: String(a.broker || "").slice(0, 60),
+    collateral: clamp(num(a.collateral, 0), 0, 1e12),
+    collateralBasis: a.collateralBasis === "before" ? "before" : "after",
+    cash: clamp(num(a.cash, 0), -1e12, 1e12),
+    brokerRate: (a.brokerRate === null || a.brokerRate === "" || a.brokerRate === undefined) ? null : clamp(num(a.brokerRate, NaN), 0, 100000)
+  };
+  if (!isFinite(out.account.brokerRate)) out.account.brokerRate = null;
+  out.positions = Array.isArray(s.positions) ? s.positions.slice(0, 100).map(function(p){
+    p = p || {};
+    var pnl = (p.pnl === null || p.pnl === "" || p.pnl === undefined) ? null : num(p.pnl, NaN);
+    return { id: String(p.id || uid("pos")), code: String(p.code || "").slice(0, 12), name: String(p.name || "").slice(0, 60),
+             side: p.side === "sell" ? "sell" : "buy",
+             principal: clamp(num(p.principal, 0), 0, 1e12),
+             pnl: isFinite(pnl) ? clamp(pnl, -1e12, 1e12) : null };
+  }) : [];
+  out.instruments = Array.isArray(s.instruments) ? s.instruments.slice(0, 50).map(function(it){
+    it = it || {};
+    var r = it.ref || {};
+    var bv = (r.baseValue === null || r.baseValue === "" || r.baseValue === undefined) ? null : num(r.baseValue, NaN);
+    var cv = (r.currentValue === null || r.currentValue === "" || r.currentValue === undefined) ? null : num(r.currentValue, NaN);
+    return { id: String(it.id || uid("ins")), code: String(it.code || "").slice(0, 12), name: String(it.name || "").slice(0, 80),
+      type: it.type === "stock" ? "stock" : "ETF",
+      basePrice: clamp(num(it.basePrice, 0), 0, 1e9), currentPrice: clamp(num(it.currentPrice, 0), 0, 1e9),
+      unit: Math.max(1, Math.round(num(it.unit, 1))), baseIsSample: !!it.baseIsSample,
+      ref: { name: ["日経平均","TOPIX","S&P500","NASDAQ100","なし"].indexOf(r.name) >= 0 ? r.name : "なし",
+             baseDate: String(r.baseDate || ""), baseValue: isFinite(bv) ? bv : null, currentValue: isFinite(cv) ? cv : null },
+      stages: Array.isArray(it.stages) ? it.stages.slice(0, 100).map(function(st){
+        st = st || {};
+        return { id: String(st.id || uid("st")), dropPct: clamp(num(st.dropPct, 0), 0, 100),
+                 budget: clamp(Math.round(num(st.budget, 0)), 0, 1e12), enabled: st.enabled !== false };
+      }) : [] };
+  }) : [];
+  var st = s.settings || {};
+  out.settings = {
+    marginCall: clamp(num(st.marginCall, 20), 0, 100), management: clamp(num(st.management, 25), 0, 100),
+    newMargin: clamp(num(st.newMargin, 31), 1, 100), maxDrop: clamp(Math.round(num(st.maxDrop, 80)), 5, 100),
+    step: clamp(num(st.step, 5), 1, 50),
+    collateralMode: ["same","half","strong","none","custom"].indexOf(st.collateralMode) >= 0 ? st.collateralMode : "same",
+    collateralCustom: clamp(num(st.collateralCustom, 100), 0, 300),
+    includeProfit: st.includeProfit !== false, fees: clamp(num(st.fees, 0), 0, 1e12)
+  };
+  out.version = DATA_VERSION;
+  return out;
+}
+
+/* ============================================================
+   計算モジュール MarginSim（証券会社の実制度とは独立した概算モデル）
+   維持率 ＝（代用評価額(シナリオ後) ＋ 保証金現金 ＋ 建玉評価損益(算入設定適用後) − 控除費用）÷ 建代金合計 × 100
+   建代金合計が 0 のとき維持率は null（画面では「対象外」）。
+   ============================================================ */
+var MarginSim = (function(){
+  function collateralFactor(settings){
+    switch (settings.collateralMode){
+      case "same": return 1; case "half": return 0.5; case "strong": return 1.2; case "none": return 0;
+      case "custom": return clamp(num(settings.collateralCustom, 100), 0, 300) / 100;
+      default: return 1;
+    }
+  }
+  function stagePrice(basePrice, dropPct){ return Math.floor(basePrice * (1 - dropPct / 100)); }
+  function qtyFor(budget, price, unit){
+    if (!(price > 0) || !(unit >= 1) || !(budget > 0)) return 0;
+    return Math.floor(budget / price / unit) * unit;
+  }
+  function adjPnl(pnl, settings){ return settings.includeProfit ? pnl : Math.min(pnl, 0); }
+  /* 既存建玉の評価損益：現在値（建代金＋現在評価損益）が下落率ぶん変動する近似。pnl 未入力は 0 として概算し approx を立てる */
+  function existingPnlAt(positions, dropPct){
+    var pnl = 0, approx = false;
+    positions.forEach(function(p){
+      var cur = p.pnl === null ? 0 : p.pnl;
+      if (p.pnl === null && p.principal > 0) approx = true;
+      var mv = p.principal + cur;
+      var delta = mv * (dropPct / 100);
+      pnl += cur + (p.side === "sell" ? delta : -delta);
+    });
+    return { pnl: pnl, approx: approx };
+  }
+  function collateralAt(base, dropPct, factor){ return Math.max(0, Math.floor(base * (1 - (dropPct / 100) * factor))); }
+
+  /* 全段階の数量・実購入額・実行可否をトリガー到達時点の保証金で判定（段階は下落率の昇順に処理） */
+  function evaluateStages(state){
+    var st = state.settings, factor = collateralFactor(st);
+    var flat = [];
+    state.instruments.forEach(function(ins){
+      ins.stages.forEach(function(sg){ flat.push({ ins: ins, sg: sg }); });
+    });
+    flat.sort(function(a, b){ return a.sg.dropPct - b.sg.dropPct || String(a.ins.code).localeCompare(String(b.ins.code)); });
+    var result = {}; var executedPrior = [];
+    flat.forEach(function(item){
+      var ins = item.ins, sg = item.sg;
+      var price = stagePrice(ins.basePrice, sg.dropPct);
+      var qty = qtyFor(sg.budget, price, ins.unit);
+      var cost = qty * price;
+      var rec = { price: price, qty: qty, cost: cost, feasible: false, reason: "", cumBudget: 0 };
+      if (!sg.enabled){ rec.reason = "無効"; result[sg.id] = rec; return; }
+      if (qty <= 0){ rec.reason = price <= 0 ? "基準価格が未設定" : "予算内で売買単位を購入できない"; result[sg.id] = rec; return; }
+      /* トリガー到達時点（下落率＝この段階の下落率）の推計保証金 */
+      var t = sg.dropPct;
+      var exP = existingPnlAt(state.positions, t);
+      var newPnl = 0;
+      executedPrior.forEach(function(p){
+        var curPrice = Math.floor(p.ins.basePrice * (1 - t / 100));
+        newPnl += p.qty * (curPrice - p.price);
+      });
+      var balance = collateralAt(state.account.collateral, t, factor) + state.account.cash
+                    + adjPnl(exP.pnl + newPnl, st) - st.fees;
+      var required = Math.ceil(cost * st.newMargin / 100);
+      if (balance >= required){ rec.feasible = true; executedPrior.push({ ins: ins, qty: qty, price: price }); }
+      else { rec.reason = "必要保証金（概算 " + fmtYen(required) + "）に対し推計保証金が不足"; }
+      result[sg.id] = rec;
+    });
+    /* 累計予算（有効段階のみ、下落率順） */
+    state.instruments.forEach(function(ins){
+      var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
+      var cum = 0;
+      sorted.forEach(function(sg){ if (sg.enabled){ cum += sg.budget; } if (result[sg.id]) result[sg.id].cumBudget = cum; });
+    });
+    return result;
+  }
+
+  function simulate(state){
+    var st = state.settings, factor = collateralFactor(st);
+    var stageRes = evaluateStages(state);
+    var drops = [];
+    for (var d = 0; d <= st.maxDrop + 1e-9; d += st.step) drops.push(Math.round(d * 100) / 100);
+    if (drops[drops.length - 1] !== st.maxDrop) drops.push(st.maxDrop);
+    var existingPrincipal = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
+    var rows = drops.map(function(drop){
+      var executed = [];
+      state.instruments.forEach(function(ins){
+        ins.stages.forEach(function(sg){
+          var r = stageRes[sg.id];
+          if (sg.enabled && r && r.feasible && sg.dropPct <= drop + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
+        });
+      });
+      var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
+      var newPnl = executed.reduce(function(s, e){
+        var curPrice = Math.floor(e.ins.basePrice * (1 - drop / 100));
+        return s + e.r.qty * (curPrice - e.r.price);
+      }, 0);
+      var exP = existingPnlAt(state.positions, drop);
+      var collateral = collateralAt(state.account.collateral, drop, factor);
+      var totalPnl = exP.pnl + newPnl;
+      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees;
+      var totalPrincipal = existingPrincipal + newPrincipal;
+      var rate = totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null;
+      var capacity = st.newMargin > 0 ? Math.max(0, Math.floor(balance / (st.newMargin / 100)) - totalPrincipal) : 0;
+      var infeasibleHere = 0;
+      state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+        var r = stageRes[sg.id];
+        if (sg.enabled && r && !r.feasible && sg.dropPct <= drop + 1e-9) infeasibleHere++;
+      });});
+      return { drop: drop, collateral: collateral, existingPnl: exP.pnl, newPnl: newPnl, totalPnl: totalPnl,
+               existingPnlApprox: exP.approx, newPrincipal: newPrincipal, totalPrincipal: totalPrincipal,
+               balance: balance, rate: rate, capacity: capacity, executedCount: executed.length, infeasibleCount: infeasibleHere };
+    });
+    /* 現在値（下落率0%、計画購入は未実行として既存建玉のみで推計） */
+    var exNow = existingPnlAt(state.positions, 0);
+    var balanceNow = state.account.collateral + state.account.cash + adjPnl(exNow.pnl, st) - st.fees;
+    var current = { principal: existingPrincipal, pnl: exNow.pnl, pnlApprox: exNow.approx,
+                    balance: balanceNow, rate: existingPrincipal > 0 ? (balanceNow / existingPrincipal) * 100 : null };
+    /* 計画合計 */
+    var planBudget = 0, planCost = 0;
+    state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+      if (sg.enabled){ planBudget += sg.budget; planCost += stageRes[sg.id] ? stageRes[sg.id].cost : 0; }
+    });});
+    /* 最初の到達点 */
+    function firstBelow(threshold){
+      for (var i = 0; i < rows.length; i++){ if (rows[i].rate !== null && rows[i].rate < threshold) return rows[i]; }
+      return null;
+    }
+    var firstInfeasible = null;
+    state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+      var r = stageRes[sg.id];
+      if (sg.enabled && r && !r.feasible && (firstInfeasible === null || sg.dropPct < firstInfeasible.drop)) {
+        firstInfeasible = { drop: sg.dropPct, code: ins.code, reason: r.reason };
+      }
+    });});
+    var minPnl = rows.length ? Math.min.apply(null, rows.map(function(r){ return r.totalPnl; })) : 0;
+    return { rows: rows, stageRes: stageRes, current: current, planBudget: planBudget, planCost: planCost,
+             firstMgmt: firstBelow(st.management), firstCall: firstBelow(st.marginCall),
+             firstInfeasible: firstInfeasible, minPnl: minPnl, factor: factor };
+  }
+  return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor,
+           existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate };
+})();
+</script>
+<script>
+"use strict";
+/* ---------- アプリ状態と永続保存（IndexedDB） ----------
+   データは端末のブラウザ内 IndexedDB に、形式バージョン付きの封筒（envelope）で自動保存し、
+   起動時に復元する。保存データが破損している場合や、このアプリより新しい形式の場合は
+   推測で読み込まず・勝手に上書きもせず、検証関数 unpackState が理由を返して安全に処理する。
+   JSON バックアップ（書き出し／読み込み）も同じ封筒・同じ検証を通す。 */
+var state = sampleState();
+var sim = MarginSim.simulate(state);
+var ui = { view: "dashboard", selectedInsId: state.instruments[0].id, selectedDrop: null, chartScale: "auto" };
+
+function recalc(){ sim = MarginSim.simulate(state); scheduleSave(); }
+
+/* 形式バージョン付きで包む／検証して開く（自動保存・復元・JSON 共通） */
+function packState(st, savedAt){
+  return { app: "margin-nanpin-planner", version: DATA_VERSION, savedAt: savedAt || new Date().toISOString(), data: st };
+}
+function unpackState(payload){
+  if (!payload || typeof payload !== "object") return { ok: false, reason: "corrupt" };
+  var raw = (payload.data && typeof payload.data === "object") ? payload.data : payload;
+  var ver = num(payload.version !== undefined ? payload.version : raw.version, NaN);
+  if (!isFinite(ver)) return { ok: false, reason: "corrupt" };
+  if (ver > DATA_VERSION) return { ok: false, reason: "version", foundVersion: ver };
+  if (!raw || typeof raw !== "object" || (!Array.isArray(raw.instruments) && !raw.account)) return { ok: false, reason: "corrupt" };
+  var clean = sanitizeState(raw); /* 旧バージョンは現行形式の既定値で補いながら移行する */
+  if (!clean) return { ok: false, reason: "corrupt" };
+  return { ok: true, state: clean, fromVersion: ver };
+}
+
+/* ---------- IndexedDB ストレージ層 ---------- */
+var IDB_NAME = "nanpin-planner-db", IDB_STORE = "kv", IDB_KEY = "app-state", IDB_CORRUPT_KEY = "app-state-corrupt-backup";
+var persistenceReady = false; /* 初回読み込みが終わるまで自動保存しない（サンプルで保存済みデータを上書きしないため） */
+var storageBlocked = false;   /* 新しい形式の保存データを検出したときは、上書き防止のため自動保存を止める */
+var storageAvailable = true;  /* 埋め込み表示など IndexedDB が使えない環境では false になり、JSON のみで運用する */
+var lastSavedAt = "";
+var loadWarning = "";         /* "" | "corrupt" | "version" */
+var loadWarningVersion = null;
+var saveTimer = null, savePending = false;
+
+function idbOpen(){
+  return new Promise(function(resolve, reject){
+    if (!("indexedDB" in window)) { reject(new Error("IndexedDB unavailable")); return; }
+    var req = window.indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = function(){ req.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = function(){ resolve(req.result); };
+    req.onerror = function(){ reject(req.error || new Error("IndexedDB open failed")); };
+    req.onblocked = function(){ reject(new Error("IndexedDB blocked")); };
+  });
+}
+function idbRun(mode, fn){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction(IDB_STORE, mode);
+      var req = null;
+      try { req = fn(tx.objectStore(IDB_STORE)); } catch (e) { try { db.close(); } catch (e2) {} reject(e); return; }
+      tx.oncomplete = function(){ db.close(); resolve(req ? req.result : null); };
+      tx.onabort = function(){ db.close(); reject(tx.error || new Error("IndexedDB aborted")); };
+      tx.onerror = function(){ reject(tx.error || new Error("IndexedDB failed")); };
+    });
+  });
+}
+function idbGet(key){ return idbRun("readonly", function(s){ return s.get(key); }); }
+function idbPut(key, val){ return idbRun("readwrite", function(s){ return s.put(val, key); }); }
+function idbDel(key){ return idbRun("readwrite", function(s){ return s.delete(key); }); }
+
+function persistInfoText(){
+  if (!storageAvailable) return "この環境ではブラウザ内保存（IndexedDB）を利用できないため、自動保存は無効です。JSONバックアップをご利用ください。";
+  if (storageBlocked) return "保存データが新しい形式（バージョン " + loadWarningVersion + "）のため読み込めず、上書き防止のため自動保存を停止しています。下のボタンで保存データを消去すると、現在のデータで自動保存を再開できます。";
+  return "自動保存：有効（この端末のブラウザ内に保存）" + (lastSavedAt ? "／最終保存 " + lastSavedAt : "／まだ保存されていません") + "。データ形式バージョン：" + DATA_VERSION + "。";
+}
+function setSaveStatus(text){
+  var n = document.getElementById("saveStatus");
+  if (n) n.textContent = text;
+  var info = document.getElementById("persistInfo");
+  if (info) info.textContent = persistInfoText();
+}
+function scheduleSave(){
+  if (!persistenceReady || storageBlocked || !storageAvailable) return;
+  savePending = true;
+  setSaveStatus("未保存の変更があります…");
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){ saveNow(); }, 300);
+}
+function saveNow(){
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (!persistenceReady || storageBlocked || !storageAvailable || !savePending) return Promise.resolve(false);
+  savePending = false;
+  var at = new Date();
+  return idbPut(IDB_KEY, packState(state, at.toISOString())).then(function(){
+    lastSavedAt = at.toLocaleDateString("ja-JP") + " " + at.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setSaveStatus("自動保存済み " + at.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+    return true;
+  }).catch(function(){
+    storageAvailable = false;
+    setSaveStatus("自動保存を利用できません");
+    return false;
+  });
+}
+function manualSave(){ savePending = true; return saveNow(); }
+document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "hidden") saveNow(); });
+window.addEventListener("beforeunload", function(){ saveNow(); });
+
+/* 起動時の復元：保存データがあれば検証して読み込む。なければ現在の（サンプル）状態を初回保存する */
+function initPersistence(){
+  idbGet(IDB_KEY).then(function(record){
+    if (record === undefined || record === null){
+      persistenceReady = true;
+      savePending = true;
+      saveNow();
+      return;
+    }
+    var res = unpackState(record);
+    if (res.ok){
+      state = res.state;
+      ui.selectedInsId = state.instruments.length ? state.instruments[0].id : null;
+      ui.selectedDrop = null;
+      if (record.savedAt) { var d = new Date(record.savedAt); if (isFinite(d.getTime())) lastSavedAt = d.toLocaleString("ja-JP"); }
+      persistenceReady = true;
+      sim = MarginSim.simulate(state);
+      render();
+      setSaveStatus("保存データを復元しました");
+      toast("前回保存したデータを復元しました。");
+      return;
+    }
+    if (res.reason === "version"){
+      /* 新しい形式：内容を推測で読まず、上書きもしない */
+      storageBlocked = true; loadWarning = "version"; loadWarningVersion = res.foundVersion;
+      persistenceReady = true;
+      setSaveStatus("保存データの形式が新しいため未読込");
+      render();
+      toast("保存データは新しい形式のため読み込めませんでした。自動保存は停止しています。");
+      return;
+    }
+    /* 破損：原本を退避キーへ移してから初期データで開始し、自動保存を再開する */
+    loadWarning = "corrupt";
+    idbPut(IDB_CORRUPT_KEY, record).then(function(){ return idbDel(IDB_KEY); }).catch(function(){}).then(function(){
+      persistenceReady = true;
+      savePending = true;
+      saveNow();
+      render();
+      toast("保存データが破損していたため、初期データで開始しました。");
+    });
+  }).catch(function(){
+    storageAvailable = false;
+    persistenceReady = true;
+    setSaveStatus("自動保存を利用できません");
+    render();
+  });
+}
+function toast(msg){
+  var t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.getElementById("toastRoot").appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3200);
+}
+function showModal(html){
+  document.getElementById("modalRoot").innerHTML = '<div class="modalback"><div class="modal" role="dialog" aria-modal="true">' + html + "</div></div>";
+}
+function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
+function confirmModal(title, body, okLabel, onOk){
+  showModal("<h3>" + esc(title) + '</h3><p style="margin:0 0 14px">' + body + '</p><div class="rowflex" style="justify-content:flex-end"><button class="btn" id="mCancel">キャンセル</button><button class="btn danger-outline" id="mOk">' + esc(okLabel) + "</button></div>");
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = function(){ closeModal(); onOk(); };
+}
+function switchView(v){
+  ui.view = v;
+  ["dashboard","plan","account","settings"].forEach(function(k){
+    document.getElementById("view-" + k).hidden = k !== v;
+  });
+  document.querySelectorAll("[data-view]").forEach(function(b){ b.setAttribute("aria-selected", b.getAttribute("data-view") === v ? "true" : "false"); });
+  render();
+  window.scrollTo(0, 0);
+}
+function render(){
+  document.getElementById("sampleBadge").style.display = state.meta.isSample ? "" : "none";
+  if (ui.view === "dashboard") renderDashboard();
+  else if (ui.view === "plan") renderPlan();
+  else if (ui.view === "account") renderAccount();
+  else renderSettings();
+}
+function rateStatus(rate){
+  if (rate === null) return { cls: "mute", label: "対象外" };
+  if (rate < state.settings.marginCall) return { cls: "danger", label: "追証基準割れ" };
+  if (rate < state.settings.management) return { cls: "warn", label: "管理基準割れ" };
+  return { cls: "safe", label: "基準内" };
+}
+
+/* ================= ダッシュボード ================= */
+function renderDashboard(){
+  var st = state.settings, cur = sim.current, el = document.getElementById("view-dashboard");
+  var brokerRate = state.account.brokerRate;
+  var dispRate = brokerRate !== null ? brokerRate : cur.rate;
+  var dispRateLabel = brokerRate !== null ? "証券会社表示の維持率" : "現在の保証金維持率（推計）";
+  var mgmtMarginPt = dispRate !== null ? dispRate - st.management : null;
+  var callMarginPt = dispRate !== null ? dispRate - st.marginCall : null;
+  var mgmtMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.management / 100 : null;
+  var callMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.marginCall / 100 : null;
+  var status = rateStatus(cur.rate);
+  var heroCls = sim.firstCall ? "danger" : (sim.firstMgmt ? "caution" : "");
+  var heroMain, heroSub;
+  if (sim.firstMgmt){
+    heroMain = "下落 −" + sim.firstMgmt.drop + "% で自主管理基準（" + st.management + "%）に到達する想定";
+    heroSub = sim.firstCall ? ("追証基準（" + st.marginCall + "%）には下落 −" + sim.firstCall.drop + "% で到達する想定です（最初の到達点）。基準到達と実際の追証発生は同一ではありません。")
+                            : ("追証基準（" + st.marginCall + "%）には想定範囲（−" + st.maxDrop + "%）で到達しません。");
+  } else {
+    heroMain = "想定範囲（−" + st.maxDrop + "%）では自主管理基準（" + st.management + "%）に到達しない想定";
+    heroSub = "下落 −" + st.maxDrop + "% まで全計画を実行しても、管理基準を上回る推計です。";
+  }
+  if (sim.firstInfeasible){
+    heroSub += " なお、銘柄 " + esc(sim.firstInfeasible.code) + " の −" + sim.firstInfeasible.drop + "% 段階は「" + esc(sim.firstInfeasible.reason) + "」のため実行不能として計算しています。";
+  }
+  var html = "";
+  html += '<div class="hero-rate ' + heroCls + '"><div class="h-label">どの程度の下落まで耐えられるか（簡易シナリオ：全銘柄同率下落・担保は市場下落の ' + Math.round(sim.factor * 100) + '% 連動）</div>'
+        + '<div class="h-big">' + heroMain + '</div><div class="h-sub">' + heroSub + "</div></div>";
+
+  html += '<div class="kpis">'
+    + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "既存建玉のみでの推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
+    + kpi("自主管理基準（" + st.management + "%）までの余裕", mgmtMarginPt === null ? "—" : (mgmtMarginPt >= 0 ? "+" : "−") + Math.abs(mgmtMarginPt).toFixed(1) + "<small> pt</small>", mgmtMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(mgmtMarginYen), mgmtMarginPt !== null && mgmtMarginPt < 0 ? "alert" : "")
+    + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(callMarginYen), callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
+    + kpi("現在の信用建玉総額", fmtYen(cur.principal), "既存建玉の建代金合計（実口座）", "")
+    + kpi("将来の計画購入総額", fmtYen(sim.planCost), "予算合計 " + fmtYen(sim.planBudget) + "（売買単位で丸めた実購入額）", "")
+    + kpi("想定最大評価損", fmtSignedYen(sim.minPnl), "想定範囲内で最も大きい評価損（既存＋計画建玉）", sim.minPnl < 0 ? "caution" : "")
+    + kpi("管理基準に到達する想定下落率", sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "到達せず", sim.firstMgmt ? "最初の到達点。以後の段階は詳細表で確認" : "−" + st.maxDrop + "% の範囲では到達しません", sim.firstMgmt ? "caution" : "")
+    + kpi("現在の建玉評価損益", cur.pnl === 0 && state.positions.some(function(p){ return p.pnl === null; }) ? "未入力" : fmtSignedYen(cur.pnl), state.positions.some(function(p){ return p.pnl === null; }) ? "未入力の建玉があり、推計は概算です" : "口座画面で入力した現在値", "")
+    + "</div>";
+
+  if (state.meta.isSample){
+    html += '<div class="notice warn"><strong>サンプルデータで表示しています。</strong> 代用有価証券評価額 15,617,481円（掛目適用後）・委託保証金現金 70,309円・既存建玉 64,800円（評価損益は未入力のため補完していません）と、国内ETFのナンピン計画（累計予算 4,500,000円）です。「口座・保有状況」画面で実データに書き換えてください。ETFの基準価格 3,000円は仮のサンプル値です。</div>';
+  }
+
+  if (loadWarning === "version"){
+    html += '<div class="notice danger"><strong>保存データを読み込めませんでした。</strong> 保存データの形式バージョン（' + loadWarningVersion + '）がこのアプリ（' + DATA_VERSION + '）より新しいため、内容を推測で読み込むことはしませんでした。上書きを防ぐため自動保存を停止しています。「設定・データ」で保存データを消去すると、現在のデータで自動保存を再開できます。</div>';
+  } else if (loadWarning === "corrupt"){
+    html += '<div class="notice warn"><strong>保存データが破損していたため、初期データで開始しました。</strong> 破損した保存データは退避してあり、自動では復元しません。JSONバックアップをお持ちの場合は「設定・データ」から読み込めます。</div>';
+  }
+
+  html += '<div class="card"><h2>下落率 × 保証金維持率シミュレーション</h2>'
+    + '<p class="sub">横軸：基準価格からの下落率／縦軸：保証金維持率（推計）。点は購入予定段階の到達位置です。詳細表の行を選ぶとグラフ上に位置を示します。</p>'
+    + '<div class="rowflex" style="justify-content:flex-end;margin-bottom:6px"><span style="font-size:.8rem;color:var(--muted);font-weight:700">縦軸</span><span class="seg" role="group" aria-label="縦軸スケール">'
+    + '<button data-scale="auto" aria-pressed="' + (ui.chartScale !== "linear") + '">対数</button><button data-scale="linear" aria-pressed="' + (ui.chartScale === "linear") + '">線形</button></span></div>'
+    + '<div class="chartbox">' + chartSVG() + "</div>"
+    + '<div class="legend"><span><span class="sw"></span>シミュレーション維持率</span><span><span class="sw dash mgmt"></span>自主管理基準 ' + st.management + '%</span><span><span class="sw dash call"></span>追証基準 ' + st.marginCall + '%</span><span><span class="dotkey"></span>購入予定段階</span></div>'
+    + "</div>";
+
+  html += '<div class="card"><h2>下落率別の詳細（シミュレーション）</h2><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。</p><div class="tblwrap"><table class="dt"><thead><tr>'
+    + "<th>下落率</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
+  sim.rows.forEach(function(r){
+    var rs = rateStatus(r.rate);
+    var rowCls = ui.selectedDrop === r.drop ? "sel" : (r.rate !== null && r.rate < st.marginCall ? "row-danger" : (r.rate !== null && r.rate < st.management ? "row-warn" : ""));
+    var stateLabel = r.rate === null ? "対象外" : rs.label;
+    if (r.infeasibleCount > 0) stateLabel += "・購入不能あり";
+    html += '<tr data-drop="' + r.drop + '" class="' + rowCls + '"><td class="num">−' + r.drop + '%</td><td class="num" data-label="累計購入額">' + fmtYenShort(r.newPrincipal) + '円</td><td class="num" data-label="建玉総額">' + fmtYenShort(r.totalPrincipal) + '円</td><td class="num" data-label="評価損益">' + fmtSignedYen(r.totalPnl) + '</td><td class="num" data-label="代用評価額">' + fmtYenShort(r.collateral) + '円</td><td class="num" data-label="維持率"><strong>' + fmtPct(r.rate) + '</strong></td><td class="num" data-label="新規建余力（概算）">' + fmtYenShort(r.capacity) + '円</td><td data-label="状態"><span class="pill ' + rs.cls + '">' + esc(stateLabel) + "</span></td></tr>";
+  });
+  html += "</tbody></table></div>";
+  if (sim.rows.some(function(r){ return r.existingPnlApprox; })){
+    html += '<p class="hint">※ 既存建玉の一部は評価損益が未入力のため、評価損益の推計は概算です（未入力分は現在損益0として下落変動のみ反映）。正確な値が必要な場合は「口座・保有状況」で評価損益を入力してください。</p>';
+  }
+  html += "</div>";
+
+  html += '<div class="card"><h2>現在の実口座情報</h2><p class="sub">シミュレーション値ではなく、登録されている現在の口座情報です。</p><dl class="kv">'
+    + "<dt>証券会社</dt><dd>" + (state.account.broker ? esc(state.account.broker) : "未登録") + "</dd>"
+    + "<dt>代用有価証券評価額（" + (state.account.collateralBasis === "after" ? "掛目適用後" : "掛目適用前・時価") + "）</dt><dd class='num'>" + fmtYen(state.account.collateral) + "</dd>"
+    + "<dt>委託保証金現金</dt><dd class='num'>" + fmtYen(state.account.cash) + "</dd>"
+    + "<dt>既存建玉 建代金合計</dt><dd class='num'>" + fmtYen(cur.principal) + "</dd>"
+    + "<dt>推計保証金残高</dt><dd class='num'>" + fmtYen(cur.balance) + "</dd>"
+    + "<dt>情報更新日時</dt><dd>" + (state.meta.updatedAt ? esc(state.meta.updatedAt) : "未記録") + "</dd></dl>"
+    + '<div class="rowflex mt"><button class="btn" data-goto="account">口座情報を編集</button><button class="btn" data-goto="plan">購入計画を編集</button></div></div>';
+
+  el.innerHTML = html;
+  el.querySelectorAll("[data-goto]").forEach(function(b){ b.onclick = function(){ switchView(b.getAttribute("data-goto")); }; });
+  el.querySelectorAll("[data-scale]").forEach(function(b){ b.onclick = function(){ ui.chartScale = b.getAttribute("data-scale"); renderDashboard(); }; });
+  el.querySelectorAll("tr[data-drop]").forEach(function(tr){
+    tr.onclick = function(){ ui.selectedDrop = num(tr.getAttribute("data-drop")); renderDashboard(); };
+  });
+}
+function kpi(label, value, note, cls){
+  return '<div class="kpi ' + (cls || "") + '"><div class="k-label">' + esc(label) + '</div><div class="k-value num">' + value + '</div><div class="k-note">' + esc(note) + "</div></div>";
+}
+
+/* ---------- 維持率グラフ（手書きSVG） ---------- */
+function chartSVG(){
+  var st = state.settings, rows = sim.rows.filter(function(r){ return r.rate !== null; });
+  var W = 760, H = 380, L = 84, R = 16, T = 14, B = 40, iw = W - L - R, ih = H - T - B;
+  if (!rows.length) return '<p class="hint">建玉がないため、維持率グラフは表示できません（対象外）。購入計画を登録すると、計画実行後の維持率が表示されます。</p>';
+  var maxRate = Math.max.apply(null, rows.map(function(r){ return r.rate; }));
+  var useLog = ui.chartScale !== "linear" && maxRate > 300;
+  var yMin = useLog ? 5 : 0;
+  var yMax = useLog ? Math.pow(10, Math.ceil(Math.log10(Math.max(maxRate, 30)))) : Math.max(30, Math.ceil(maxRate * 1.1 / 10) * 10);
+  function X(d){ return L + (d / st.maxDrop) * iw; }
+  function Y(v){
+    if (useLog){ var lo = Math.log10(yMin), hi = Math.log10(yMax); return T + ih - ((Math.log10(Math.max(v, yMin)) - lo) / (hi - lo)) * ih; }
+    return T + ih - (v / yMax) * ih;
+  }
+  var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="下落率と保証金維持率のシミュレーショングラフ">';
+  var ticks = useLog ? [5,10,20,25,50,100,200,500,1000,2000,5000,10000,20000,50000,100000].filter(function(v){ return v >= yMin && v <= yMax; })
+                     : (function(){ var a = []; var stepT = yMax > 1000 ? 500 : (yMax > 200 ? 100 : 25); for (var v = 0; v <= yMax; v += stepT) a.push(v); return a; })();
+  ticks.forEach(function(v){
+    var y = Y(v);
+    s += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" stroke="var(--line)" stroke-width="1"/>'
+       + '<text x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + v.toLocaleString("ja-JP") + "%</text>";
+  });
+  for (var d = 0; d <= st.maxDrop; d += (st.maxDrop >= 60 ? 10 : 5)){
+    var x = X(d);
+    s += '<text x="' + x + '" y="' + (H - 18) + '" text-anchor="middle" font-size="11" fill="var(--muted)">−' + d + '%</text>'
+       + '<line x1="' + x + '" y1="' + T + '" x2="' + x + '" y2="' + (T + ih) + '" stroke="var(--line)" stroke-width="0.5" opacity="0.5"/>';
+  }
+  s += '<text x="' + (L + iw / 2) + '" y="' + (H - 2) + '" text-anchor="middle" font-size="11" fill="var(--muted)">下落率</text>';
+  function thresh(v, color, label){
+    if (v < yMin || v > yMax) return "";
+    var y = Y(v);
+    return '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" stroke="' + color + '" stroke-width="1.6" stroke-dasharray="7 4"/>'
+         + '<text x="' + (W - R - 2) + '" y="' + (y - 5) + '" text-anchor="end" font-size="11" font-weight="700" fill="' + color + '">' + label + " " + v + "%</text>";
+  }
+  s += thresh(st.management, "#d9930d", "自主管理基準");
+  s += thresh(st.marginCall, "#d43a31", "追証基準");
+  if (ui.selectedDrop !== null){
+    var sx = X(ui.selectedDrop);
+    s += '<line x1="' + sx + '" y1="' + T + '" x2="' + sx + '" y2="' + (T + ih) + '" stroke="var(--info)" stroke-width="1.6"/>';
+  }
+  var pts = rows.map(function(r){ return X(r.drop).toFixed(1) + "," + Y(r.rate).toFixed(1); }).join(" ");
+  s += '<polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linejoin="round"/>';
+  rows.forEach(function(r){
+    s += '<circle cx="' + X(r.drop) + '" cy="' + Y(r.rate) + '" r="' + (ui.selectedDrop === r.drop ? 5.5 : 3) + '" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"><title>−' + r.drop + "%：維持率 " + fmtPct(r.rate) + "</title></circle>";
+  });
+  /* 購入段階マーカー */
+  var rateAt = {};
+  sim.rows.forEach(function(r){ rateAt[r.drop] = r.rate; });
+  var seen = {};
+  state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+    if (!sg.enabled || sg.dropPct > st.maxDrop) return;
+    var row = sim.rows.reduce(function(best, r){ return Math.abs(r.drop - sg.dropPct) < Math.abs(best.drop - sg.dropPct) ? r : best; }, sim.rows[0]);
+    if (!row || row.rate === null) return;
+    var key = sg.dropPct + ":" + Math.round(row.rate);
+    if (seen[key]) return; seen[key] = 1;
+    s += '<circle cx="' + X(sg.dropPct) + '" cy="' + Y(row.rate) + '" r="5" fill="#d9930d" stroke="var(--surface)" stroke-width="1.5"><title>' + esc(ins.code) + " −" + sg.dropPct + "% 段階</title></circle>";
+  });});
+  s += "</svg>";
+  return s;
+}
+</script>
+<script>
+"use strict";
+/* ================= 購入計画 ================= */
+function currentInstrument(){
+  var ins = state.instruments.filter(function(i){ return i.id === ui.selectedInsId; })[0];
+  if (!ins && state.instruments.length){ ins = state.instruments[0]; ui.selectedInsId = ins.id; }
+  return ins || null;
+}
+function renderPlan(){
+  var el = document.getElementById("view-plan");
+  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
+  html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
+  state.instruments.forEach(function(ins){
+    var tot = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ return a + s.budget; }, 0);
+    html += '<button class="chip" data-ins="' + ins.id + '" aria-selected="' + (ins.id === ui.selectedInsId) + '"><span class="c-code">' + esc(ins.code || "コード未設定") + " " + esc(ins.name) + '</span><br><span class="c-name">' + (ins.type === "ETF" ? "ETF" : "個別株式") + "／計画予算 " + fmtYen(tot) + "</span></button>";
+  });
+  html += '<button class="chip" id="addIns"><span class="c-code">＋ 銘柄を追加</span><br><span class="c-name">個別株式・ETFを登録</span></button></div>';
+
+  var ins = currentInstrument();
+  if (!ins){
+    html += '<div class="card"><h2>銘柄が登録されていません</h2><p class="sub">「銘柄を追加」から登録してください。</p></div>';
+    el.innerHTML = html; bindPlanCommon(el); return;
+  }
+  var refChg = (ins.ref && ins.ref.baseValue && ins.ref.currentValue) ? ((ins.ref.currentValue / ins.ref.baseValue - 1) * 100) : null;
+  var curChg = (ins.basePrice > 0 && ins.currentPrice > 0) ? ((ins.currentPrice / ins.basePrice - 1) * 100) : null;
+  html += '<div class="card"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">基準価格は仮のサンプル値</span>' : "") + '</h2>'
+    + '<p class="sub">購入トリガーは、この銘柄自身の基準価格からの下落率です。参考指数は騰落率の比較用で、トリガーや維持率の計算には使いません。</p>'
+    + '<div class="formgrid">'
+    + fld("銘柄コード", '<input type="text" id="f_code" value="' + esc(ins.code) + '" autocomplete="off">')
+    + fld("銘柄名", '<input type="text" id="f_name" value="' + esc(ins.name) + '" autocomplete="off">')
+    + fld("区分", '<select id="f_type"><option value="ETF"' + (ins.type === "ETF" ? " selected" : "") + '>ETF</option><option value="stock"' + (ins.type === "stock" ? " selected" : "") + ">個別株式</option></select>")
+    + fld("売買単位（株/口）", '<input type="number" id="f_unit" min="1" step="1" value="' + ins.unit + '">')
+    + fld("基準価格（円）", '<input type="number" id="f_base" min="0" step="1" value="' + ins.basePrice + '">')
+    + fld("現在価格（円）", '<input type="number" id="f_cur" min="0" step="1" value="' + ins.currentPrice + '">')
+    + fld("参考指数", '<select id="f_refname">' + ["なし","日経平均","TOPIX","S&P500","NASDAQ100"].map(function(n){ return '<option value="' + n + '"' + (ins.ref.name === n ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select>")
+    + fld("参考指数 基準日", '<input type="date" id="f_refdate" value="' + esc(ins.ref.baseDate || "") + '">')
+    + fld("参考指数 基準値", '<input type="number" id="f_refbase" min="0" step="0.01" value="' + (ins.ref.baseValue === null ? "" : ins.ref.baseValue) + '" placeholder="未入力">')
+    + fld("参考指数 現在値", '<input type="number" id="f_refcur" min="0" step="0.01" value="' + (ins.ref.currentValue === null ? "" : ins.ref.currentValue) + '" placeholder="未入力">')
+    + "</div>"
+    + '<p class="hint">基準価格比の現在値：' + (curChg === null ? "—" : (curChg >= 0 ? "+" : "−") + Math.abs(curChg).toFixed(2) + "%")
+    + (refChg !== null ? "　／　参考指数（" + esc(ins.ref.name) + "）の騰落率：" + (refChg >= 0 ? "+" : "−") + Math.abs(refChg).toFixed(2) + "%" : "　／　参考指数の騰落率：基準値・現在値を入力すると表示")
+    + '</p><div class="rowflex"><button class="btn small" id="dupIns">この銘柄の計画を複製</button><button class="btn small danger-outline" id="delIns">この銘柄を削除</button></div></div>';
+
+  var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
+  html += '<div class="card"><h2>ナンピン購入計画（' + esc(ins.code) + " " + esc(ins.name) + '）</h2>'
+    + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は基準価格×(1−下落率)を円未満切り捨て。変更は全体の維持率シミュレーションへ即時反映されます。</p>'
+    + '<div class="rowflex"><button class="btn primary small" id="addStage">＋ 購入段階を追加</button><button class="btn small" id="resetPlan">計画を初期化</button></div>'
+    + '<div id="stageList">';
+  sorted.forEach(function(sg){
+    var r = sim.stageRes[sg.id] || { price: 0, qty: 0, cost: 0, feasible: false, reason: "", cumBudget: 0 };
+    var statusPill = !sg.enabled ? '<span class="pill mute">無効</span>'
+      : (r.qty <= 0 ? '<span class="pill danger">実行不能：' + esc(r.reason) + "</span>"
+      : (r.feasible ? '<span class="pill safe">実行予定</span>' : '<span class="pill danger">実行不能（概算判定）</span>'));
+    html += '<div class="stagerow' + (sg.enabled ? "" : " off") + '" data-stage="' + sg.id + '">'
+      + '<div class="sr-top"><label class="switchlabel"><input type="checkbox" data-act="toggle" ' + (sg.enabled ? "checked" : "") + "> 有効</label>"
+      + "<strong>−" + sg.dropPct + "% 段階</strong>" + statusPill
+      + '<span style="margin-left:auto"></span><button class="btn small danger-outline" data-act="del">この段階を削除</button></div>'
+      + '<div class="sr-grid">'
+      + fld("下落率（%）", '<input type="number" data-act="drop" aria-label="下落率（%）" min="0" max="100" step="0.5" value="' + sg.dropPct + '">')
+      + '<div class="calc"><div class="cl">想定購入価格</div><div class="cv num" data-cell="price">' + fmtYen(r.price) + "</div></div>"
+      + fld("追加購入予定額（予算・円）", '<input type="number" data-act="budget" aria-label="追加購入予定額（予算・円）" min="0" step="1000" value="' + sg.budget + '">')
+      + '<div class="calc"><div class="cl">累計購入予定額（予算）</div><div class="cv num" data-cell="cum">' + fmtYen(r.cumBudget) + "</div></div>"
+      + "</div>"
+      + '<label class="flabel" style="margin-top:8px">購入額スライダー（0〜100万円）</label><input type="range" data-act="slider" min="0" max="1000000" step="2500" value="' + Math.min(sg.budget, 1000000) + '" aria-label="購入額スライダー">'
+      + '<div class="sr-grid">'
+      + '<div class="calc"><div class="cl">購入数量（' + (ins.type === "ETF" ? "口" : "株") + '）</div><div class="cv num" data-cell="qty">' + r.qty.toLocaleString("ja-JP") + "</div></div>"
+      + '<div class="calc"><div class="cl">実購入予定額</div><div class="cv num" data-cell="cost">' + fmtYen(r.cost) + "</div></div>"
+      + '<div class="calc"><div class="cl">予算との差</div><div class="cv num" data-cell="diff">' + fmtYen(sg.budget - r.cost) + "</div></div>"
+      + '<div class="calc"><div class="cl">実行状態の詳細</div><div style="font-size:.8rem" data-cell="reason">' + (sg.enabled ? esc(r.feasible ? "トリガー到達時点で必要保証金を満たす見込み（概算）" : r.reason) : "無効のため計算対象外") + "</div></div>"
+      + "</div></div>";
+  });
+  var planBudgetIns = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ return a + s.budget; }, 0);
+  var planCostIns = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
+  html += '</div><p class="hint">この銘柄の計画：予算合計 <strong class="num">' + fmtYen(planBudgetIns) + '</strong>／実購入予定合計 <strong class="num">' + fmtYen(planCostIns) + "</strong>（差は売買単位への丸めによる未使用分）</p></div>";
+  el.innerHTML = html;
+  bindPlanCommon(el);
+  bindInstrumentForm(el, ins);
+  bindStages(el, ins);
+}
+function fld(label, inner){ var m = inner.match(/id="([^"]+)"/); var f = m ? ' for="' + m[1] + '"' : ""; return '<div class="field"><label class="flabel"' + f + ">" + esc(label) + "</label>" + inner + "</div>"; }
+function bindPlanCommon(el){
+  el.querySelectorAll("[data-ins]").forEach(function(b){ b.onclick = function(){ ui.selectedInsId = b.getAttribute("data-ins"); renderPlan(); }; });
+  var add = el.querySelector("#addIns");
+  if (add) add.onclick = function(){
+    var ni = { id: uid("ins"), code: "", name: "", type: "stock", basePrice: 0, currentPrice: 0, unit: 100, baseIsSample: false,
+               ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null },
+               stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true }] };
+    state.instruments.push(ni); ui.selectedInsId = ni.id; state.meta.isSample = false;
+    recalc(); renderPlan(); toast("銘柄を追加しました。コード・基準価格を入力してください。");
+  };
+}
+function commitIns(ins, patch){ Object.keys(patch).forEach(function(k){ ins[k] = patch[k]; }); recalc(); }
+function bindInstrumentForm(el, ins){
+  function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderPlan(); }); }
+  on("#f_code", function(n){ ins.code = n.value.trim().slice(0, 12); });
+  on("#f_name", function(n){ ins.name = n.value.trim().slice(0, 80); });
+  on("#f_type", function(n){ ins.type = n.value === "stock" ? "stock" : "ETF"; });
+  on("#f_unit", function(n){ ins.unit = Math.max(1, Math.round(num(n.value, 1))); });
+  on("#f_base", function(n){ ins.basePrice = clamp(num(n.value, 0), 0, 1e9); ins.baseIsSample = false; });
+  on("#f_cur", function(n){ ins.currentPrice = clamp(num(n.value, 0), 0, 1e9); });
+  on("#f_refname", function(n){ ins.ref.name = n.value; });
+  on("#f_refdate", function(n){ ins.ref.baseDate = n.value; });
+  on("#f_refbase", function(n){ ins.ref.baseValue = n.value === "" ? null : num(n.value, NaN); if (!isFinite(ins.ref.baseValue)) ins.ref.baseValue = null; });
+  on("#f_refcur", function(n){ ins.ref.currentValue = n.value === "" ? null : num(n.value, NaN); if (!isFinite(ins.ref.currentValue)) ins.ref.currentValue = null; });
+  var dup = el.querySelector("#dupIns");
+  if (dup) dup.onclick = function(){
+    showModal('<h3>計画の複製</h3><p style="margin:0 0 10px">銘柄情報と購入計画を複製します。新しい銘柄コードを入力してください。</p>'
+      + '<label class="flabel">新しい銘柄コード</label><input type="text" id="dupCode" value="' + esc(ins.code) + '">'
+      + '<label class="flabel" style="margin-top:10px">新しい銘柄名</label><input type="text" id="dupName" value="' + esc(ins.name) + '（複製）">'
+      + '<div class="rowflex" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mCancel">キャンセル</button><button class="btn primary" id="mOk">複製する</button></div>');
+    document.getElementById("mCancel").onclick = closeModal;
+    document.getElementById("mOk").onclick = function(){
+      var copy = JSON.parse(JSON.stringify(ins));
+      copy.id = uid("ins"); copy.code = document.getElementById("dupCode").value.trim().slice(0, 12);
+      copy.name = document.getElementById("dupName").value.trim().slice(0, 80); copy.baseIsSample = false;
+      copy.stages.forEach(function(s){ s.id = uid("st"); });
+      state.instruments.push(copy); ui.selectedInsId = copy.id;
+      closeModal(); recalc(); renderPlan(); toast("計画を複製しました。");
+    };
+  };
+  var del = el.querySelector("#delIns");
+  if (del) del.onclick = function(){
+    confirmModal("銘柄を削除しますか", "銘柄「" + esc(ins.code) + " " + esc(ins.name) + "」とその購入計画を削除します。この操作は取り消せません。", "削除する", function(){
+      state.instruments = state.instruments.filter(function(i){ return i.id !== ins.id; });
+      ui.selectedInsId = state.instruments.length ? state.instruments[0].id : null;
+      recalc(); renderPlan(); toast("銘柄を削除しました。");
+    });
+  };
+  var addStage = el.querySelector("#addStage");
+  if (addStage) addStage.onclick = function(){
+    var maxDrop = ins.stages.length ? Math.max.apply(null, ins.stages.map(function(s){ return s.dropPct; })) : 0;
+    ins.stages.push({ id: uid("st"), dropPct: Math.min(100, maxDrop + 5), budget: 100000, enabled: true });
+    recalc(); renderPlan();
+  };
+  var reset = el.querySelector("#resetPlan");
+  if (reset) reset.onclick = function(){
+    confirmModal("購入計画を初期化しますか", ins.code === "1308"
+      ? "この銘柄の計画を初期サンプル（−5%〜−65%、累計予算 4,500,000円）に戻します。"
+      : "この銘柄の購入計画をすべて削除し、−5%・10万円の1段階だけの初期状態に戻します。", "初期化する", function(){
+      ins.stages = ins.code === "1308" ? sampleStages() : [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true }];
+      recalc(); renderPlan(); toast("購入計画を初期化しました。");
+    });
+  };
+}
+function bindStages(el, ins){
+  el.querySelectorAll("[data-stage]").forEach(function(row){
+    var sid = row.getAttribute("data-stage");
+    var sg = ins.stages.filter(function(s){ return s.id === sid; })[0];
+    if (!sg) return;
+    row.querySelectorAll("[data-act]").forEach(function(ctrl){
+      var act = ctrl.getAttribute("data-act");
+      if (act === "toggle"){ ctrl.addEventListener("change", function(){ sg.enabled = ctrl.checked; recalc(); renderPlan(); }); }
+      else if (act === "del"){ ctrl.addEventListener("click", function(){
+        confirmModal("購入段階を削除しますか", "−" + sg.dropPct + "%／予算 " + fmtYen(sg.budget) + " の段階を削除します。", "削除する", function(){
+          ins.stages = ins.stages.filter(function(s){ return s.id !== sid; }); recalc(); renderPlan();
+        });
+      }); }
+      else if (act === "drop"){ ctrl.addEventListener("change", function(){ sg.dropPct = clamp(num(ctrl.value, sg.dropPct), 0, 100); recalc(); renderPlan(); }); }
+      else if (act === "budget"){
+        ctrl.addEventListener("input", function(){ sg.budget = clamp(Math.round(num(ctrl.value, 0)), 0, 1e12); recalc(); refreshStageRow(row, ins, sg); refreshMinibar(); });
+        ctrl.addEventListener("change", function(){ renderPlan(); });
+      }
+      else if (act === "slider"){
+        ctrl.addEventListener("input", function(){
+          sg.budget = num(ctrl.value, 0);
+          var b = row.querySelector('[data-act="budget"]'); if (b) b.value = sg.budget;
+          recalc(); refreshStageRow(row, ins, sg); refreshMinibar();
+        });
+        ctrl.addEventListener("change", function(){ renderPlan(); });
+      }
+    });
+  });
+}
+function refreshStageRow(row, ins, sg){
+  var r = sim.stageRes[sg.id]; if (!r) return;
+  function set(cell, txt){ var n = row.querySelector('[data-cell="' + cell + '"]'); if (n) n.textContent = txt; }
+  set("price", fmtYen(r.price)); set("cum", fmtYen(r.cumBudget)); set("qty", r.qty.toLocaleString("ja-JP"));
+  set("cost", fmtYen(r.cost)); set("diff", fmtYen(sg.budget - r.cost));
+  set("reason", sg.enabled ? (r.feasible ? "トリガー到達時点で必要保証金を満たす見込み（概算）" : r.reason) : "無効のため計算対象外");
+}
+function refreshMinibar(){
+  var bar = document.querySelector("#view-plan .minibar");
+  if (bar) bar.innerHTML = '<span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
+}
+
+/* ================= 口座・保有状況 ================= */
+function renderAccount(){
+  var el = document.getElementById("view-account"), a = state.account, cur = sim.current;
+  var html = '<div class="card"><h2>口座情報</h2><p class="sub">代用有価証券評価額は<strong>掛目適用後の評価額</strong>を標準入力とします。掛目適用前の時価を入力する場合は、下の区分を切り替えてください（計算では入力値をそのまま代用評価額として扱います）。</p>'
+    + '<div class="formgrid c3">'
+    + fld("証券会社名", '<input type="text" id="a_broker" value="' + esc(a.broker) + '" placeholder="例：○○証券" autocomplete="off">')
+    + fld("代用有価証券評価額（円）", '<input type="number" id="a_collateral" min="0" step="1" value="' + a.collateral + '">')
+    + fld("代用評価額の区分", '<select id="a_basis"><option value="after"' + (a.collateralBasis === "after" ? " selected" : "") + '>掛目適用後の評価額（標準）</option><option value="before"' + (a.collateralBasis === "before" ? " selected" : "") + ">掛目適用前の時価</option></select>")
+    + fld("委託保証金現金（円）", '<input type="number" id="a_cash" step="1" value="' + a.cash + '">')
+    + fld("証券会社表示の保証金維持率（%・任意）", '<input type="number" id="a_brokerRate" min="0" step="0.1" value="' + (a.brokerRate === null ? "" : a.brokerRate) + '" placeholder="未入力">')
+    + fld("情報更新日時", '<input type="text" id="a_updated" value="' + esc(state.meta.updatedAt) + '" placeholder="例：2026-11-17 11:30">')
+    + "</div>"
+    + '<dl class="kv mt"><dt>推計保証金残高（現在）</dt><dd class="num">' + fmtYen(cur.balance) + '</dd>'
+    + '<dt>推計維持率（既存建玉のみ）</dt><dd class="num">' + fmtPct(cur.rate) + (cur.pnlApprox ? "（評価損益未入力分あり・概算）" : "") + "</dd>"
+    + (a.brokerRate !== null && cur.rate !== null ? '<dt>証券会社表示との差</dt><dd class="num">' + (a.brokerRate - cur.rate >= 0 ? "+" : "−") + Math.abs(a.brokerRate - cur.rate).toFixed(1) + " pt（計算モデルが異なるため差が生じます）</dd>" : "")
+    + "</dl></div>";
+
+  html += '<div class="card"><h2>既存の信用建玉</h2><p class="sub">購入計画とは別に、すでに保有している信用建玉を登録します。評価損益は空欄（未入力）にできます。その場合シミュレーションでは概算として扱い、勝手な値で補完しません。</p>'
+    + '<div class="rowflex"><button class="btn primary small" id="addPos">＋ 建玉を追加</button></div><div id="posList">';
+  state.positions.forEach(function(p){
+    html += '<div class="posrow" data-pos="' + p.id + '"><div class="rowflex"><strong>' + esc(p.code || "コード未設定") + " " + esc(p.name || "") + '</strong><span class="pill ' + (p.side === "buy" ? "info" : "warn") + '">' + (p.side === "buy" ? "買建" : "売建") + '</span><span style="margin-left:auto"></span><button class="btn small danger-outline" data-pact="del">削除</button></div>'
+      + '<div class="pr-grid">'
+      + fld("銘柄コード", '<input type="text" data-pact="code" aria-label="建玉の銘柄コード" value="' + esc(p.code) + '" autocomplete="off">')
+      + fld("銘柄名・メモ", '<input type="text" data-pact="name" aria-label="建玉の銘柄名・メモ" value="' + esc(p.name) + '" autocomplete="off">')
+      + fld("買建・売建", '<select data-pact="side" aria-label="買建・売建"><option value="buy"' + (p.side === "buy" ? " selected" : "") + '>買建</option><option value="sell"' + (p.side === "sell" ? " selected" : "") + ">売建</option></select>")
+      + fld("建代金（円）", '<input type="number" data-pact="principal" aria-label="建代金（円）" min="0" step="1" value="' + p.principal + '">')
+      + fld("現在の評価損益（円・空欄=未入力）", '<input type="number" data-pact="pnl" aria-label="現在の評価損益（円）" step="1" value="' + (p.pnl === null ? "" : p.pnl) + '" placeholder="未入力">')
+      + "</div></div>";
+  });
+  var totP = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
+  html += '</div><p class="hint">既存建玉の建代金合計：<strong class="num">' + fmtYen(totP) + "</strong>（担保は銘柄ごとに重複計上せず、口座全体で一度だけ計算します）</p></div>";
+  el.innerHTML = html;
+
+  function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderAccount(); }); }
+  on("#a_broker", function(n){ a.broker = n.value.trim().slice(0, 60); state.meta.isSample = false; });
+  on("#a_collateral", function(n){ a.collateral = clamp(num(n.value, 0), 0, 1e12); state.meta.isSample = false; });
+  on("#a_basis", function(n){ a.collateralBasis = n.value === "before" ? "before" : "after"; });
+  on("#a_cash", function(n){ a.cash = clamp(num(n.value, 0), -1e12, 1e12); state.meta.isSample = false; });
+  on("#a_brokerRate", function(n){ a.brokerRate = n.value === "" ? null : num(n.value, NaN); if (!isFinite(a.brokerRate)) a.brokerRate = null; });
+  on("#a_updated", function(n){ state.meta.updatedAt = n.value.trim(); });
+  el.querySelector("#addPos").onclick = function(){
+    state.positions.push({ id: uid("pos"), code: "", name: "", side: "buy", principal: 0, pnl: null });
+    recalc(); renderAccount();
+  };
+  el.querySelectorAll("[data-pos]").forEach(function(row){
+    var p = state.positions.filter(function(x){ return x.id === row.getAttribute("data-pos"); })[0];
+    if (!p) return;
+    row.querySelectorAll("[data-pact]").forEach(function(ctrl){
+      var act = ctrl.getAttribute("data-pact");
+      if (act === "del"){ ctrl.addEventListener("click", function(){
+        confirmModal("建玉を削除しますか", "「" + esc(p.name || p.code || "建玉") + "」（建代金 " + fmtYen(p.principal) + "）を削除します。", "削除する", function(){
+          state.positions = state.positions.filter(function(x){ return x.id !== p.id; }); recalc(); renderAccount();
+        });
+      }); return; }
+      ctrl.addEventListener("change", function(){
+        if (act === "code") p.code = ctrl.value.trim().slice(0, 12);
+        else if (act === "name") p.name = ctrl.value.trim().slice(0, 60);
+        else if (act === "side") p.side = ctrl.value === "sell" ? "sell" : "buy";
+        else if (act === "principal") p.principal = clamp(num(ctrl.value, 0), 0, 1e12);
+        else if (act === "pnl"){ p.pnl = ctrl.value === "" ? null : num(ctrl.value, NaN); if (!isFinite(p.pnl)) p.pnl = null; }
+        recalc(); renderAccount();
+      });
+    });
+  });
+}
+</script>
+<script>
+"use strict";
+/* ================= 設定・データ管理 ================= */
+function renderSettings(){
+  var el = document.getElementById("view-settings"), s = state.settings;
+  var html = '<div class="grid2 wide"><div>'
+    + '<div class="card" style="margin-top:14px"><h2>シミュレーション設定</h2><p class="sub">これらは証券会社の制度そのものではなく、本ツールの計算に使う変更可能なパラメータです。実際の制度条件は証券会社にご確認ください。</p>'
+    + '<div class="formgrid">'
+    + fld("自主管理基準（%）", '<input type="number" id="s_mgmt" min="0" max="100" step="0.5" value="' + s.management + '">')
+    + fld("追証基準（%）", '<input type="number" id="s_call" min="0" max="100" step="0.5" value="' + s.marginCall + '">')
+    + fld("新規建保証金率（%）", '<input type="number" id="s_newm" min="1" max="100" step="1" value="' + s.newMargin + '">')
+    + fld("最大想定下落率（%）", '<input type="number" id="s_maxdrop" min="5" max="100" step="5" value="' + s.maxDrop + '">')
+    + fld("シミュレーション刻み幅（%）", '<input type="number" id="s_step" min="1" max="50" step="1" value="' + s.step + '">')
+    + fld("控除費用（円）", '<input type="number" id="s_fees" min="0" step="100" value="' + s.fees + '">')
+    + fld("担保の価格変動条件", '<select id="s_colmode"><option value="same"' + (s.collateralMode === "same" ? " selected" : "") + '>市場と同率で下落</option><option value="half"' + (s.collateralMode === "half" ? " selected" : "") + '>市場の半分だけ下落</option><option value="strong"' + (s.collateralMode === "strong" ? " selected" : "") + '>市場の1.2倍下落</option><option value="none"' + (s.collateralMode === "none" ? " selected" : "") + '>変動しない</option><option value="custom"' + (s.collateralMode === "custom" ? " selected" : "") + ">任意の割合（下で指定）</option></select>")
+    + fld("担保の連動割合（%・任意時）", '<input type="number" id="s_colcustom" min="0" max="300" step="5" value="' + s.collateralCustom + '">')
+    + "</div>"
+    + '<label class="switchlabel"><input type="checkbox" id="s_profit" ' + (s.includeProfit ? "checked" : "") + "> 建玉の評価益も維持率の計算に算入する（オフの場合は評価損のみ算入）</label>"
+    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ 建玉評価損益 − 控除費用）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。将来の制度変更（最低保証金額・保証金拘束など）はこの計算モジュール側で拡張する設計です。</p></div>'
+
+    + '<div class="card"><h2>データ管理</h2><p class="sub">入力したデータは、この端末のブラウザ内（IndexedDB）に形式バージョン付きで自動保存され、再起動後も自動で復元されます。保存先はこの端末・このブラウザ内のみで、他の端末とは同期されません。機種変更やブラウザのデータ消去に備えて、JSONバックアップも併用してください。</p>'
+    + '<p class="hint" id="persistInfo">' + esc(persistInfoText()) + "</p>"
+    + (storageBlocked ? '<div class="notice danger" style="margin:0 0 10px">保存データの形式バージョン（' + loadWarningVersion + '）がこのアプリ（' + DATA_VERSION + '）より新しいため読み込めませんでした。<div class="rowflex mt"><button class="btn danger-outline small" id="clearStoredBtn">保存データを消去して自動保存を再開</button></div></div>' : "")
+    + (loadWarning === "corrupt" ? '<div class="notice warn" style="margin:0 0 10px">前回の保存データが破損していたため読み込めず、退避しました。現在のデータは自動保存されています。</div>' : "")
+    + '<div class="rowflex"><button class="btn" id="saveNowBtn">今すぐ保存</button><button class="btn primary" id="exportBtn">JSONで書き出す（バックアップ）</button><button class="btn" id="importBtn">JSONを読み込む（復元）</button><button class="btn danger-outline" id="resetBtn">初期サンプルデータに戻す</button></div>'
+    + '<p class="hint">読み込み時は形式とバージョンを検証し、不正な値（文字列・負数・範囲外）は自動で除去・丸めてから取り込みます。破損したファイルや、このアプリより新しい形式のファイルは取り込まず、現在のデータを保持します。取り込んだデータは自動保存にも反映されます。</p></div>'
+    + "</div><div>"
+
+    + '<div class="card" style="margin-top:14px"><h2>計算モデルの前提と注意</h2>'
+    + '<ul style="margin:6px 0 0;padding-left:1.2em;font-size:.88rem">'
+    + "<li>簡易シナリオ：すべての対象銘柄が同じ割合で下落し、担保は設定した連動割合で下落します（銘柄ごとに異なる下落率を設定する詳細シナリオは今後の拡張用にデータ構造のみ用意）。</li>"
+    + "<li>購入段階は下落率の到達順に実行し、各段階の必要保証金（実購入額×新規建保証金率）を、到達時点の推計保証金と比較して実行可否を判定します。これは概算判定であり、維持率だけで新規建ての可否を判断していません。正確な新規建余力の再現に必要な情報が不足する項目は「概算」と明示しています。</li>"
+    + "<li>既存建玉の評価損益の将来推計は「現在の時価（建代金＋現在評価損益）が下落率ぶん変動する」近似です。評価損益が未入力の建玉は現在損益0として概算し、その旨を表示します。</li>"
+    + "<li>維持率が追証基準に到達することと、実際に追証が発生することは同一ではありません。</li>"
+    + "<li>金額は円単位、数量は売買単位で一貫して切り捨てます。浮動小数点誤差を避けるため、価格・数量は整数化してから金額を計算します。</li>"
+    + "</ul></div>"
+
+    + '<div class="card"><h2>計算の自己テスト</h2><p class="sub">累計額・数量の丸め・複数銘柄の合算・担保の重複計上なし・建玉ゼロ時の処理・保証金不足判定・保存復元の一致・手計算との一致などを自動検証します。</p>'
+    + '<button class="btn" id="runTests">テストを実行</button><div id="testResults"></div></div>'
+    + "</div></div>";
+  el.innerHTML = html;
+
+  function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderSettings(); if (ui.view === "settings") toast("設定を反映しました。"); }); }
+  on("#s_mgmt", function(n){ s.management = clamp(num(n.value, 25), 0, 100); });
+  on("#s_call", function(n){ s.marginCall = clamp(num(n.value, 20), 0, 100); });
+  on("#s_newm", function(n){ s.newMargin = clamp(num(n.value, 31), 1, 100); });
+  on("#s_maxdrop", function(n){ s.maxDrop = clamp(Math.round(num(n.value, 80)), 5, 100); });
+  on("#s_step", function(n){ s.step = clamp(num(n.value, 5), 1, 50); });
+  on("#s_fees", function(n){ s.fees = clamp(num(n.value, 0), 0, 1e12); });
+  on("#s_colmode", function(n){ s.collateralMode = n.value; });
+  on("#s_colcustom", function(n){ s.collateralCustom = clamp(num(n.value, 100), 0, 300); });
+  var prof = el.querySelector("#s_profit");
+  if (prof) prof.addEventListener("change", function(){ s.includeProfit = prof.checked; recalc(); toast("評価益の算入設定を反映しました。"); });
+
+  var saveBtn = el.querySelector("#saveNowBtn");
+  if (saveBtn) saveBtn.onclick = function(){
+    if (!storageAvailable){ toast("この環境では自動保存を利用できません。JSONバックアップをご利用ください。"); return; }
+    if (storageBlocked){ toast("新しい形式の保存データがあるため、上書き防止で保存を停止しています。"); return; }
+    savePending = true;
+    saveNow().then(function(ok){ toast(ok ? "保存しました。" : "保存できませんでした。"); });
+  };
+  var clearBtn = el.querySelector("#clearStoredBtn");
+  if (clearBtn) clearBtn.onclick = function(){
+    confirmModal("保存データを消去しますか", "読み込めなかった新しい形式の保存データを消去し、現在のデータで自動保存を再開します。現在の画面のデータは消えません。", "消去して再開する", function(){
+      idbDel(IDB_KEY).then(function(){
+        storageBlocked = false; loadWarning = ""; loadWarningVersion = null;
+        savePending = true; saveNow();
+        renderSettings(); toast("保存データを消去し、自動保存を再開しました。");
+      }).catch(function(){ toast("保存データを消去できませんでした。"); });
+    });
+  };
+  el.querySelector("#exportBtn").onclick = exportJSON;
+  el.querySelector("#importBtn").onclick = function(){ document.getElementById("importFile").click(); };
+  el.querySelector("#resetBtn").onclick = function(){
+    confirmModal("初期サンプルデータに戻しますか", "現在の口座情報・銘柄・購入計画はすべて初期サンプルに置き換わります。必要な場合は先にJSONで書き出してください。", "初期化する", function(){
+      state = sampleState(); ui.selectedInsId = state.instruments[0].id; ui.selectedDrop = null;
+      recalc(); renderSettings(); toast("初期サンプルデータに戻しました。");
+    });
+  };
+  el.querySelector("#runTests").onclick = function(){
+    var results = runSelfTests();
+    var pass = results.filter(function(r){ return r.ok; }).length;
+    var h = '<p class="mt" style="font-weight:900">' + pass + " / " + results.length + ' 件 パス</p><ul class="testlist">';
+    results.forEach(function(r){ h += '<li><span class="' + (r.ok ? "ok" : "ng") + '">' + (r.ok ? "✓" : "✗") + "</span><span><strong>" + esc(r.name) + "</strong><br><span style='color:var(--muted);font-size:.8rem'>" + esc(r.detail) + "</span></span></li>"; });
+    el.querySelector("#testResults").innerHTML = h + "</ul>";
+  };
+}
+
+/* ---------- JSON エクスポート／インポート ---------- */
+function exportJSON(){
+  var payload = { app: "margin-nanpin-planner", version: DATA_VERSION, exportedAt: new Date().toISOString(), data: state };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "nanpin-plan-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  toast("JSONバックアップを書き出しました。");
+}
+document.getElementById("importFile").addEventListener("change", function(ev){
+  var file = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    var parsed = null;
+    try { parsed = JSON.parse(String(reader.result)); } catch (e) { parsed = null; }
+    if (parsed === null){
+      showModal("<h3>読み込めませんでした</h3><p style='margin:0 0 14px'>ファイルの内容がJSONとして読み取れないため、取り込みを中止しました。現在のデータはそのまま保持されています。</p><div class='rowflex' style='justify-content:flex-end'><button class='btn primary' onclick='closeModal()'>閉じる</button></div>");
+      return;
+    }
+    var res = unpackState(parsed);
+    if (!res.ok){
+      var msg = res.reason === "version"
+        ? "このファイルの形式バージョン（" + res.foundVersion + "）は、このアプリ（" + DATA_VERSION + "）より新しいため取り込めませんでした。新しいアプリで書き出したファイルは、古いアプリでは開けません。"
+        : "ファイルの形式が不正か破損しているため、取り込みを中止しました。";
+      showModal("<h3>読み込めませんでした</h3><p style='margin:0 0 14px'>" + esc(msg) + "現在のデータはそのまま保持されています。</p><div class='rowflex' style='justify-content:flex-end'><button class='btn primary' onclick='closeModal()'>閉じる</button></div>");
+      return;
+    }
+    state = res.state;
+    ui.selectedInsId = state.instruments.length ? state.instruments[0].id : null;
+    ui.selectedDrop = null;
+    recalc(); render();
+    toast("データを復元しました（形式バージョン " + DATA_VERSION + " として検証済み）。");
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- 自己テスト（指示書 §8） ---------- */
+function runSelfTests(){
+  var T = [];
+  function t(name, ok, detail){ T.push({ name: name, ok: !!ok, detail: detail }); }
+  /* 1 累計額 */
+  var s1 = sampleState(); var r1 = MarginSim.simulate(s1);
+  var cumBudget = s1.instruments[0].stages.reduce(function(a, x){ return a + x.budget; }, 0);
+  var lastCum = r1.stageRes[s1.instruments[0].stages[s1.instruments[0].stages.length - 1].id].cumBudget;
+  t("購入計画の累計額", cumBudget === 4500000 && lastCum === 4500000, "サンプル計画の予算合計・最終累計ともに 4,500,000円");
+  /* 2 購入額変更で結果更新 */
+  var s2 = JSON.parse(JSON.stringify(s1)); s2.instruments[0].stages[0].budget = 900000;
+  var r2 = MarginSim.simulate(sanitizeState(s2));
+  t("購入額変更時に全体の結果が更新される", r2.planCost !== r1.planCost && r2.rows[1].totalPrincipal !== r1.rows[1].totalPrincipal, "第1段階の予算を変更すると計画購入総額と建玉総額が変化");
+  /* 3 複数銘柄の合算 */
+  var s3 = sampleState();
+  s3.instruments.push({ id: "t2", code: "7203", name: "テスト株", type: "stock", basePrice: 1000, currentPrice: 1000, unit: 100, baseIsSample: false, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "t2s", dropPct: 10, budget: 90000, enabled: true }] });
+  var r3 = MarginSim.simulate(s3);
+  var row10 = r3.rows.filter(function(r){ return r.drop === 10; })[0];
+  t("複数銘柄の建玉が正しく合算される", row10 && row10.totalPrincipal === 64800 + r3.stageRes["t2s"].cost + (r1.rows.filter(function(r){ return r.drop === 10; })[0].newPrincipal), "−10%時点の建玉総額＝既存＋銘柄A計画＋銘柄B計画");
+  /* 4 担保の重複計上なし */
+  t("担保が重複計上されない", row10 && row10.collateral === MarginSim.collateralAt(s3.account.collateral, 10, 1), "銘柄が2つでも代用評価額は口座全体で1回だけ計上");
+  /* 5 建玉ゼロ */
+  var s5 = sampleState(); s5.positions = []; s5.instruments[0].stages = [];
+  var r5 = MarginSim.simulate(s5);
+  t("建玉ゼロでゼロ除算しない", r5.current.rate === null && r5.rows.every(function(r){ return r.rate === null; }), "建代金0のとき維持率は null（画面表示は「対象外」）で NaN にならない");
+  /* 6 数量の売買単位 */
+  var okUnit = true, okBudget = true;
+  Object.keys(r1.stageRes).forEach(function(k){ var rr = r1.stageRes[k]; if (rr.qty % 10 !== 0) okUnit = false; });
+  s1.instruments[0].stages.forEach(function(sg){ var rr = r1.stageRes[sg.id]; if (rr.cost > sg.budget) okBudget = false; });
+  t("購入数量が売買単位に適合し予算を超えない", okUnit && okBudget, "全段階で数量は売買単位10の倍数、実購入額は予算以下");
+  /* 7 保証金不足 */
+  var s7 = sampleState(); s7.account.collateral = 1000; s7.account.cash = 0;
+  var r7 = MarginSim.simulate(s7);
+  t("保証金不足時の処理", Object.keys(r7.stageRes).some(function(k){ return !r7.stageRes[k].feasible; }) && !!r7.firstInfeasible, "担保を極小にすると段階が実行不能として判定され、最初の実行不能段階が記録される");
+  /* 8 保存・復元 */
+  var roundtrip = sanitizeState(JSON.parse(JSON.stringify(state)));
+  t("保存・復元で数値が変化しない", JSON.stringify(roundtrip) === JSON.stringify(sanitizeState(state)), "JSON化→検証付き復元で全数値が一致");
+  /* 9 不正入力の除去 */
+  var dirty = sampleState(); dirty.instruments[0].stages[0].budget = "abc"; dirty.instruments[0].basePrice = -500; dirty.settings.maxDrop = 9999;
+  var clean9 = sanitizeState(dirty);
+  t("不正な入力値が計算に混入しない", clean9.instruments[0].stages[0].budget === 0 && clean9.instruments[0].basePrice === 0 && clean9.settings.maxDrop === 100, "文字列・負数・範囲外の値を検証で除去／丸め");
+  /* 10 手計算との一致 */
+  var s10 = { version: 1, meta: { isSample: false, updatedAt: "" },
+    account: { broker: "", collateral: 1000000, collateralBasis: "after", cash: 0, brokerRate: null }, positions: [],
+    instruments: [{ id: "h1", code: "9999", name: "手計算", type: "stock", basePrice: 1000, currentPrice: 1000, unit: 100, baseIsSample: false, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "h1s", dropPct: 10, budget: 90000, enabled: true }] }],
+    settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5, collateralMode: "same", collateralCustom: 100, includeProfit: true, fees: 0 } };
+  var r10 = MarginSim.simulate(s10);
+  var stg = r10.stageRes["h1s"];
+  var row20 = r10.rows.filter(function(r){ return r.drop === 20; })[0];
+  var expectedRate = (800000 - 10000) / 90000 * 100;
+  t("計算結果が手計算と一致する", stg.price === 900 && stg.qty === 100 && stg.cost === 90000 && Math.abs(row20.rate - expectedRate) < 0.01 && row20.totalPnl === -10000,
+    "価格900円×100株＝90,000円、−20%時点で担保800,000円・評価損−10,000円・維持率 " + expectedRate.toFixed(1) + "%");
+  /* 11 形式バージョン付き保存の往復（自動保存・JSON 共通の封筒） */
+  var packed = packState(s1);
+  var unpacked = unpackState(JSON.parse(JSON.stringify(packed)));
+  t("形式バージョン付きで保存・復元できる", packed.version === DATA_VERSION && unpacked.ok && JSON.stringify(unpacked.state) === JSON.stringify(sanitizeState(s1)), "封筒（バージョン " + DATA_VERSION + "）に包んでJSON化し、検証付きで開くと全数値が一致");
+  /* 12 破損・形式不一致への対応 */
+  var newerRes = unpackState({ app: "margin-nanpin-planner", version: DATA_VERSION + 99, data: sampleState() });
+  var brokenRes = unpackState({ app: "margin-nanpin-planner", version: DATA_VERSION, data: { foo: 1 } });
+  var garbageRes = unpackState("not an object");
+  t("破損・形式不一致の保存データを安全に弾く", !newerRes.ok && newerRes.reason === "version" && !brokenRes.ok && brokenRes.reason === "corrupt" && !garbageRes.ok, "新しい形式は version、構造の壊れたデータは corrupt として検出し、推測で読み込まない");
+  return T;
+}
+
+/* ---------- 初期化 ---------- */
+document.querySelectorAll("[data-view]").forEach(function(b){
+  b.addEventListener("click", function(){ switchView(b.getAttribute("data-view")); });
+});
+recalc();
+render();
+initPersistence();
+if ("serviceWorker" in navigator) {
+  try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch (e) { /* 埋め込み表示などでは登録できない場合がある（GitHub Pages等の単独配置用） */ }
+}
+</script>
+</body>
+</html>
