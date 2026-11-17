@@ -164,6 +164,24 @@ table.dt tbody tr{cursor:pointer}
 .notice.danger{background:var(--danger-bg);border-color:var(--danger-line)}
 details.more{margin-top:10px}
 details.more summary{font-weight:700;color:var(--accent-ink);cursor:pointer;padding:.4rem 0;min-height:2.25rem}
+/* 折り畳み式 詳細カード（ダッシュボード：下落率別の詳細） */
+.card.detail-card{padding:0;overflow:hidden}
+.card.detail-card>summary{list-style:none;cursor:pointer;padding:16px;-webkit-tap-highlight-color:transparent}
+.card.detail-card>summary::-webkit-details-marker{display:none}
+.card.detail-card>summary::marker{content:""}
+.detail-summary-in{display:flex;align-items:flex-start;gap:12px}
+.detail-summary-main{flex:1;min-width:0}
+.detail-summary-main h2{font-size:1.02rem;margin:0;font-weight:900;line-height:1.4}
+.detail-summary-meta{color:var(--muted);font-size:.82rem;margin-top:4px;line-height:1.5}
+.detail-summary-meta strong{color:var(--ink)}
+.detail-toggle{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--surface2);color:var(--accent-ink);border-radius:999px;padding:.32rem .7rem;font-size:.8rem;font-weight:700;white-space:nowrap;margin-top:2px}
+.detail-toggle .chev{display:inline-block;font-size:.72rem;line-height:1;transition:transform .18s ease}
+.card.detail-card[open ] .detail-toggle .chev{transform:rotate(180deg)}
+.card.detail-card[open ] .detail-toggle .label-open{display:none}
+.card.detail-card:not([open ]) .detail-toggle .label-close{display:none}
+.detail-body{padding:0 16px 16px;border-top:1px solid var(--line)}
+.detail-body .sub{margin-top:12px}
+@media(max-width:640px){.detail-summary-in{flex-wrap:wrap}.detail-toggle{margin-top:6px}}
 .kv{display:grid;grid-template-columns:minmax(150px,auto) 1fr;gap:4px 14px;font-size:.9rem}
 .kv dt{color:var(--muted);font-weight:700}
 .kv dd{margin:0;text-align:right;font-weight:700}
@@ -465,7 +483,7 @@ var MarginSim = (function(){
    JSON バックアップ（書き出し／読み込み）も同じ封筒・同じ検証を通す。 */
 var state = sampleState();
 var sim = MarginSim.simulate(state);
-var ui = { view: "dashboard", selectedInsId: state.instruments[0].id, selectedDrop: null, chartScale: "auto" };
+var ui = { view: "dashboard", selectedInsId: state.instruments[0].id, selectedDrop: null, chartScale: "auto", detailOpen: false };
 
 function recalc(){ sim = MarginSim.simulate(state); scheduleSave(); }
 
@@ -699,7 +717,11 @@ function renderDashboard(){
     + '<div class="legend"><span><span class="sw"></span>シミュレーション維持率</span><span><span class="sw dash mgmt"></span>自主管理基準 ' + st.management + '%</span><span><span class="sw dash call"></span>追証基準 ' + st.marginCall + '%</span><span><span class="dotkey"></span>購入予定段階</span></div>'
     + "</div>";
 
-  html += '<div class="card"><h2>下落率別の詳細（シミュレーション）</h2><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。</p><div class="tblwrap"><table class="dt"><thead><tr>'
+  var detailMeta = "全" + sim.rows.length + "段階（0%〜−" + st.maxDrop + "%）"
+    + " ・ 管理基準到達：" + (sim.firstMgmt ? "<strong>−" + sim.firstMgmt.drop + "%</strong>" : "なし")
+    + " ・ 追証基準到達：" + (sim.firstCall ? "<strong>−" + sim.firstCall.drop + "%</strong>" : "なし")
+    + (ui.selectedDrop !== null ? " ・ 選択中：<strong>−" + ui.selectedDrop + "%</strong>" : "");
+  html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>下落率別の詳細（シミュレーション）</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。</p><div class="tblwrap"><table class="dt"><thead><tr>'
     + "<th>下落率</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
   sim.rows.forEach(function(r){
     var rs = rateStatus(r.rate);
@@ -712,7 +734,7 @@ function renderDashboard(){
   if (sim.rows.some(function(r){ return r.existingPnlApprox; })){
     html += '<p class="hint">※ 既存建玉の一部は評価損益が未入力のため、評価損益の推計は概算です（未入力分は現在損益0として下落変動のみ反映）。正確な値が必要な場合は「口座・保有状況」で評価損益を入力してください。</p>';
   }
-  html += "</div>";
+  html += "</div></details>";
 
   html += '<div class="card"><h2>現在の実口座情報</h2><p class="sub">シミュレーション値ではなく、登録されている現在の口座情報です。</p><dl class="kv">'
     + "<dt>証券会社</dt><dd>" + (state.account.broker ? esc(state.account.broker) : "未登録") + "</dd>"
@@ -726,8 +748,10 @@ function renderDashboard(){
   el.innerHTML = html;
   el.querySelectorAll("[data-goto]").forEach(function(b){ b.onclick = function(){ switchView(b.getAttribute("data-goto")); }; });
   el.querySelectorAll("[data-scale]").forEach(function(b){ b.onclick = function(){ ui.chartScale = b.getAttribute("data-scale"); renderDashboard(); }; });
+  var detailEl = el.querySelector("#dropDetail");
+  if (detailEl){ detailEl.addEventListener("toggle", function(){ ui.detailOpen = detailEl.open; var meta = detailEl.querySelector(".detail-summary-meta"); if (meta && !detailEl.open){ /* 閉じたときも要約はそのまま（再描画なしで状態だけ保持） */ } }); }
   el.querySelectorAll("tr[data-drop]").forEach(function(tr){
-    tr.onclick = function(){ ui.selectedDrop = num(tr.getAttribute("data-drop")); renderDashboard(); };
+    tr.onclick = function(){ ui.selectedDrop = num(tr.getAttribute("data-drop")); ui.detailOpen = true; renderDashboard(); };
   });
 }
 function kpi(label, value, note, cls){
