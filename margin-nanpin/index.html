@@ -277,6 +277,8 @@ function fmtYenShort(v){ if (v === null || v === undefined || !isFinite(v)) retu
 function fmtPct(v, digits){ if (v === null || v === undefined || !isFinite(v)) return "対象外"; return v.toFixed(digits === undefined ? 1 : digits) + "%"; }
 function fmtSignedYen(v){ if (v === null || v === undefined || !isFinite(v)) return "—"; var r = Math.round(v); return (r > 0 ? "+" : (r < 0 ? "−" : "")) + Math.abs(r).toLocaleString("ja-JP") + "円"; }
 function esc(s){ return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+/* 銘柄コードの正規化：前後の空白を除き英字を大文字化する（例 "285a" → "285A"）。コード照合はすべてこの形式で行う */
+function normalizeCode(code){ return String(code === null || code === undefined ? "" : code).trim().toUpperCase().slice(0, 12); }
 
 /* ---------- サンプルデータ（指示書 §5） ---------- */
 function sampleStages(){
@@ -319,7 +321,7 @@ function sanitizeState(s){
   out.positions = Array.isArray(s.positions) ? s.positions.slice(0, 100).map(function(p){
     p = p || {};
     var pnl = (p.pnl === null || p.pnl === "" || p.pnl === undefined) ? null : num(p.pnl, NaN);
-    return { id: String(p.id || uid("pos")), code: String(p.code || "").slice(0, 12), name: String(p.name || "").slice(0, 60),
+    return { id: String(p.id || uid("pos")), code: normalizeCode(p.code), name: String(p.name || "").slice(0, 60),
              side: p.side === "sell" ? "sell" : "buy",
              principal: clamp(num(p.principal, 0), 0, 1e12),
              pnl: isFinite(pnl) ? clamp(pnl, -1e12, 1e12) : null };
@@ -333,7 +335,7 @@ function sanitizeState(s){
     var acqRaw = (it.acquiredPrice === undefined || it.acquiredPrice === null) ? it.basePrice : it.acquiredPrice;
     var cpRaw = (it.closePrice === undefined) ? it.currentPrice : it.closePrice;
     var cpv = (cpRaw === null || cpRaw === "" || cpRaw === undefined) ? null : num(cpRaw, NaN);
-    return { id: String(it.id || uid("ins")), code: String(it.code || "").slice(0, 12), name: String(it.name || "").slice(0, 80),
+    return { id: String(it.id || uid("ins")), code: normalizeCode(it.code), name: String(it.name || "").slice(0, 80),
       type: it.type === "stock" ? "stock" : "ETF",
       acquiredPrice: clamp(num(acqRaw, 0), 0, 1e9),
       closePrice: isFinite(cpv) ? clamp(cpv, 0, 1e9) : null,
@@ -525,9 +527,10 @@ var PriceFeed = (function(){
         var e = raw.stocks[code] || {};
         var close = num(e.close, NaN);
         if (!isFinite(close) || close <= 0 || !validDate(e.closeDate)) return;
-        stocks[String(code).slice(0, 12)] = {
+        stocks[normalizeCode(code)] = {
           name: String(e.name || "").slice(0, 80),
-          type: e.type === "stock" ? "stock" : "ETF",
+          /* 終値データ側の区分表記ゆれ（"stock" / "個別株式"）をアプリ内部形式へそろえる */
+          type: (e.type === "stock" || e.type === "個別株式" || e.type === "株式") ? "stock" : "ETF",
           unit: Math.max(1, Math.round(num(e.unit, 1))),
           close: close, closeDate: String(e.closeDate)
         };
@@ -556,7 +559,7 @@ var PriceFeed = (function(){
     }
     return { updatedAt: String(raw.updatedAt || ""), source: String(raw.source || ""), stocks: stocks, indices: indices };
   }
-  function stock(feed, code){ return (feed && code && feed.stocks[code]) ? feed.stocks[code] : null; }
+  function stock(feed, code){ var c = normalizeCode(code); return (feed && c && feed.stocks[c]) ? feed.stocks[c] : null; }
   function indexLatest(feed, name){ return (feed && name && feed.indices[name]) ? feed.indices[name] : null; }
   /* 基準日の終値：指定日に無ければ、それ以前で最も近い営業日の終値を返す（exact=false で区別できる） */
   function indexCloseOn(feed, name, dateStr){
@@ -722,14 +725,14 @@ function initPersistence(){
 }
 /* ---------- 終値データ（prices.json）の読み込み ----------
    アプリと同じ場所の prices.json を読む（同一オリジンのため CORS 制限なし）。
-   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjIwMEEiOnsiY2xvc2UiOjMwODEsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoiTkVYVCBGVU5EUyDml6XntYzljYrlsI7kvZPmoKrmjIfmlbDpgKPli5XlnovkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0= を試し、それも無ければ
+   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ== を試し、それも無ければ
    「未取得」として終値の手入力にフォールバックする。取得した終値は銘柄データへ反映し、
    IndexedDB にも保存されるため、次回起動時（オフライン含む）も最後の終値が表示できる。 */
 var pricesData = null;
 var pricesStatus = "loading"; /* loading | ok | missing */
 var pricesLoadedFrom = "";
 function loadPrices(){
-  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjIwMEEiOnsiY2xvc2UiOjMwODEsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoiTkVYVCBGVU5EUyDml6XntYzljYrlsI7kvZPmoKrmjIfmlbDpgKPli5XlnovkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0="];
+  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ=="];
   function tryNext(i){
     if (i >= candidates.length){ if (!pricesData) pricesStatus = "missing"; render(); return; }
     fetch(candidates[i], { cache: "no-store" }).then(function(res){
@@ -754,7 +757,19 @@ function applyPricesToState(){
     if (ins.closePrice !== q.close || ins.closeDate !== q.closeDate || ins.closeSource !== "json"){
       ins.closePrice = q.close; ins.closeDate = q.closeDate; ins.closeSource = "json"; changed = true;
     }
-    if (!ins.name && q.name){ ins.name = q.name; changed = true; }
+    /* 区分・売買単位は銘柄ごとのマスタ情報（ETFは1口/10口など銘柄で異なる）なので、終値データの値を正として合わせる */
+    if (ins.type !== q.type){ ins.type = q.type; changed = true; }
+    if (ins.unit !== q.unit){ ins.unit = q.unit; changed = true; }
+    if (q.name){
+      if (!ins.name){ ins.name = q.name; changed = true; }
+      else if (ins.name !== q.name){
+        /* 別銘柄の銘柄名がそのまま残っている場合（計画の複製やコード変更時の取り違え）だけ自動で補正する。
+           それ以外の独自の銘柄名はユーザーの入力として尊重し、「銘柄情報を取得」でのみ上書きする */
+        var myCode = normalizeCode(ins.code);
+        var clash = Object.keys(pricesData.stocks).some(function(c){ return c !== myCode && pricesData.stocks[c].name === ins.name; });
+        if (clash){ ins.name = q.name; changed = true; }
+      }
+    }
   });
   if (changed) recalc();
   return changed;
@@ -1009,11 +1024,11 @@ function renderPlan(){
   function fmtIdx(v){ return (v === null || v === undefined || !isFinite(v)) ? "データなし" : Number(v).toLocaleString("ja-JP", { maximumFractionDigits: 2 }); }
 
   html += '<div class="grid2" style="margin-top:14px"><div class="card" style="margin-top:0"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">取得価格は仮のサンプル値</span>' : "") + '</h2>'
-    + '<p class="sub">購入トリガーは、この銘柄自身の<strong>取得価格</strong>からの下落率です。最新終値は終値データ（prices.json）から自動で取り込み、取得価格との騰落率を表示します。</p>'
+    + '<p class="sub">購入トリガーは、この銘柄自身の<strong>取得価格</strong>からの下落率です。最新終値は終値データ（prices.json）から自動で取り込み、取得価格との騰落率を表示します。「銘柄情報を取得」を押すと、登録済みコードでは銘柄名・区分・売買単位（ETFは1口／10口など銘柄ごとに異なります）も終値データの値に合わせて取り込みます。</p>'
     + '<div class="coderow"><div class="field" style="flex:1;min-width:0"><label class="flabel" for="f_code">銘柄コード</label><input type="text" id="f_code" value="' + esc(ins.code) + '" autocomplete="off"></div><button class="btn" id="fetchQuote" type="button">銘柄情報を取得</button></div>'
     + '<p class="hint">' + (pricesStatus === "ok"
-        ? (quote ? "終値データに登録あり：" + esc(quote.closeDate) + " 終値 " + fmtYen(quote.close) + (quote.name ? "／" + esc(quote.name) : "")
-                 : "このコードは終値データに未登録です。登録済みコードは自動で終値が入ります。未登録の場合は下の欄で終値を手入力できます。")
+        ? (quote ? "終値データに登録あり：" + esc(quote.closeDate) + " 終値 " + fmtYen(quote.close) + (quote.name ? "／" + esc(quote.name) : "") + "／" + (quote.type === "ETF" ? "ETF" : "個別株式") + "・売買単位 " + quote.unit
+                 : "このコードは終値データに未登録です。登録済みコードは銘柄名・区分・売買単位・終値が自動で入ります。未登録の場合は各欄を手入力してください。")
         : pricesStatusText()) + '</p>'
     + '<div class="formgrid">'
     + fld("銘柄名", '<input type="text" id="f_name" value="' + esc(ins.name) + '" autocomplete="off">')
@@ -1095,7 +1110,18 @@ function bindPlanCommon(el){
 function commitIns(ins, patch){ Object.keys(patch).forEach(function(k){ ins[k] = patch[k]; }); recalc(); }
 function bindInstrumentForm(el, ins){
   function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderPlan(); }); }
-  on("#f_code", function(n){ ins.code = n.value.trim().slice(0, 12); });
+  on("#f_code", function(n){
+    var nc = normalizeCode(n.value);
+    if (nc !== ins.code){
+      ins.code = nc;
+      /* コードが変わったら終値データから銘柄名・区分・売買単位・終値を取り直す。
+         未登録コードに変えた場合は、前の銘柄の終値（データ由来）を残さずクリアする（手入力の終値は残す） */
+      if (PriceFeed.stock(pricesData, nc)){ applyPricesToState(); }
+      else if (ins.closeSource === "json"){
+        ins.closePrice = null; ins.closeDate = ""; ins.closeSource = "";
+      }
+    }
+  });
   on("#f_name", function(n){ ins.name = n.value.trim().slice(0, 80); });
   on("#f_type", function(n){ ins.type = n.value === "stock" ? "stock" : "ETF"; });
   on("#f_unit", function(n){ ins.unit = Math.max(1, Math.round(num(n.value, 1))); });
@@ -1105,14 +1131,19 @@ function bindInstrumentForm(el, ins){
   var fq = el.querySelector("#fetchQuote");
   if (fq) fq.onclick = function(){
     var codeInput = el.querySelector("#f_code");
-    ins.code = (codeInput ? codeInput.value : "").trim().slice(0, 12);
+    ins.code = normalizeCode(codeInput ? codeInput.value : "");
     if (pricesStatus !== "ok"){ toast("終値データ（prices.json）を取得できていません。再読み込みします。"); recalc(); loadPrices(); return; }
     var q = PriceFeed.stock(pricesData, ins.code);
-    if (!q){ recalc(); renderPlan(); toast("コード「" + ins.code + "」は終値データに未登録です。終値は手入力できます。"); return; }
+    if (!q){ recalc(); renderPlan(); toast("コード「" + ins.code + "」は終値データに未登録です。銘柄名・売買単位・終値は手入力できます。"); return; }
+    /* 終値だけでなく、銘柄名・区分・売買単位も終値データの値で取り込む（明示的に取得を押した操作なので上書きする） */
     ins.closePrice = q.close; ins.closeDate = q.closeDate; ins.closeSource = "json";
-    if (!ins.name && q.name) ins.name = q.name;
+    var filled = [];
+    if (q.name){ ins.name = q.name; filled.push("銘柄名"); }
+    ins.type = q.type; filled.push(q.type === "ETF" ? "区分（ETF）" : "区分（個別株式）");
+    ins.unit = q.unit; filled.push("売買単位 " + q.unit);
+    filled.push(q.closeDate + " 終値 " + fmtYen(q.close));
     recalc(); renderPlan();
-    toast("銘柄情報を取り込みました：" + q.closeDate + " 終値 " + fmtYen(q.close));
+    toast("銘柄情報を取り込みました：" + filled.join("・"));
   };
   on("#f_refname", function(n){ ins.ref.name = n.value; });
   on("#f_refdate", function(n){ ins.ref.baseDate = n.value; });
@@ -1127,7 +1158,7 @@ function bindInstrumentForm(el, ins){
     document.getElementById("mCancel").onclick = closeModal;
     document.getElementById("mOk").onclick = function(){
       var copy = JSON.parse(JSON.stringify(ins));
-      copy.id = uid("ins"); copy.code = document.getElementById("dupCode").value.trim().slice(0, 12);
+      copy.id = uid("ins"); copy.code = normalizeCode(document.getElementById("dupCode").value);
       copy.name = document.getElementById("dupName").value.trim().slice(0, 80); copy.baseIsSample = false;
       copy.stages.forEach(function(s){ s.id = uid("st"); });
       state.instruments.push(copy); ui.selectedInsId = copy.id;
@@ -1254,7 +1285,7 @@ function renderAccount(){
         });
       }); return; }
       ctrl.addEventListener("change", function(){
-        if (act === "code") p.code = ctrl.value.trim().slice(0, 12);
+        if (act === "code") p.code = normalizeCode(ctrl.value);
         else if (act === "name") p.name = ctrl.value.trim().slice(0, 60);
         else if (act === "side") p.side = ctrl.value === "sell" ? "sell" : "buy";
         else if (act === "principal") p.principal = clamp(num(ctrl.value, 0), 0, 1e12);
@@ -1476,6 +1507,17 @@ function runSelfTests(){
   var base16 = PriceFeed.indexCloseOn(feed13, "TOPIX", "2026-11-15");
   var exact16 = PriceFeed.indexCloseOn(feed13, "TOPIX", "2026-11-13");
   t("参考指数の基準日の終値を解決する", !!base16 && base16.close === 3000 && base16.date === "2026-11-13" && !base16.exact && !!exact16 && exact16.exact === true, "基準日が休場日なら直近の営業日の終値を使い、完全一致かどうかを区別できる");
+  /* 17 銘柄コードの正規化と、銘柄名・区分・売買単位の取り込み */
+  var feed17 = PriceFeed.sanitize({ updatedAt: "2026-11-17T07:00:00+09:00", source: "test",
+    stocks: { "200A": { name: "半導体ETF", type: "ETF", unit: 1, close: 3081, closeDate: "2026-11-16" },
+              "285a": { name: "テスト半導体株", type: "個別株式", unit: 100, close: 8392, closeDate: "2026-11-16" } },
+    indices: {} });
+  var q17a = PriceFeed.stock(feed17, "200a");
+  var q17b = PriceFeed.stock(feed17, " 285A ");
+  t("銘柄コードを正規化し銘柄名・区分・売買単位を取り込める", normalizeCode(" 285a ") === "285A"
+    && !!q17a && q17a.name === "半導体ETF" && q17a.type === "ETF" && q17a.unit === 1
+    && !!q17b && q17b.type === "stock" && q17b.unit === 100,
+    "小文字・空白つきのコードでも照合でき、ETFの売買単位1と個別株式（データ表記「個別株式」）の売買単位100・区分を正しく取り込む");
   return T;
 }
 
