@@ -725,14 +725,14 @@ function initPersistence(){
 }
 /* ---------- 終値データ（prices.json）の読み込み ----------
    アプリと同じ場所の prices.json を読む（同一オリジンのため CORS 制限なし）。
-   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ== を試し、それも無ければ
+   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIxMzQ2Ijp7ImNsb3NlIjo2MjE1MCwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJNQVhJUyDml6XntYwyMjXkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjE1NDciOnsiY2xvc2UiOjEzMDUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuS4iuWgtOOCpOODs+ODh+ODg+OCr+OCueODleOCoeODs+ODieexs+WbveagquW8j++8iFMmUDUwMO+8iSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjAwQSI6eyJjbG9zZSI6MzA4MSwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJORVhUIEZVTkRTIOaXpee1jOWNiuWwjuS9k+agquaMh+aVsOmAo+WLleWei+S4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjg1QSI6eyJjbG9zZSI6ODM5MiwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiLjgq3jgqrjgq/jgrfjgqLjg5vjg7zjg6vjg4fjgqPjg7PjgrDjgrkiLCJ0eXBlIjoic3RvY2siLCJ1bml0IjoxMDB9LCI3MjAzIjp7ImNsb3NlIjozNDI4LCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuODiOODqOOCv+iHquWLlei7iiIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjg3MjkiOnsiY2xvc2UiOjE0Ni4zLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCveODi+ODvOODleOCo+ODiuODs+OCt+ODo+ODq+OCsOODq+ODvOODlyIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0= を試し、それも無ければ
    「未取得」として終値の手入力にフォールバックする。取得した終値は銘柄データへ反映し、
    IndexedDB にも保存されるため、次回起動時（オフライン含む）も最後の終値が表示できる。 */
 var pricesData = null;
 var pricesStatus = "loading"; /* loading | ok | missing */
 var pricesLoadedFrom = "";
 function loadPrices(){
-  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ=="];
+  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIxMzQ2Ijp7ImNsb3NlIjo2MjE1MCwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJNQVhJUyDml6XntYwyMjXkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjE1NDciOnsiY2xvc2UiOjEzMDUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuS4iuWgtOOCpOODs+ODh+ODg+OCr+OCueODleOCoeODs+ODieexs+WbveagquW8j++8iFMmUDUwMO+8iSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjAwQSI6eyJjbG9zZSI6MzA4MSwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJORVhUIEZVTkRTIOaXpee1jOWNiuWwjuS9k+agquaMh+aVsOmAo+WLleWei+S4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjg1QSI6eyJjbG9zZSI6ODM5MiwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiLjgq3jgqrjgq/jgrfjgqLjg5vjg7zjg6vjg4fjgqPjg7PjgrDjgrkiLCJ0eXBlIjoic3RvY2siLCJ1bml0IjoxMDB9LCI3MjAzIjp7ImNsb3NlIjozNDI4LCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuODiOODqOOCv+iHquWLlei7iiIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjg3MjkiOnsiY2xvc2UiOjE0Ni4zLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCveODi+ODvOODleOCo+ODiuODs+OCt+ODo+ODq+OCsOODq+ODvOODlyIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0="];
   function tryNext(i){
     if (i >= candidates.length){ if (!pricesData) pricesStatus = "missing"; render(); return; }
     fetch(candidates[i], { cache: "no-store" }).then(function(res){
@@ -778,6 +778,17 @@ function pricesStatusText(){
   if (pricesStatus === "loading") return "終値データを確認中…";
   if (pricesStatus === "ok" && pricesData) return "終値データ：取得済み" + (pricesData.updatedAt ? "（" + esc(pricesData.updatedAt) + " 更新" : "") + (pricesData.source ? "／" + esc(pricesData.source) : "") + (pricesData.updatedAt ? "）" : "");
   return "終値データ（prices.json）は未取得です。終値は手入力できます。";
+}
+/* 銘柄コード欄の下に出すヒント文。入力途中のコードでも正規化してから照合する
+   （例：「285a」と小文字で打った直後でも「登録あり」と正しく判定する）。
+   戻り値はプレーンテキスト（呼び出し側で esc するか textContent に入れる） */
+function quoteHintText(code){
+  var c = normalizeCode(code);
+  if (pricesStatus !== "ok") return pricesStatusText();
+  if (!c) return "銘柄コードを入力すると、終値データの登録状況（銘柄名・区分・売買単位・終値）を表示します。";
+  var q = PriceFeed.stock(pricesData, c);
+  if (q) return "終値データに登録あり：" + q.closeDate + " 終値 " + fmtYen(q.close) + (q.name ? "／" + q.name : "") + "／" + (q.type === "ETF" ? "ETF" : "個別株式") + "・売買単位 " + q.unit;
+  return "このコードは終値データに未登録です。登録済みコードは銘柄名・区分・売買単位・終値が自動で入ります。未登録の場合は各欄を手入力してください。";
 }
 function toast(msg){
   var t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
@@ -870,7 +881,7 @@ function renderDashboard(){
     html += '<div class="card"><h2>銘柄の現在位置（取得価格と最新終値）</h2><p class="sub">' + pricesStatusText() + ' 騰落率は最新終値（終値データまたは手入力）から計算しています。</p>';
     state.instruments.forEach(function(ins){
       var chg = changePct(ins.acquiredPrice, ins.closePrice);
-      html += '<div class="posline"><div class="posline-main"><strong>' + esc(ins.code || "コード未設定") + " " + esc(ins.name) + '</strong><span class="posline-sub">取得価格 ' + fmtYen(ins.acquiredPrice) + "／最新終値 " + (ins.closePrice !== null ? fmtYen(ins.closePrice) + "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + "）" : "未取得") + '</span></div>'
+      html += '<div class="posline"><div class="posline-main"><strong>' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</strong><span class="posline-sub">取得価格 ' + fmtYen(ins.acquiredPrice) + "／最新終値 " + (ins.closePrice !== null ? fmtYen(ins.closePrice) + "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + "）" : "未取得") + '</span></div>'
         + (chg === null ? '<span class="pill mute">騰落率 —</span>' : '<span class="pill ' + (chg >= 0 ? "up" : "down") + '">' + (chg >= 0 ? "+" : "−") + Math.abs(chg).toFixed(2) + "%</span>")
         + "</div>";
     });
@@ -1001,7 +1012,7 @@ function renderPlan(){
   html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
   state.instruments.forEach(function(ins){
     var tot = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ return a + s.budget; }, 0);
-    html += '<button class="chip" data-ins="' + ins.id + '" aria-selected="' + (ins.id === ui.selectedInsId) + '"><span class="c-code">' + esc(ins.code || "コード未設定") + " " + esc(ins.name) + '</span><br><span class="c-name">' + (ins.type === "ETF" ? "ETF" : "個別株式") + "／計画予算 " + fmtYen(tot) + "</span></button>";
+    html += '<button class="chip" data-ins="' + ins.id + '" aria-selected="' + (ins.id === ui.selectedInsId) + '"><span class="c-code">' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</span><br><span class="c-name">' + (ins.type === "ETF" ? "ETF" : "個別株式") + "／計画予算 " + fmtYen(tot) + "</span></button>";
   });
   html += '<button class="chip" id="addIns"><span class="c-code">＋ 銘柄を追加</span><br><span class="c-name">個別株式・ETFを登録</span></button></div>';
 
@@ -1026,10 +1037,7 @@ function renderPlan(){
   html += '<div class="grid2" style="margin-top:14px"><div class="card" style="margin-top:0"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">取得価格は仮のサンプル値</span>' : "") + '</h2>'
     + '<p class="sub">購入トリガーは、この銘柄自身の<strong>取得価格</strong>からの下落率です。最新終値は終値データ（prices.json）から自動で取り込み、取得価格との騰落率を表示します。「銘柄情報を取得」を押すと、登録済みコードでは銘柄名・区分・売買単位（ETFは1口／10口など銘柄ごとに異なります）も終値データの値に合わせて取り込みます。</p>'
     + '<div class="coderow"><div class="field" style="flex:1;min-width:0"><label class="flabel" for="f_code">銘柄コード</label><input type="text" id="f_code" value="' + esc(ins.code) + '" autocomplete="off"></div><button class="btn" id="fetchQuote" type="button">銘柄情報を取得</button></div>'
-    + '<p class="hint">' + (pricesStatus === "ok"
-        ? (quote ? "終値データに登録あり：" + esc(quote.closeDate) + " 終値 " + fmtYen(quote.close) + (quote.name ? "／" + esc(quote.name) : "") + "／" + (quote.type === "ETF" ? "ETF" : "個別株式") + "・売買単位 " + quote.unit
-                 : "このコードは終値データに未登録です。登録済みコードは銘柄名・区分・売買単位・終値が自動で入ります。未登録の場合は各欄を手入力してください。")
-        : pricesStatusText()) + '</p>'
+    + '<p class="hint" id="codeHint">' + esc(quoteHintText(ins.code)) + '</p>'
     + '<div class="formgrid">'
     + fld("銘柄名", '<input type="text" id="f_name" value="' + esc(ins.name) + '" autocomplete="off">')
     + fld("区分", '<select id="f_type"><option value="ETF"' + (ins.type === "ETF" ? " selected" : "") + '>ETF</option><option value="stock"' + (ins.type === "stock" ? " selected" : "") + ">個別株式</option></select>")
@@ -1060,7 +1068,7 @@ function renderPlan(){
     + "</div></div>";
 
   var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
-  html += '<div class="card"><h2>ナンピン購入計画（' + esc(ins.code) + " " + esc(ins.name) + '）</h2>'
+  html += '<div class="card"><h2>ナンピン購入計画（' + esc(normalizeCode(ins.code)) + " " + esc(ins.name) + '）</h2>'
     + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は取得価格×(1−下落率)を円未満切り捨て。変更は全体の維持率シミュレーションへ即時反映されます。</p>'
     + '<div class="rowflex"><button class="btn primary small" id="addStage">＋ 購入段階を追加</button><button class="btn small" id="resetPlan">計画を初期化</button></div>'
     + '<div id="stageList">';
@@ -1121,6 +1129,16 @@ function bindInstrumentForm(el, ins){
         ins.closePrice = null; ins.closeDate = ""; ins.closeSource = "";
       }
     }
+  });
+  /* 入力中もその場でコードを正規化し、ヒント表示を正規化後のコードで照合し直す
+     （「285a」と打った直後に「未登録」と誤表示される問題への対処。再描画はせず入力中のフォーカスを保つ） */
+  var codeInputEl = el.querySelector("#f_code");
+  if (codeInputEl) codeInputEl.addEventListener("input", function(){
+    var nc = normalizeCode(codeInputEl.value);
+    if (codeInputEl.value !== nc) codeInputEl.value = nc;
+    ins.code = nc;
+    var hintEl = el.querySelector("#codeHint");
+    if (hintEl) hintEl.textContent = quoteHintText(nc);
   });
   on("#f_name", function(n){ ins.name = n.value.trim().slice(0, 80); });
   on("#f_type", function(n){ ins.type = n.value === "stock" ? "stock" : "ETF"; });
@@ -1518,6 +1536,15 @@ function runSelfTests(){
     && !!q17a && q17a.name === "半導体ETF" && q17a.type === "ETF" && q17a.unit === 1
     && !!q17b && q17b.type === "stock" && q17b.unit === 100,
     "小文字・空白つきのコードでも照合でき、ETFの売買単位1と個別株式（データ表記「個別株式」）の売買単位100・区分を正しく取り込む");
+  /* 18 コード入力中のヒント表示（入力したコードを正規化してその場で照合する） */
+  var savedFeed18 = pricesData, savedStatus18 = pricesStatus;
+  pricesData = feed17; pricesStatus = "ok";
+  var hint18a = quoteHintText(" 285a ");
+  var hint18b = quoteHintText("9999");
+  var hint18c = quoteHintText("1346");
+  pricesData = savedFeed18; pricesStatus = savedStatus18;
+  t("コード入力中のヒントが正規化したコードで照合される", hint18a.indexOf("登録あり") >= 0 && hint18a.indexOf("8,392円") >= 0 && hint18b.indexOf("未登録") >= 0 && hint18c.indexOf("未登録") >= 0,
+    "小文字・空白つきで入力しても「登録あり」と表示され、未登録コードは「未登録」と表示される（取得ボタンを押す前でも正しく判定）。1346はテスト用フィードに無いため未登録になるのが正しい");
   return T;
 }
 
