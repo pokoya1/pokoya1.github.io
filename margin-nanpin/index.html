@@ -201,7 +201,7 @@ details.more summary{font-weight:700;color:var(--accent-ink);cursor:pointer;padd
 .testlist .ok{color:var(--accent-ink);font-weight:900}
 .testlist .ng{color:var(--danger);font-weight:900}
 footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
-/* 価格パネル（取得価格・最新終値・参考指数） */
+/* 価格パネル（計画基準価格・最新終値・参考指数） */
 .pricepanel{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 14px;background:var(--surface2);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-top:12px}
 .pricepanel .pp-label{font-size:.74rem;font-weight:700;color:var(--muted)}
 .pricepanel .pp-value{font-size:1.35rem;font-weight:900;line-height:1.3;margin-top:2px}
@@ -222,6 +222,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
   .chip{min-height:3.4rem}
   .pricepanel .pp-value{font-size:1.2rem}
 }
+.grouphead{font-size:1rem;font-weight:900;margin:18px 0 0}
+.grouphead .gh-tag{font-size:.72rem;color:var(--muted);font-weight:700;margin-left:6px}
 .view[hidden]{display:none}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
@@ -264,10 +266,14 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
 /* ============================================================
    信用ナンピン計画・リスク管理（第一段階）
    計算モデルは独立モジュール MarginSim に分離。
-   丸め規則：価格は円未満を切り捨てて表示・計算に使用（想定価格＝取得価格×(1−下落率) を円単位に切り捨て）。
+   丸め規則：価格は円未満を切り捨てて表示・計算に使用（想定価格＝計画基準価格×(1−下落率) を円単位に切り捨て）。
+   価格は3分離：計画基準価格（下落率の起点・ユーザー入力）／平均建値（銘柄別保有の実績）／最新終値（終値データ）。
+   実行済みの購入段階は実績として保有側で表し、将来シミュレーションでは再購入しない（二重計上防止）。
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
-var DATA_VERSION = 2;
+var DATA_VERSION = 3;
+var APP_VERSION = "1.3";
+var SW_CACHE_NAME = "nanpin-planner-v9";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
 function num(v, fb){ var n = (typeof v === "string") ? Number(v.replace(/[,，\s]/g,"")) : Number(v); return isFinite(n) ? n : (fb === undefined ? 0 : fb); }
@@ -283,7 +289,7 @@ function normalizeCode(code){ return String(code === null || code === undefined 
 /* ---------- サンプルデータ（指示書 §5） ---------- */
 function sampleStages(){
   var defs = [[5,100000],[10,100000],[15,100000],[20,200000],[25,437500],[30,437500],[35,437500],[40,437500],[45,437500],[50,437500],[55,437500],[60,437500],[65,500000]];
-  return defs.map(function(d){ return { id: uid("st"), dropPct: d[0], budget: d[1], enabled: true }; });
+  return defs.map(function(d){ return { id: uid("st"), dropPct: d[0], budget: d[1], enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }; });
 }
 function sampleState(){
   return {
@@ -295,12 +301,13 @@ function sampleState(){
     ],
     instruments: [
       { id: uid("ins"), code: "1308", name: "上場インデックスファンドTOPIX", type: "ETF",
-        acquiredPrice: 3000, closePrice: null, closeDate: "", closeSource: "", unit: 10, baseIsSample: true,
+        planBasePrice: 3000, closePrice: null, closeDate: "", closeSource: "", unit: 1, baseIsSample: true,
+        holding: { qty: 0, avgPrice: 0, side: "buy" },
         ref: { name: "TOPIX", baseDate: "", baseValue: null, currentValue: null },
         stages: sampleStages() }
     ],
     settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5,
-                collateralMode: "same", collateralCustom: 100, includeProfit: true, fees: 0 }
+                collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000 }
   };
 }
 
@@ -331,23 +338,33 @@ function sanitizeState(s){
     var r = it.ref || {};
     var bv = (r.baseValue === null || r.baseValue === "" || r.baseValue === undefined) ? null : num(r.baseValue, NaN);
     var cv = (r.currentValue === null || r.currentValue === "" || r.currentValue === undefined) ? null : num(r.currentValue, NaN);
-    /* 価格の統一：旧形式の「基準価格」は取得価格へ、「現在価格」は最新終値へ移行して引き継ぐ */
-    var acqRaw = (it.acquiredPrice === undefined || it.acquiredPrice === null) ? it.basePrice : it.acquiredPrice;
+    /* 価格の3分離（形式v3）：計画基準価格（下落率の起点・ユーザー入力）／平均建値（保有管理）／最新終値（終値データ）。
+       旧形式からの移行：v2の「取得価格 acquiredPrice」、さらに旧い「基準価格 basePrice」は、いずれも下落率の起点だったため
+       計画基準価格 planBasePrice として引き継ぐ。「現在価格 currentPrice」は最新終値へ引き継ぐ。値は失わない。 */
+    var pbRaw = (it.planBasePrice !== undefined && it.planBasePrice !== null) ? it.planBasePrice
+              : ((it.acquiredPrice !== undefined && it.acquiredPrice !== null) ? it.acquiredPrice : it.basePrice);
     var cpRaw = (it.closePrice === undefined) ? it.currentPrice : it.closePrice;
     var cpv = (cpRaw === null || cpRaw === "" || cpRaw === undefined) ? null : num(cpRaw, NaN);
+    var hd = it.holding || {};
+    function optNum(v){ if (v === null || v === "" || v === undefined) return null; var n = num(v, NaN); return isFinite(n) ? clamp(n, 0, 1e12) : null; }
     return { id: String(it.id || uid("ins")), code: normalizeCode(it.code), name: String(it.name || "").slice(0, 80),
       type: it.type === "stock" ? "stock" : "ETF",
-      acquiredPrice: clamp(num(acqRaw, 0), 0, 1e9),
+      planBasePrice: clamp(num(pbRaw, 0), 0, 1e9),
       closePrice: isFinite(cpv) ? clamp(cpv, 0, 1e9) : null,
       closeDate: String(it.closeDate || "").slice(0, 10),
       closeSource: it.closeSource === "manual" ? "manual" : (it.closeSource === "json" ? "json" : ""),
       unit: Math.max(1, Math.round(num(it.unit, 1))), baseIsSample: !!it.baseIsSample,
+      holding: { qty: clamp(Math.round(num(hd.qty, 0)), 0, 1e9),
+                 avgPrice: clamp(num(hd.avgPrice, 0), 0, 1e9),
+                 side: hd.side === "sell" ? "sell" : "buy" },
       ref: { name: ["日経平均","TOPIX","S&P500","NASDAQ100","なし"].indexOf(r.name) >= 0 ? r.name : "なし",
              baseDate: String(r.baseDate || ""), baseValue: isFinite(bv) ? bv : null, currentValue: isFinite(cv) ? cv : null },
       stages: Array.isArray(it.stages) ? it.stages.slice(0, 100).map(function(st){
         st = st || {};
         return { id: String(st.id || uid("st")), dropPct: clamp(num(st.dropPct, 0), 0, 100),
-                 budget: clamp(Math.round(num(st.budget, 0)), 0, 1e12), enabled: st.enabled !== false };
+                 budget: clamp(Math.round(num(st.budget, 0)), 0, 1e12), enabled: st.enabled !== false,
+                 executed: !!st.executed, execPrice: optNum(st.execPrice), execQty: (st.execQty === null || st.execQty === "" || st.execQty === undefined) ? null : clamp(Math.round(num(st.execQty, 0)), 0, 1e9),
+                 execAmount: optNum(st.execAmount), reflected: !!st.reflected };
       }) : [] };
   }) : [];
   var st = s.settings || {};
@@ -357,7 +374,9 @@ function sanitizeState(s){
     step: clamp(num(st.step, 5), 1, 50),
     collateralMode: ["same","half","strong","none","custom"].indexOf(st.collateralMode) >= 0 ? st.collateralMode : "same",
     collateralCustom: clamp(num(st.collateralCustom, 100), 0, 300),
-    includeProfit: st.includeProfit !== false, fees: clamp(num(st.fees, 0), 0, 1e12)
+    /* 評価損益の算入はSBI証券公式ルール（評価損のみ算入・評価益は算入しない）に統一したため、旧設定値は引き継がない */
+    includeProfit: false, fees: clamp(num(st.fees, 0), 0, 1e12),
+    minMargin: clamp(num(st.minMargin, 300000), 0, 1e12)
   };
   out.version = DATA_VERSION;
   return out;
@@ -365,7 +384,9 @@ function sanitizeState(s){
 
 /* ============================================================
    計算モジュール MarginSim（証券会社の実制度とは独立した概算モデル）
-   維持率 ＝（代用評価額(シナリオ後) ＋ 保証金現金 ＋ 建玉評価損益(算入設定適用後) − 控除費用）÷ 建代金合計 × 100
+   維持率 ＝（代用評価額(シナリオ後) ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用）÷ 建代金合計 × 100
+   評価損益の算入はSBI証券公式の委託保証金率の計算に合わせ、評価損（マイナス）の場合のみ差し引き、
+   評価益（プラス）の場合はゼロとして計算する（評価益は維持率に算入しない）。評価損益そのものの表示は符号どおり行う。
    建代金合計が 0 のとき維持率は null（画面では「対象外」）。
    ============================================================ */
 var MarginSim = (function(){
@@ -381,7 +402,8 @@ var MarginSim = (function(){
     if (!(price > 0) || !(unit >= 1) || !(budget > 0)) return 0;
     return Math.floor(budget / price / unit) * unit;
   }
-  function adjPnl(pnl, settings){ return settings.includeProfit ? pnl : Math.min(pnl, 0); }
+  /* SBI証券公式ルール：評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算する */
+  function adjPnl(pnl, settings){ return Math.min(pnl, 0); }
   /* 既存建玉の評価損益：現在値（建代金＋現在評価損益）が下落率ぶん変動する近似。pnl 未入力は 0 として概算し approx を立てる */
   function existingPnlAt(positions, dropPct){
     var pnl = 0, approx = false;
@@ -395,6 +417,48 @@ var MarginSim = (function(){
     return { pnl: pnl, approx: approx };
   }
   function collateralAt(base, dropPct, factor){ return Math.max(0, Math.floor(base * (1 - (dropPct / 100) * factor))); }
+  /* ---------- 銘柄別の実保有建玉（第4節） ----------
+     保有は銘柄ごとに「数量×平均建値」で管理し、建代金と評価損益はここから一元計算する（二重入力・二重計上をしない）。
+     現在の評価損益は最新終値基準。終値が無い保有は現在損益0として概算し approx を立てる（既存建玉の未入力と同じ扱い）。 */
+  function holdingPrincipal(ins){ var h = ins.holding; return (h && h.qty > 0) ? h.qty * h.avgPrice : 0; }
+  function holdingPnlNow(ins){
+    var h = ins.holding;
+    if (!h || !(h.qty > 0)) return { pnl: 0, approx: false };
+    if (!(ins.closePrice > 0)) return { pnl: 0, approx: h.avgPrice > 0 };
+    var diff = h.side === "sell" ? (h.avgPrice - ins.closePrice) : (ins.closePrice - h.avgPrice);
+    return { pnl: h.qty * diff, approx: false };
+  }
+  /* 下落率シナリオでの保有評価損益：シナリオ価格は購入段階と同じく計画基準価格×(1−下落率)で決める
+     （現在の下落率の地点では最新終値基準の現在損益と一致する）。計画基準価格が無い場合は終値、
+     それも無い場合は平均建値を起点にする（終値が無い保有は概算として approx を引き継ぐ） */
+  function holdingPnlAt(ins, dropPct){
+    var h = ins.holding;
+    if (!h || !(h.qty > 0)) return { pnl: 0, approx: false };
+    var now = holdingPnlNow(ins);
+    var base = ins.planBasePrice > 0 ? ins.planBasePrice : (ins.closePrice > 0 ? ins.closePrice : h.avgPrice);
+    if (!(base > 0)) return { pnl: now.pnl, approx: now.approx };
+    var price = base * (1 - dropPct / 100);
+    var pnl = h.side === "sell" ? h.qty * (h.avgPrice - price) : h.qty * (price - h.avgPrice);
+    return { pnl: pnl, approx: now.approx };
+  }
+  function holdingsTotalsAt(state, dropPct){
+    var principal = 0, pnl = 0, approx = false;
+    state.instruments.forEach(function(ins){
+      principal += holdingPrincipal(ins);
+      var r = holdingPnlAt(ins, dropPct);
+      pnl += r.pnl; if (r.approx) approx = true;
+    });
+    return { principal: principal, pnl: pnl, approx: approx };
+  }
+  function holdingsTotalsNow(state){
+    var principal = 0, pnl = 0, approx = false;
+    state.instruments.forEach(function(ins){
+      principal += holdingPrincipal(ins);
+      var r = holdingPnlNow(ins);
+      pnl += r.pnl; if (r.approx) approx = true;
+    });
+    return { principal: principal, pnl: pnl, approx: approx };
+  }
 
   /* 全段階の数量・実購入額・実行可否をトリガー到達時点の保証金で判定（段階は下落率の昇順に処理） */
   function evaluateStages(state){
@@ -407,32 +471,35 @@ var MarginSim = (function(){
     var result = {}; var executedPrior = [];
     flat.forEach(function(item){
       var ins = item.ins, sg = item.sg;
-      var price = stagePrice(ins.acquiredPrice, sg.dropPct);
+      var price = stagePrice(ins.planBasePrice, sg.dropPct);
       var qty = qtyFor(sg.budget, price, ins.unit);
       var cost = qty * price;
-      var rec = { price: price, qty: qty, cost: cost, feasible: false, reason: "", cumBudget: 0 };
+      var rec = { price: price, qty: qty, cost: cost, feasible: false, reason: "", cumBudget: 0, executed: !!sg.executed };
+      /* 実行済みの段階は実績として保有建玉側で表すため、将来シミュレーションでは再購入しない */
+      if (sg.executed){ rec.reason = "実行済み"; result[sg.id] = rec; return; }
       if (!sg.enabled){ rec.reason = "無効"; result[sg.id] = rec; return; }
-      if (qty <= 0){ rec.reason = price <= 0 ? "取得価格が未設定" : "予算内で売買単位を購入できない"; result[sg.id] = rec; return; }
+      if (qty <= 0){ rec.reason = price <= 0 ? "計画基準価格が未設定" : "予算内で売買単位を購入できない"; result[sg.id] = rec; return; }
       /* トリガー到達時点（下落率＝この段階の下落率）の推計保証金 */
       var t = sg.dropPct;
       var exP = existingPnlAt(state.positions, t);
+      var hdT = holdingsTotalsAt(state, t);
       var newPnl = 0;
       executedPrior.forEach(function(p){
-        var curPrice = Math.floor(p.ins.acquiredPrice * (1 - t / 100));
+        var curPrice = Math.floor(p.ins.planBasePrice * (1 - t / 100));
         newPnl += p.qty * (curPrice - p.price);
       });
       var balance = collateralAt(state.account.collateral, t, factor) + state.account.cash
-                    + adjPnl(exP.pnl + newPnl, st) - st.fees;
+                    + adjPnl(exP.pnl + hdT.pnl + newPnl, st) - st.fees;
       var required = Math.ceil(cost * st.newMargin / 100);
       if (balance >= required){ rec.feasible = true; executedPrior.push({ ins: ins, qty: qty, price: price }); }
       else { rec.reason = "必要保証金（概算 " + fmtYen(required) + "）に対し推計保証金が不足"; }
       result[sg.id] = rec;
     });
-    /* 累計予算（有効段階のみ、下落率順） */
+    /* 累計予算（有効かつ未実行の段階のみ、下落率順。実行済みは今後の購入予定に数えない） */
     state.instruments.forEach(function(ins){
       var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
       var cum = 0;
-      sorted.forEach(function(sg){ if (sg.enabled){ cum += sg.budget; } if (result[sg.id]) result[sg.id].cumBudget = cum; });
+      sorted.forEach(function(sg){ if (sg.enabled && !sg.executed){ cum += sg.budget; } if (result[sg.id]) result[sg.id].cumBudget = cum; });
     });
     return result;
   }
@@ -454,34 +521,42 @@ var MarginSim = (function(){
       });
       var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
       var newPnl = executed.reduce(function(s, e){
-        var curPrice = Math.floor(e.ins.acquiredPrice * (1 - drop / 100));
+        var curPrice = Math.floor(e.ins.planBasePrice * (1 - drop / 100));
         return s + e.r.qty * (curPrice - e.r.price);
       }, 0);
       var exP = existingPnlAt(state.positions, drop);
+      var hdP = holdingsTotalsAt(state, drop);
       var collateral = collateralAt(state.account.collateral, drop, factor);
-      var totalPnl = exP.pnl + newPnl;
+      var totalPnl = exP.pnl + hdP.pnl + newPnl;
       var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees;
-      var totalPrincipal = existingPrincipal + newPrincipal;
+      var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
       var rate = totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null;
       var capacity = st.newMargin > 0 ? Math.max(0, Math.floor(balance / (st.newMargin / 100)) - totalPrincipal) : 0;
-      var infeasibleHere = 0;
+      var infeasibleHere = 0, infeasibleAt = 0;
       state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
         var r = stageRes[sg.id];
-        if (sg.enabled && r && !r.feasible && sg.dropPct <= drop + 1e-9) infeasibleHere++;
+        if (sg.enabled && !sg.executed && r && !r.feasible && sg.dropPct <= drop + 1e-9) infeasibleHere++;
+        if (sg.enabled && !sg.executed && r && !r.feasible && Math.abs(sg.dropPct - drop) < 1e-9) infeasibleAt++;
       });});
-      return { drop: drop, collateral: collateral, existingPnl: exP.pnl, newPnl: newPnl, totalPnl: totalPnl,
-               existingPnlApprox: exP.approx, newPrincipal: newPrincipal, totalPrincipal: totalPrincipal,
-               balance: balance, rate: rate, capacity: capacity, executedCount: executed.length, infeasibleCount: infeasibleHere };
+      return { drop: drop, collateral: collateral, existingPnl: exP.pnl, holdingsPnl: hdP.pnl, newPnl: newPnl, totalPnl: totalPnl,
+               existingPnlApprox: exP.approx || hdP.approx, holdingsPrincipal: hdP.principal, newPrincipal: newPrincipal, totalPrincipal: totalPrincipal,
+               balance: balance, rate: rate, capacity: capacity, executedCount: executed.length, infeasibleCount: infeasibleHere,
+               infeasibleAtDrop: infeasibleAt, belowMinMargin: balance < st.minMargin };
     });
-    /* 現在値（下落率0%、計画購入は未実行として既存建玉のみで推計） */
+    /* 現在値：起点は「銘柄別の実保有＋口座の既存建玉」。計画購入は未実行の段階だけを将来シナリオで追加する */
     var exNow = existingPnlAt(state.positions, 0);
-    var balanceNow = state.account.collateral + state.account.cash + adjPnl(exNow.pnl, st) - st.fees;
-    var current = { principal: existingPrincipal, pnl: exNow.pnl, pnlApprox: exNow.approx,
-                    balance: balanceNow, rate: existingPrincipal > 0 ? (balanceNow / existingPrincipal) * 100 : null };
-    /* 計画合計 */
+    var hdNow = holdingsTotalsNow(state);
+    var currentPrincipal = existingPrincipal + hdNow.principal;
+    var currentPnl = exNow.pnl + hdNow.pnl;
+    var balanceNow = state.account.collateral + state.account.cash + adjPnl(currentPnl, st) - st.fees;
+    var current = { principal: currentPrincipal, pnl: currentPnl, pnlApprox: exNow.approx || hdNow.approx,
+                    holdingsPrincipal: hdNow.principal, holdingsPnl: hdNow.pnl,
+                    balance: balanceNow, rate: currentPrincipal > 0 ? (balanceNow / currentPrincipal) * 100 : null,
+                    belowMinMargin: balanceNow < st.minMargin };
+    /* 計画合計（未実行の段階のみ。実行済みは実績として数えない） */
     var planBudget = 0, planCost = 0;
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
-      if (sg.enabled){ planBudget += sg.budget; planCost += stageRes[sg.id] ? stageRes[sg.id].cost : 0; }
+      if (sg.enabled && !sg.executed){ planBudget += sg.budget; planCost += stageRes[sg.id] ? stageRes[sg.id].cost : 0; }
     });});
     /* 最初の到達点 */
     function firstBelow(threshold){
@@ -491,17 +566,69 @@ var MarginSim = (function(){
     var firstInfeasible = null;
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
       var r = stageRes[sg.id];
-      if (sg.enabled && r && !r.feasible && (firstInfeasible === null || sg.dropPct < firstInfeasible.drop)) {
+      if (sg.enabled && !sg.executed && r && !r.feasible && (firstInfeasible === null || sg.dropPct < firstInfeasible.drop)) {
         firstInfeasible = { drop: sg.dropPct, code: ins.code, reason: r.reason };
       }
     });});
     var minPnl = rows.length ? Math.min.apply(null, rows.map(function(r){ return r.totalPnl; })) : 0;
+    /* ---------- 精緻化：0.1%刻み＋購入トリガーの直前・直後で再評価する ----------
+       表・グラフは従来の刻み幅のままだが、基準への「最初の到達下落率」は細かい評価点で求める。
+       段階購入のトリガーでは維持率が不連続に変化するため、トリガー下落率そのもの（購入後）に加えて
+       トリガー直前（その段階をまだ購入していない状態）も評価点に含め、到達の見落としを防ぐ。 */
+    function computeAt(drop, cutoff){
+      var executed = [];
+      state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+        var r = stageRes[sg.id];
+        if (sg.enabled && r && r.feasible && sg.dropPct <= cutoff + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
+      });});
+      var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
+      var newPnl = executed.reduce(function(s, e){
+        var curPrice = Math.floor(e.ins.planBasePrice * (1 - drop / 100));
+        return s + e.r.qty * (curPrice - e.r.price);
+      }, 0);
+      var exP = existingPnlAt(state.positions, drop);
+      var hdP = holdingsTotalsAt(state, drop);
+      var collateral = collateralAt(state.account.collateral, drop, factor);
+      var totalPnl = exP.pnl + hdP.pnl + newPnl;
+      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees;
+      var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
+      return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal };
+    }
+    var triggerDrops = [];
+    state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){ if (sg.enabled && !sg.executed) triggerDrops.push(sg.dropPct); }); });
+    function preciseFirst(check){
+      var candMap = {}, cands = [];
+      function addC(d){ var k = d.toFixed(4); if (!candMap[k]){ candMap[k] = 1; cands.push(d); } }
+      for (var d = 0; d <= st.maxDrop + 1e-9; d += 0.1) addC(Math.round(d * 10) / 10);
+      addC(st.maxDrop);
+      triggerDrops.forEach(addC);
+      cands.sort(function(a, b){ return a - b; });
+      for (var i = 0; i < cands.length; i++){
+        var cd = cands[i];
+        var isTrig = triggerDrops.some(function(t){ return Math.abs(t - cd) < 1e-9; });
+        if (isTrig && check(computeAt(cd, cd - 0.0001))) return Math.round(cd * 10) / 10;
+        if (check(computeAt(cd, cd))) return Math.round(cd * 10) / 10;
+      }
+      return null;
+    }
+    var firstMgmtPrecise = preciseFirst(function(r){ return r.rate !== null && r.rate < st.management; });
+    var firstCallPrecise = preciseFirst(function(r){ return r.rate !== null && r.rate < st.marginCall; });
+    var firstMinMarginPrecise = preciseFirst(function(r){ return r.balance < st.minMargin; });
+    /* 補助指標：新規建て条件を満たせなくなった段階で購入を止めた場合の最終（最大下落率時点）維持率。
+       本体のシミュレーション（購入可能な段階はすべて実行する前提）とは区別して表示する */
+    var lastRow = rows.length ? rows[rows.length - 1] : null;
+    var stoppedRes = firstInfeasible ? computeAt(st.maxDrop, firstInfeasible.drop - 0.0001)
+                                      : { rate: lastRow ? lastRow.rate : null, totalPrincipal: lastRow ? lastRow.totalPrincipal : 0 };
     return { rows: rows, stageRes: stageRes, current: current, planBudget: planBudget, planCost: planCost,
              firstMgmt: firstBelow(st.management), firstCall: firstBelow(st.marginCall),
+             firstMgmtPrecise: firstMgmtPrecise, firstCallPrecise: firstCallPrecise, firstMinMarginPrecise: firstMinMarginPrecise,
+             finalRateAll: lastRow ? lastRow.rate : null, finalRateStopped: stoppedRes.rate, finalPrincipalStopped: stoppedRes.totalPrincipal,
              firstInfeasible: firstInfeasible, minPnl: minPnl, factor: factor };
   }
   return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor,
-           existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate };
+           existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate,
+           holdingPrincipal: holdingPrincipal, holdingPnlNow: holdingPnlNow, holdingPnlAt: holdingPnlAt,
+           holdingsTotalsAt: holdingsTotalsAt, holdingsTotalsNow: holdingsTotalsNow };
 })();
 
 /* ============================================================
@@ -517,6 +644,50 @@ function changePct(from, to){
   if (!(from > 0) || to === null || to === undefined || !isFinite(to)) return null;
   return (to / from - 1) * 100;
 }
+/* 最新終値が未実行段階の想定価格（トリガー）をすでに下回っているか。
+   true でも自動で実行済みにはしない。ユーザーが段階ごとに選ぶための注意表示にだけ使う */
+function stagePassed(ins, sg){
+  if (!ins || !sg || sg.executed || ins.closePrice === null || ins.closePrice === undefined || !(ins.planBasePrice > 0)) return false;
+  return ins.closePrice <= MarginSim.stagePrice(ins.planBasePrice, sg.dropPct);
+}
+/* 実行実績を保有建玉へ反映する際の加重平均。買い・売りの区分が既存保有と違う場合は null（混ぜない） */
+function mergeHolding(holding, side, qty, price){
+  var h = holding || { qty: 0, avgPrice: 0, side: "buy" };
+  if (!(qty > 0) || !(price >= 0)) return null;
+  if (h.qty > 0 && h.side !== side) return null;
+  var nq = h.qty + qty;
+  var avg = nq > 0 ? (h.qty * h.avgPrice + qty * price) / nq : 0;
+  return { qty: nq, avgPrice: Math.round(avg * 100) / 100, side: side };
+}
+/* ---------- 購入計画の一括生成（第5節） ----------
+   総予算・開始/終了下落率・間隔・配分方式から未実行段階の予算配分を作る純粋関数。
+   戻り値の予算合計は総予算を超えない。配分は100円単位で切り捨て、端数は重みの大きい段階から順に100円ずつ配る。
+   実行済み段階・保有建玉には触れない（適用側で未実行分だけを置き換える）。 */
+function generateBulkStages(params){
+  var total = Math.max(0, Math.round(num(params && params.total, 0)));
+  var start = clamp(num(params && params.start, 5), 0, 100);
+  var end = clamp(num(params && params.end, 65), 0, 100);
+  var step = clamp(num(params && params.step, 5), 0.5, 100);
+  var mode = params && ["equal","deeper","shallower"].indexOf(params.mode) >= 0 ? params.mode : "equal";
+  if (end < start){ var tmp = start; start = end; end = tmp; }
+  var drops = [];
+  for (var d = start; d <= end + 1e-9 && drops.length < 100; d = Math.round((d + step) * 100) / 100) drops.push(Math.round(d * 100) / 100);
+  if (drops.length && Math.abs(drops[drops.length - 1] - end) > 1e-9 && drops.length < 100) drops.push(end);
+  var n = drops.length;
+  if (!n || total <= 0) return drops.map(function(dp){ return { dropPct: dp, budget: 0 }; });
+  var weights = drops.map(function(dp, i){
+    if (mode === "deeper") return i + 1;
+    if (mode === "shallower") return n - i;
+    return 1;
+  });
+  var sumW = weights.reduce(function(a, b){ return a + b; }, 0);
+  var budgets = weights.map(function(w){ return Math.floor(total * w / sumW / 100) * 100; });
+  var rest = total - budgets.reduce(function(a, b){ return a + b; }, 0);
+  var order = weights.map(function(w, i){ return i; }).sort(function(a, b){ return weights[b] - weights[a] || a - b; });
+  var oi = 0;
+  while (rest >= 100 && order.length){ budgets[order[oi % order.length]] += 100; rest -= 100; oi++; }
+  return drops.map(function(dp, i){ return { dropPct: dp, budget: budgets[i] }; });
+}
 var PriceFeed = (function(){
   function validDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")); }
   function sanitize(raw){
@@ -527,12 +698,25 @@ var PriceFeed = (function(){
         var e = raw.stocks[code] || {};
         var close = num(e.close, NaN);
         if (!isFinite(close) || close <= 0 || !validDate(e.closeDate)) return;
+        var splits = [];
+        if (Array.isArray(e.recentSplits)){
+          e.recentSplits.slice(0, 10).forEach(function(sp){
+            sp = sp || {};
+            if (!validDate(sp.date)) return;
+            var ratio = (typeof sp.ratio === "number" && isFinite(sp.ratio) && sp.ratio > 0) ? String(sp.ratio)
+                      : (typeof sp.ratio === "string" && sp.ratio.trim() ? sp.ratio.trim().slice(0, 20) : "");
+            if (ratio) splits.push({ date: String(sp.date), ratio: ratio });
+          });
+        }
         stocks[normalizeCode(code)] = {
           name: String(e.name || "").slice(0, 80),
           /* 終値データ側の区分表記ゆれ（"stock" / "個別株式"）をアプリ内部形式へそろえる */
           type: (e.type === "stock" || e.type === "個別株式" || e.type === "株式") ? "stock" : "ETF",
           unit: Math.max(1, Math.round(num(e.unit, 1))),
-          close: close, closeDate: String(e.closeDate)
+          close: close, closeDate: String(e.closeDate),
+          /* v2形式の信頼性情報：前回データの使い回し（stale）と直近の株式分割 */
+          stale: !!e.stale,
+          recentSplits: splits
         };
       });
     }
@@ -548,16 +732,22 @@ var PriceFeed = (function(){
         }
         var latest = num(e.latestClose, NaN);
         var key = String(name).slice(0, 20);
+        /* v2形式の信頼性情報：データ品質（provisional=異常値候補を暫定処理／suspect=大きな変動を検出）、
+           異常値候補の件数、前回データの使い回し（stale）、代替値かどうか（TOPIX=1306の終値で代替） */
+        var quality = ["ok","provisional","suspect"].indexOf(e.dataQuality) >= 0 ? e.dataQuality : "";
+        var anomalyCount = Array.isArray(e.anomalies) ? e.anomalies.length
+                         : (isFinite(num(e.anomalies, NaN)) ? Math.max(0, Math.round(num(e.anomalies, 0))) : 0);
+        var extra = { dataQuality: quality, anomalyCount: anomalyCount, stale: !!e.stale, closeIsProxy: !!e.closeIsProxy };
         if (isFinite(latest) && latest > 0 && validDate(e.latestDate)){
-          indices[key] = { latestClose: latest, latestDate: String(e.latestDate), history: hist };
+          indices[key] = Object.assign({ latestClose: latest, latestDate: String(e.latestDate), history: hist }, extra);
         } else if (Object.keys(hist).length){
           var dates = Object.keys(hist).sort();
           var ld = dates[dates.length - 1];
-          indices[key] = { latestClose: hist[ld], latestDate: ld, history: hist };
+          indices[key] = Object.assign({ latestClose: hist[ld], latestDate: ld, history: hist }, extra);
         }
       });
     }
-    return { updatedAt: String(raw.updatedAt || ""), source: String(raw.source || ""), stocks: stocks, indices: indices };
+    return { updatedAt: String(raw.updatedAt || ""), generatedAt: String(raw.generatedAt || raw.updatedAt || ""), source: String(raw.source || ""), stocks: stocks, indices: indices };
   }
   function stock(feed, code){ var c = normalizeCode(code); return (feed && c && feed.stocks[c]) ? feed.stocks[c] : null; }
   function indexLatest(feed, name){ return (feed && name && feed.indices[name]) ? feed.indices[name] : null; }
@@ -725,14 +915,14 @@ function initPersistence(){
 }
 /* ---------- 終値データ（prices.json）の読み込み ----------
    アプリと同じ場所の prices.json を読む（同一オリジンのため CORS 制限なし）。
-   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIxMzQ2Ijp7ImNsb3NlIjo2MjE1MCwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJNQVhJUyDml6XntYwyMjXkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjE1NDciOnsiY2xvc2UiOjEzMDUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuS4iuWgtOOCpOODs+ODh+ODg+OCr+OCueODleOCoeODs+ODieexs+WbveagquW8j++8iFMmUDUwMO+8iSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjAwQSI6eyJjbG9zZSI6MzA4MSwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJORVhUIEZVTkRTIOaXpee1jOWNiuWwjuS9k+agquaMh+aVsOmAo+WLleWei+S4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjg1QSI6eyJjbG9zZSI6ODM5MiwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiLjgq3jgqrjgq/jgrfjgqLjg5vjg7zjg6vjg4fjgqPjg7PjgrDjgrkiLCJ0eXBlIjoic3RvY2siLCJ1bml0IjoxMDB9LCI3MjAzIjp7ImNsb3NlIjozNDI4LCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuODiOODqOOCv+iHquWLlei7iiIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjg3MjkiOnsiY2xvc2UiOjE0Ni4zLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCveODi+ODvOODleOCo+ODiuODs+OCt+ODo+ODq+OCsOODq+ODvOODlyIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0= を試し、それも無ければ
+   置かれていない環境では同梱シード data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjEzNDYiOnsiY2xvc2UiOjYyMTUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik1BWElTIOaXpee1jDIyNeS4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMTU0NyI6eyJjbG9zZSI6MTMwNTAsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJ57Gz5Zu95qCq5byP77yIUyZQNTAw77yJIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfSwiODcyOSI6eyJjbG9zZSI6MTQ2LjMsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44K944OL44O844OV44Kj44OK44Oz44K344Oj44Or44Kw44Or44O844OXIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ== を試し、それも無ければ
    「未取得」として終値の手入力にフォールバックする。取得した終値は銘柄データへ反映し、
    IndexedDB にも保存されるため、次回起動時（オフライン含む）も最後の終値が表示できる。 */
 var pricesData = null;
 var pricesStatus = "loading"; /* loading | ok | missing */
 var pricesLoadedFrom = "";
 function loadPrices(){
-  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MTB9LCIxMzQ2Ijp7ImNsb3NlIjo2MjE1MCwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJNQVhJUyDml6XntYwyMjXkuIrloLTmipXkv6EiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjE1NDciOnsiY2xvc2UiOjEzMDUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuS4iuWgtOOCpOODs+ODh+ODg+OCr+OCueODleOCoeODs+ODieexs+WbveagquW8j++8iFMmUDUwMO+8iSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjAwQSI6eyJjbG9zZSI6MzA4MSwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiJORVhUIEZVTkRTIOaXpee1jOWNiuWwjuS9k+agquaMh+aVsOmAo+WLleWei+S4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMjg1QSI6eyJjbG9zZSI6ODM5MiwiY2xvc2VEYXRlIjoiMjAyNi0xMS0xNiIsIm5hbWUiOiLjgq3jgqrjgq/jgrfjgqLjg5vjg7zjg6vjg4fjgqPjg7PjgrDjgrkiLCJ0eXBlIjoic3RvY2siLCJ1bml0IjoxMDB9LCI3MjAzIjp7ImNsb3NlIjozNDI4LCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuODiOODqOOCv+iHquWLlei7iiIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjg3MjkiOnsiY2xvc2UiOjE0Ni4zLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCveODi+ODvOODleOCo+ODiuODs+OCt+ODo+ODq+OCsOODq+ODvOODlyIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH19LCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE3VDEyOjU5OjAwKzA5OjAwIiwidmVyc2lvbiI6MX0="];
+  var candidates = ["prices.json", "data:application/json;base64,eyJpbmRpY2VzIjp7fSwibm90ZSI6IuOCouODl+ODquWQjOaiseOBruOCt+ODvOODieODh+ODvOOCv+OBp+OBmeOAguWumuacn+OCuOODp+ODluOBjOOCouODl+ODquOBqOWQjOOBmOWgtOaJgOOBqyBwcmljZXMuanNvbiDjgpLphY3nva7jgZnjgovjgajjgIHjgZ3jgaHjgonjgYzlhKrlhYjjgZfjgaboqq3jgb/ovrzjgb7jgozjgb7jgZnjgILmjIfmlbDjg4fjg7zjgr/jga/mnKrmpJzoqLzjga7jgZ/jgoHlkKvjgoHjgabjgYTjgb7jgZvjgpPvvIjjgqLjg5fjg6rlgbTjgafjga/miYvlhaXlipvjgavjg5Xjgqnjg7zjg6vjg5Djg4Pjgq/jgZfjgb7jgZnvvInjgIIiLCJzb3VyY2UiOiJZYWhvbyBGaW5hbmNl77yI56K66KqN5riI44G/44K544OK44OD44OX44K344On44OD44OI77yJIiwic3RvY2tzIjp7IjEzMDgiOnsiY2xvc2UiOjQwNTQsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJVE9QSVgiLCJ0eXBlIjoiRVRGIiwidW5pdCI6MX0sIjEzNDYiOnsiY2xvc2UiOjYyMTUwLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik1BWElTIOaXpee1jDIyNeS4iuWgtOaKleS/oSIsInR5cGUiOiJFVEYiLCJ1bml0IjoxfSwiMTU0NyI6eyJjbG9zZSI6MTMwNTAsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi5LiK5aC044Kk44Oz44OH44OD44Kv44K544OV44Kh44Oz44OJ57Gz5Zu95qCq5byP77yIUyZQNTAw77yJIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyMDBBIjp7ImNsb3NlIjozMDgxLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6Ik5FWFQgRlVORFMg5pel57WM5Y2K5bCO5L2T5qCq5oyH5pWw6YCj5YuV5Z6L5LiK5aC05oqV5L+hIiwidHlwZSI6IkVURiIsInVuaXQiOjF9LCIyODVBIjp7ImNsb3NlIjo4MzkyLCJjbG9zZURhdGUiOiIyMDI2LTExLTE2IiwibmFtZSI6IuOCreOCquOCr+OCt+OCouODm+ODvOODq+ODh+OCo+ODs+OCsOOCuSIsInR5cGUiOiJzdG9jayIsInVuaXQiOjEwMH0sIjcyMDMiOnsiY2xvc2UiOjM0MjgsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44OI44Oo44K/6Ieq5YuV6LuKIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfSwiODcyOSI6eyJjbG9zZSI6MTQ2LjMsImNsb3NlRGF0ZSI6IjIwMjYtMTEtMTYiLCJuYW1lIjoi44K944OL44O844OV44Kj44OK44Oz44K344Oj44Or44Kw44Or44O844OXIiwidHlwZSI6InN0b2NrIiwidW5pdCI6MTAwfX0sInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTdUMTI6NTk6MDArMDk6MDAiLCJ2ZXJzaW9uIjoxfQ=="];
   function tryNext(i){
     if (i >= candidates.length){ if (!pricesData) pricesStatus = "missing"; render(); return; }
     fetch(candidates[i], { cache: "no-store" }).then(function(res){
@@ -754,7 +944,8 @@ function applyPricesToState(){
   state.instruments.forEach(function(ins){
     var q = PriceFeed.stock(pricesData, ins.code);
     if (!q) return;
-    if (ins.closePrice !== q.close || ins.closeDate !== q.closeDate || ins.closeSource !== "json"){
+    /* 手入力で上書きした終値は自動取得で上書きしない（自動に戻すのはユーザーの明示操作のみ） */
+    if (ins.closeSource !== "manual" && (ins.closePrice !== q.close || ins.closeDate !== q.closeDate || ins.closeSource !== "json")){
       ins.closePrice = q.close; ins.closeDate = q.closeDate; ins.closeSource = "json"; changed = true;
     }
     /* 区分・売買単位は銘柄ごとのマスタ情報（ETFは1口/10口など銘柄で異なる）なので、終値データの値を正として合わせる */
@@ -776,8 +967,36 @@ function applyPricesToState(){
 }
 function pricesStatusText(){
   if (pricesStatus === "loading") return "終値データを確認中…";
-  if (pricesStatus === "ok" && pricesData) return "終値データ：取得済み" + (pricesData.updatedAt ? "（" + esc(pricesData.updatedAt) + " 更新" : "") + (pricesData.source ? "／" + esc(pricesData.source) : "") + (pricesData.updatedAt ? "）" : "");
+  if (pricesStatus === "ok" && pricesData) return "終値データ：取得済み" + (pricesData.generatedAt ? "（取得日時 " + esc(pricesData.generatedAt) : "") + (pricesData.source ? "／" + esc(pricesData.source) : "") + (pricesData.generatedAt ? "）" : "");
   return "終値データ（prices.json）は未取得です。終値は手入力できます。";
+}
+/* 価格データの鮮度判定：取得日時（generatedAt）が2日以上前、または最新の終値の対象営業日が5日以上前なら「古い可能性」を返す */
+function priceFreshness(){
+  if (pricesStatus !== "ok" || !pricesData) return { stale: false, reasons: [] };
+  var reasons = [];
+  var now = Date.now();
+  var gen = pricesData.generatedAt ? Date.parse(pricesData.generatedAt) : NaN;
+  if (isFinite(gen) && now - gen > 2 * 24 * 3600 * 1000) reasons.push("取得日時（" + pricesData.generatedAt + "）が2日以上前です");
+  var latest = "";
+  Object.keys(pricesData.stocks).forEach(function(c){ if (pricesData.stocks[c].closeDate > latest) latest = pricesData.stocks[c].closeDate; });
+  Object.keys(pricesData.indices).forEach(function(n){ if (pricesData.indices[n].latestDate > latest) latest = pricesData.indices[n].latestDate; });
+  if (latest){
+    var lt = Date.parse(latest + "T00:00:00");
+    if (isFinite(lt) && now - lt > 5 * 24 * 3600 * 1000) reasons.push("最新の終値の対象営業日が " + latest + " で、直近の営業日から大きく離れています");
+  }
+  return { stale: reasons.length > 0, reasons: reasons, latestDate: latest };
+}
+/* 指数データの信頼性表示（品質・異常値候補・前回データ・代替値）。該当が無ければ空文字 */
+function indexQualityNotes(ix, name){
+  if (!ix) return "";
+  var notes = [];
+  if (ix.dataQuality === "provisional") notes.push("暫定データを含みます（異常値候補を暫定処理しています" + (ix.anomalyCount ? "／異常値候補 " + ix.anomalyCount + "件" : "") + "）");
+  else if (ix.dataQuality === "suspect") notes.push("大きな価格変動が検出されています（株式分割等の可能性があります" + (ix.anomalyCount ? "／異常値候補 " + ix.anomalyCount + "件" : "") + "）");
+  else if (ix.anomalyCount) notes.push("異常値候補 " + ix.anomalyCount + "件が記録されています");
+  if (ix.stale) notes.push("前回データ（取得失敗のため）");
+  if (ix.closeIsProxy && name === "TOPIX") notes.push("TOPIXは1306（TOPIX連動ETF）の終値による代替値です（指数そのものの値ではありません）");
+  else if (ix.closeIsProxy) notes.push("代替値で表示しています");
+  return notes.join("。");
 }
 /* 銘柄コード欄の下に出すヒント文。入力途中のコードでも正規化してから照合する
    （例：「285a」と小文字で打った直後でも「登録あり」と正しく判定する）。
@@ -832,21 +1051,26 @@ function renderDashboard(){
   var st = state.settings, cur = sim.current, el = document.getElementById("view-dashboard");
   var brokerRate = state.account.brokerRate;
   var dispRate = brokerRate !== null ? brokerRate : cur.rate;
-  var dispRateLabel = brokerRate !== null ? "証券会社表示の維持率" : "現在の保証金維持率（推計）";
+  var dispRateLabel = brokerRate !== null ? "証券会社表示の維持率（実績）" : "現在の保証金維持率（実績から推計）";
   var mgmtMarginPt = dispRate !== null ? dispRate - st.management : null;
   var callMarginPt = dispRate !== null ? dispRate - st.marginCall : null;
   var mgmtMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.management / 100 : null;
   var callMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.marginCall / 100 : null;
   var status = rateStatus(cur.rate);
-  var heroCls = sim.firstCall ? "danger" : (sim.firstMgmt ? "caution" : "");
+  var heroCls = sim.firstCallPrecise !== null ? "danger" : (sim.firstMgmtPrecise !== null ? "caution" : "");
   var heroMain, heroSub;
-  if (sim.firstMgmt){
-    heroMain = "下落 −" + sim.firstMgmt.drop + "% で自主管理基準（" + st.management + "%）に到達する想定";
-    heroSub = sim.firstCall ? ("追証基準（" + st.marginCall + "%）には下落 −" + sim.firstCall.drop + "% で到達する想定です（最初の到達点）。基準到達と実際の追証発生は同一ではありません。")
+  if (sim.firstMgmtPrecise !== null){
+    heroMain = "下落 −" + sim.firstMgmtPrecise.toFixed(1) + "% で自主管理基準（" + st.management + "%）に到達する想定";
+    heroSub = sim.firstCallPrecise !== null ? ("追証基準（" + st.marginCall + "%）には下落 −" + sim.firstCallPrecise.toFixed(1) + "% で到達する想定です（最初の到達点・0.1%精度で算出）。基準到達と実際の追証発生は同一ではありません。")
                             : ("追証基準（" + st.marginCall + "%）には想定範囲（−" + st.maxDrop + "%）で到達しません。");
   } else {
     heroMain = "想定範囲（−" + st.maxDrop + "%）では自主管理基準（" + st.management + "%）に到達しない想定";
     heroSub = "下落 −" + st.maxDrop + "% まで全計画を実行しても、管理基準を上回る推計です。";
+  }
+  if (cur.belowMinMargin){
+    heroSub += " 現在の実質保証金 " + fmtYen(cur.balance) + " は最低保証金額 " + fmtYen(st.minMargin) + " を下回っています。制度上、新規建てには最低保証金額以上が必要で、下回ると差し入れが必要になる場合があります。";
+  } else if (sim.firstMinMarginPrecise !== null){
+    heroSub += " 実質保証金は下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で最低保証金額 " + fmtYen(st.minMargin) + " を下回る想定です。";
   }
   if (sim.firstInfeasible){
     heroSub += " なお、銘柄 " + esc(sim.firstInfeasible.code) + " の −" + sim.firstInfeasible.drop + "% 段階は「" + esc(sim.firstInfeasible.reason) + "」のため実行不能として計算しています。";
@@ -855,19 +1079,28 @@ function renderDashboard(){
   html += '<div class="hero-rate ' + heroCls + '"><div class="h-label">どの程度の下落まで耐えられるか（簡易シナリオ：全銘柄同率下落・担保は市場下落の ' + Math.round(sim.factor * 100) + '% 連動）</div>'
         + '<div class="h-big">' + heroMain + '</div><div class="h-sub">' + heroSub + "</div></div>";
 
-  html += '<div class="kpis">'
-    + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "既存建玉のみでの推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
+  html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
+    + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
     + kpi("自主管理基準（" + st.management + "%）までの余裕", mgmtMarginPt === null ? "—" : (mgmtMarginPt >= 0 ? "+" : "−") + Math.abs(mgmtMarginPt).toFixed(1) + "<small> pt</small>", mgmtMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(mgmtMarginYen), mgmtMarginPt !== null && mgmtMarginPt < 0 ? "alert" : "")
     + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(callMarginYen), callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
-    + kpi("現在の信用建玉総額", fmtYen(cur.principal), "既存建玉の建代金合計（実口座）", "")
-    + kpi("将来の計画購入総額", fmtYen(sim.planCost), "予算合計 " + fmtYen(sim.planBudget) + "（売買単位で丸めた実購入額）", "")
+    + kpi("現在の信用建玉総額（実績）", fmtYen(cur.principal), "銘柄別保有＋計画銘柄以外の既存建玉の建代金合計（実績）", "")
+    + kpi("現在の建玉評価損益（実績）", cur.pnl === 0 && state.positions.some(function(p){ return p.pnl === null; }) ? "未入力" : fmtSignedYen(cur.pnl), state.positions.some(function(p){ return p.pnl === null; }) ? "未入力の建玉があり、推計は概算です" : "口座画面で入力した現在値", "")
+    + kpi("実質保証金と最低保証金（実績）", fmtYen(cur.balance), "最低保証金額 " + fmtYen(st.minMargin) + (cur.belowMinMargin ? " を下回っています（最低保証金未達：差し入れが必要になる場合があります）" : " 以上を確保しています") + (sim.firstMinMarginPrecise !== null && !cur.belowMinMargin ? "／推計では下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で下回る想定" : ""), cur.belowMinMargin ? "alert" : "")
+    + "</div>"
+    + '<h2 class="grouphead">将来の見通し<span class="gh-tag">推計（未実行の計画を実行した場合のシミュレーション）</span></h2><div class="kpis">'
+    + kpi("未実行の購入予定総額（推計）", fmtYen(sim.planCost), "未実行段階の予算合計 " + fmtYen(sim.planBudget) + "（売買単位で丸めた実購入額）", "")
     + kpi("想定最大評価損", fmtSignedYen(sim.minPnl), "想定範囲内で最も大きい評価損（既存＋計画建玉）", sim.minPnl < 0 ? "caution" : "")
-    + kpi("管理基準に到達する想定下落率", sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "到達せず", sim.firstMgmt ? "最初の到達点。以後の段階は詳細表で確認" : "−" + st.maxDrop + "% の範囲では到達しません", sim.firstMgmt ? "caution" : "")
-    + kpi("現在の建玉評価損益", cur.pnl === 0 && state.positions.some(function(p){ return p.pnl === null; }) ? "未入力" : fmtSignedYen(cur.pnl), state.positions.some(function(p){ return p.pnl === null; }) ? "未入力の建玉があり、推計は概算です" : "口座画面で入力した現在値", "")
+    + kpi("管理基準に到達する想定下落率（推計・0.1%精度）", sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%" : "到達せず", sim.firstMgmtPrecise !== null ? "最初の到達点（購入段階の直前・直後も評価）。以後は詳細表で確認" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません", sim.firstMgmtPrecise !== null ? "caution" : "")
+    + kpi("追証基準に到達する想定下落率（推計・0.1%精度）", sim.firstCallPrecise !== null ? "−" + sim.firstCallPrecise.toFixed(1) + "%" : "到達せず", sim.firstCallPrecise !== null ? "最初の到達点（購入段階の直前・直後も評価）" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません", sim.firstCallPrecise !== null ? "alert" : "")
+    + kpi("購入可能な段階までで止めた場合の最終維持率（補助指標・推計）", sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped), sim.firstInfeasible ? ("−" + sim.firstInfeasible.drop + "% 段階で新規建て条件を満たさない可能性があり、それ以降は買わない前提。最大下落率時点・建玉総額 " + fmtYen(sim.finalPrincipalStopped)) : "購入不能の段階がないため、全計画実行時（最終維持率 " + (sim.finalRateAll === null ? "対象外" : fmtPct(sim.finalRateAll)) + "）と同じです", "")
     + "</div>";
 
+  if (cur.belowMinMargin){
+    html += '<div class="notice danger"><strong>最低保証金の警告：</strong> 現在の実質保証金（現金＋代用評価額−評価損−控除費用）' + fmtYen(cur.balance) + ' は、最低保証金額 ' + fmtYen(st.minMargin) + ' を下回っています。制度上、新規建てには委託保証金が最低保証金額以上必要で、実質保証金がこれを下回ると回復のための差し入れが必要になります。証券会社の表示で実額をご確認ください。</div>';
+  }
+
   if (state.meta.isSample){
-    html += '<div class="notice warn"><strong>サンプルデータで表示しています。</strong> 代用有価証券評価額 15,617,481円（掛目適用後）・委託保証金現金 70,309円・既存建玉 64,800円（評価損益は未入力のため補完していません）と、国内ETFのナンピン計画（累計予算 4,500,000円）です。「口座・保有状況」画面で実データに書き換えてください。ETFの取得価格 3,000円は仮のサンプル値です。</div>';
+    html += '<div class="notice warn"><strong>サンプルデータで表示しています。</strong> 代用有価証券評価額 15,617,481円（掛目適用後）・委託保証金現金 70,309円・既存建玉 64,800円（評価損益は未入力のため補完していません）と、国内ETFのナンピン計画（累計予算 4,500,000円）です。「口座・保有状況」画面で実データに書き換えてください。ETFの計画基準価格 3,000円は仮のサンプル値です。</div>';
   }
 
   if (loadWarning === "version"){
@@ -876,20 +1109,33 @@ function renderDashboard(){
     html += '<div class="notice warn"><strong>保存データが破損していたため、初期データで開始しました。</strong> 破損した保存データは退避してあり、自動では復元しません。JSONバックアップをお持ちの場合は「設定・データ」から読み込めます。</div>';
   }
 
-  /* 銘柄ごとの現在位置（取得価格 vs 最新終値） */
+  /* 銘柄ごとの現在位置（計画基準価格・最新終値・平均建値を分離して表示） */
   if (state.instruments.length){
-    html += '<div class="card"><h2>銘柄の現在位置（取得価格と最新終値）</h2><p class="sub">' + pricesStatusText() + ' 騰落率は最新終値（終値データまたは手入力）から計算しています。</p>';
+    var freshD = priceFreshness();
+    html += '<div class="card"><h2>銘柄の現在位置（計画基準価格と最新終値）</h2><p class="sub">' + pricesStatusText() + ' 下落率は計画基準価格（下落率の起点）から最新終値までで計算しています。保有がある銘柄は平均建値ベースの評価損益率も表示します。</p>'
+      + (freshD.stale ? '<div class="notice warn" style="margin:0 0 10px"><strong>価格データが古い可能性があります。</strong> ' + esc(freshD.reasons.join("／")) + '。最新の終値で再計算するには、価格データの更新後に「設定・データ」から再読み込みしてください。</div>' : "");
     state.instruments.forEach(function(ins){
-      var chg = changePct(ins.acquiredPrice, ins.closePrice);
-      html += '<div class="posline"><div class="posline-main"><strong>' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</strong><span class="posline-sub">取得価格 ' + fmtYen(ins.acquiredPrice) + "／最新終値 " + (ins.closePrice !== null ? fmtYen(ins.closePrice) + "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + "）" : "未取得") + '</span></div>'
-        + (chg === null ? '<span class="pill mute">騰落率 —</span>' : '<span class="pill ' + (chg >= 0 ? "up" : "down") + '">' + (chg >= 0 ? "+" : "−") + Math.abs(chg).toFixed(2) + "%</span>")
+      var chg = changePct(ins.planBasePrice, ins.closePrice);
+      var hp = MarginSim.holdingPnlNow(ins);
+      var hPrin = MarginSim.holdingPrincipal(ins);
+      var hRate = hPrin > 0 ? (hp.pnl / hPrin) * 100 : null;
+      var sub = "計画基準価格 " + fmtYen(ins.planBasePrice) + "／最新終値 " + (ins.closePrice !== null ? fmtYen(ins.closePrice) + "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + "）" : "未取得");
+      var fqD = PriceFeed.stock(pricesData, ins.code);
+      if (fqD && fqD.stale && ins.closeSource === "json") sub += "／前回データ（取得失敗のため）";
+      if (fqD && fqD.recentSplits && fqD.recentSplits.length) sub += "／株式分割がありました（" + fqD.recentSplits.map(function(sp){ return sp.date + "・" + sp.ratio; }).join("、") + "）。計画基準価格が分割前の価格でないか確認してください";
+      if (ins.holding && ins.holding.qty > 0){
+        sub += "／保有 " + ins.holding.qty.toLocaleString("ja-JP") + (ins.type === "ETF" ? "口" : "株") + "（" + (ins.holding.side === "sell" ? "売建" : "買建") + "）・平均建値 " + fmtYen(ins.holding.avgPrice)
+             + "・評価損益 " + (ins.closePrice !== null && ins.closePrice > 0 ? fmtSignedYen(hp.pnl) + (hRate !== null ? "（" + (hRate >= 0 ? "+" : "−") + Math.abs(hRate).toFixed(2) + "%）" : "") : "終値未取得のため未計算");
+      }
+      html += '<div class="posline"><div class="posline-main"><strong>' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</strong><span class="posline-sub">' + sub + '</span></div>'
+        + (chg === null ? '<span class="pill mute">下落率 —</span>' : '<span class="pill ' + (chg >= 0 ? "up" : "down") + '">' + (chg >= 0 ? "+" : "−") + Math.abs(chg).toFixed(2) + "%</span>")
         + "</div>";
     });
-    html += '<div class="rowflex mt"><button class="btn small" data-goto="plan">購入計画で価格を確認・編集</button></div></div>';
+    html += '<div class="rowflex mt"><button class="btn small" data-goto="plan">購入計画で価格・保有を確認・編集</button></div></div>';
   }
 
   html += '<div class="card"><h2>下落率 × 保証金維持率シミュレーション</h2>'
-    + '<p class="sub">横軸：取得価格からの下落率／縦軸：保証金維持率（推計）。点は購入予定段階の到達位置です。詳細表の行を選ぶとグラフ上に位置を示します。</p>'
+    + '<p class="sub">横軸：計画基準価格からの下落率／縦軸：保証金維持率（推計）。起点は現在の保有建玉で、未実行の購入段階だけを下落に応じて追加します。詳細表の行を選ぶとグラフ上に位置を示します。</p>'
     + '<div class="rowflex" style="justify-content:flex-end;margin-bottom:6px"><span style="font-size:.8rem;color:var(--muted);font-weight:700">縦軸</span><span class="seg" role="group" aria-label="縦軸スケール">'
     + '<button data-scale="auto" aria-pressed="' + (ui.chartScale !== "linear") + '">対数</button><button data-scale="linear" aria-pressed="' + (ui.chartScale === "linear") + '">線形</button></span></div>'
     + '<div class="chartbox">' + chartSVG() + "</div>"
@@ -897,19 +1143,28 @@ function renderDashboard(){
     + "</div>";
 
   var detailMeta = "全" + sim.rows.length + "段階（0%〜−" + st.maxDrop + "%）"
-    + " ・ 管理基準到達：" + (sim.firstMgmt ? "<strong>−" + sim.firstMgmt.drop + "%</strong>" : "なし")
-    + " ・ 追証基準到達：" + (sim.firstCall ? "<strong>−" + sim.firstCall.drop + "%</strong>" : "なし")
+    + " ・ 管理基準到達（0.1%精度）：" + (sim.firstMgmtPrecise !== null ? "<strong>−" + sim.firstMgmtPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
+    + " ・ 追証基準到達（0.1%精度）：" + (sim.firstCallPrecise !== null ? "<strong>−" + sim.firstCallPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
+    + (sim.firstMinMarginPrecise !== null ? " ・ 最低保証金を下回る下落率：<strong>−" + sim.firstMinMarginPrecise.toFixed(1) + "%</strong>" : "")
     + (ui.selectedDrop !== null ? " ・ 選択中：<strong>−" + ui.selectedDrop + "%</strong>" : "");
-  html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>下落率別の詳細（シミュレーション）</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。</p><div class="tblwrap"><table class="dt"><thead><tr>'
-    + "<th>下落率</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
+  html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>下落率別の詳細（シミュレーション）</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。<br>下落率の起点の区別：この表とグラフの下落率は<strong>各銘柄の計画基準価格を起点</strong>とする下落率です。一方、代用有価証券の連動設定（設定画面）は<strong>現在の代用評価額に対する変動の想定</strong>で、起点が異なります。基準への到達下落率は表の刻みより細かい0.1%精度（購入段階の直前・直後も評価）で別途算出し、上の要約とKPIに表示しています。維持率の分子では評価損は差し引き、評価益は算入しません（SBI証券公式ルール準拠）。</p><div class="tblwrap"><table class="dt"><thead><tr>'
+    + "<th>下落率</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>実質保証金</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
   sim.rows.forEach(function(r){
     var rs = rateStatus(r.rate);
     var rowCls = ui.selectedDrop === r.drop ? "sel" : (r.rate !== null && r.rate < st.marginCall ? "row-danger" : (r.rate !== null && r.rate < st.management ? "row-warn" : ""));
     var stateLabel = r.rate === null ? "対象外" : rs.label;
-    if (r.infeasibleCount > 0) stateLabel += "・購入不能あり";
-    html += '<tr data-drop="' + r.drop + '" class="' + rowCls + '"><td class="num">−' + r.drop + '%</td><td class="num" data-label="累計購入額">' + fmtYenShort(r.newPrincipal) + '円</td><td class="num" data-label="建玉総額">' + fmtYenShort(r.totalPrincipal) + '円</td><td class="num" data-label="評価損益">' + fmtSignedYen(r.totalPnl) + '</td><td class="num" data-label="代用評価額">' + fmtYenShort(r.collateral) + '円</td><td class="num" data-label="維持率"><strong>' + fmtPct(r.rate) + '</strong></td><td class="num" data-label="新規建余力（概算）">' + fmtYenShort(r.capacity) + '円</td><td data-label="状態"><span class="pill ' + rs.cls + '">' + esc(stateLabel) + "</span></td></tr>";
+    if (r.infeasibleAtDrop > 0) stateLabel += "・この段階は新規建て条件を満たさない可能性";
+    else if (r.infeasibleCount > 0) stateLabel += "・購入不能の段階を含む";
+    if (r.belowMinMargin) stateLabel += "・最低保証金未達（実質保証金が " + fmtYen(st.minMargin) + " 未満）";
+    html += '<tr data-drop="' + r.drop + '" class="' + rowCls + '"><td class="num">−' + r.drop + '%</td><td class="num" data-label="累計購入額">' + fmtYenShort(r.newPrincipal) + '円</td><td class="num" data-label="建玉総額">' + fmtYenShort(r.totalPrincipal) + '円</td><td class="num" data-label="評価損益">' + fmtSignedYen(r.totalPnl) + '</td><td class="num" data-label="代用評価額">' + fmtYenShort(r.collateral) + '円</td><td class="num" data-label="実質保証金">' + fmtYenShort(r.balance) + '円</td><td class="num" data-label="維持率"><strong>' + fmtPct(r.rate) + '</strong></td><td class="num" data-label="新規建余力（概算）">' + fmtYenShort(r.capacity) + '円</td><td data-label="状態"><span class="pill ' + (r.belowMinMargin || r.infeasibleAtDrop > 0 ? "danger" : rs.cls) + '">' + esc(stateLabel) + "</span></td></tr>";
   });
   html += "</tbody></table></div>";
+  if (sim.firstInfeasible){
+    html += '<p class="hint">補助指標：−' + sim.firstInfeasible.drop + '% 段階は新規建て条件（新規建保証金率 ' + st.newMargin + '%）を満たさない可能性があります。その段階で購入を止めた場合、最大下落率 −' + st.maxDrop + '% 時点の維持率は <strong class="num">' + (sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped)) + '</strong>（建玉総額 ' + fmtYen(sim.finalPrincipalStopped) + '）です。上の表は購入可能な段階をすべて実行した場合の推計で、この補助指標とは前提が異なります。</p>';
+  }
+  if (sim.rows.some(function(r){ return r.belowMinMargin; })){
+    html += '<p class="hint">※ 実質保証金が最低保証金額 ' + fmtYen(st.minMargin) + ' を下回る行は、状態欄に「最低保証金未達」と文字で表示しています（色だけでは区別していません）。</p>';
+  }
   if (sim.rows.some(function(r){ return r.existingPnlApprox; })){
     html += '<p class="hint">※ 既存建玉の一部は評価損益が未入力のため、評価損益の推計は概算です（未入力分は現在損益0として下落変動のみ反映）。正確な値が必要な場合は「口座・保有状況」で評価損益を入力してください。</p>';
   }
@@ -919,7 +1174,9 @@ function renderDashboard(){
     + "<dt>証券会社</dt><dd>" + (state.account.broker ? esc(state.account.broker) : "未登録") + "</dd>"
     + "<dt>代用有価証券評価額（" + (state.account.collateralBasis === "after" ? "掛目適用後" : "掛目適用前・時価") + "）</dt><dd class='num'>" + fmtYen(state.account.collateral) + "</dd>"
     + "<dt>委託保証金現金</dt><dd class='num'>" + fmtYen(state.account.cash) + "</dd>"
-    + "<dt>既存建玉 建代金合計</dt><dd class='num'>" + fmtYen(cur.principal) + "</dd>"
+    + "<dt>銘柄別保有の建代金合計</dt><dd class='num'>" + fmtYen(cur.holdingsPrincipal) + "</dd>"
+    + "<dt>計画銘柄以外の既存建玉 建代金合計</dt><dd class='num'>" + fmtYen(cur.principal - cur.holdingsPrincipal) + "</dd>"
+    + "<dt>建代金合計（実績）</dt><dd class='num'>" + fmtYen(cur.principal) + "</dd>"
     + "<dt>推計保証金残高</dt><dd class='num'>" + fmtYen(cur.balance) + "</dd>"
     + "<dt>情報更新日時</dt><dd>" + (state.meta.updatedAt ? esc(state.meta.updatedAt) : "未記録") + "</dd></dl>"
     + '<div class="rowflex mt"><button class="btn" data-goto="account">口座情報を編集</button><button class="btn" data-goto="plan">購入計画を編集</button></div></div>';
@@ -987,7 +1244,7 @@ function chartSVG(){
   sim.rows.forEach(function(r){ rateAt[r.drop] = r.rate; });
   var seen = {};
   state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
-    if (!sg.enabled || sg.dropPct > st.maxDrop) return;
+    if (!sg.enabled || sg.executed || sg.dropPct > st.maxDrop) return;
     var row = sim.rows.reduce(function(best, r){ return Math.abs(r.drop - sg.dropPct) < Math.abs(best.drop - sg.dropPct) ? r : best; }, sim.rows[0]);
     if (!row || row.rate === null) return;
     var key = sg.dropPct + ":" + Math.round(row.rate);
@@ -1008,10 +1265,10 @@ function currentInstrument(){
 }
 function renderPlan(){
   var el = document.getElementById("view-plan");
-  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
+  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%（0.1%精度）" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
   html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
   state.instruments.forEach(function(ins){
-    var tot = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ return a + s.budget; }, 0);
+    var tot = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
     html += '<button class="chip" data-ins="' + ins.id + '" aria-selected="' + (ins.id === ui.selectedInsId) + '"><span class="c-code">' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</span><br><span class="c-name">' + (ins.type === "ETF" ? "ETF" : "個別株式") + "／計画予算 " + fmtYen(tot) + "</span></button>";
   });
   html += '<button class="chip" id="addIns"><span class="c-code">＋ 銘柄を追加</span><br><span class="c-name">個別株式・ETFを登録</span></button></div>';
@@ -1022,7 +1279,10 @@ function renderPlan(){
     el.innerHTML = html; bindPlanCommon(el); return;
   }
   var quote = PriceFeed.stock(pricesData, ins.code);
-  var curChg = changePct(ins.acquiredPrice, ins.closePrice);
+  var curChg = changePct(ins.planBasePrice, ins.closePrice);
+  var holdPnl = MarginSim.holdingPnlNow(ins);
+  var holdPrin = MarginSim.holdingPrincipal(ins);
+  var holdRate = holdPrin > 0 ? (holdPnl.pnl / holdPrin) * 100 : null;
   /* 参考指数：終値データ（prices.json）の自動値を優先し、無い項目だけ手入力値で補う */
   var ixLatest = ins.ref.name !== "なし" ? PriceFeed.indexLatest(pricesData, ins.ref.name) : null;
   var ixBase = (ins.ref.name !== "なし" && ins.ref.baseDate) ? PriceFeed.indexCloseOn(pricesData, ins.ref.name, ins.ref.baseDate) : null;
@@ -1034,21 +1294,37 @@ function renderPlan(){
   function chgPill(v){ return v === null ? '<span class="pill mute">—</span>' : '<span class="pill ' + (v >= 0 ? "up" : "down") + '">' + (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%</span>"; }
   function fmtIdx(v){ return (v === null || v === undefined || !isFinite(v)) ? "データなし" : Number(v).toLocaleString("ja-JP", { maximumFractionDigits: 2 }); }
 
-  html += '<div class="grid2" style="margin-top:14px"><div class="card" style="margin-top:0"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">取得価格は仮のサンプル値</span>' : "") + '</h2>'
-    + '<p class="sub">購入トリガーは、この銘柄自身の<strong>取得価格</strong>からの下落率です。最新終値は終値データ（prices.json）から自動で取り込み、取得価格との騰落率を表示します。「銘柄情報を取得」を押すと、登録済みコードでは銘柄名・区分・売買単位（ETFは1口／10口など銘柄ごとに異なります）も終値データの値に合わせて取り込みます。</p>'
+  html += '<div class="grid2" style="margin-top:14px"><div class="card" style="margin-top:0"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">計画基準価格は仮のサンプル値</span>' : "") + '</h2>'
+    + '<p class="sub">価格は3つに分けて管理します。<strong>計画基準価格</strong>はナンピン購入の判断基準（下落率の起点）で、実際に購入して平均建値が変わっても自動では変更しません。<strong>平均建値</strong>は下の「現在の保有」で入力する実績の価格、<strong>最新終値</strong>は終値データ（prices.json）から自動で取り込む現在価格です。購入トリガーは計画基準価格からの下落率です。「銘柄情報を取得」を押すと、登録済みコードでは銘柄名・区分・売買単位（ETFは1口／10口など銘柄ごとに異なります）も終値データの値に合わせて取り込みます。</p>'
     + '<div class="coderow"><div class="field" style="flex:1;min-width:0"><label class="flabel" for="f_code">銘柄コード</label><input type="text" id="f_code" value="' + esc(ins.code) + '" autocomplete="off"></div><button class="btn" id="fetchQuote" type="button">銘柄情報を取得</button></div>'
     + '<p class="hint" id="codeHint">' + esc(quoteHintText(ins.code)) + '</p>'
     + '<div class="formgrid">'
     + fld("銘柄名", '<input type="text" id="f_name" value="' + esc(ins.name) + '" autocomplete="off">')
     + fld("区分", '<select id="f_type"><option value="ETF"' + (ins.type === "ETF" ? " selected" : "") + '>ETF</option><option value="stock"' + (ins.type === "stock" ? " selected" : "") + ">個別株式</option></select>")
     + fld("売買単位（株/口）", '<input type="number" id="f_unit" min="1" step="1" value="' + ins.unit + '">')
-    + fld("取得価格（円）", '<input type="number" id="f_acq" min="0" step="1" value="' + ins.acquiredPrice + '">')
+    + fld("計画基準価格（円）", '<input type="number" id="f_base" min="0" step="1" value="' + ins.planBasePrice + '">')
     + "</div>"
-    + '<div class="pricepanel"><div class="pp-cell"><div class="pp-label">最新終値' + (ins.closePrice !== null ? "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + "）" : "") + '</div><div class="pp-value num">' + (ins.closePrice !== null ? fmtYen(ins.closePrice) : "未取得") + '</div></div>'
-    + '<div class="pp-cell"><div class="pp-label">取得価格からの騰落率</div><div class="pp-value">' + (curChg === null ? "—" : chgPill(curChg)) + "</div></div></div>"
-    + (ins.closeSource !== "json"
-        ? '<div class="formgrid" style="margin-top:10px">' + fld("終値を手入力（円）", '<input type="number" id="f_close" min="0" step="1" value="' + (ins.closePrice === null ? "" : ins.closePrice) + '" placeholder="未入力">') + fld("終値の日付", '<input type="date" id="f_closedate" value="' + esc(ins.closeDate || "") + '">') + "</div>"
-        : "")
+    + '<div class="pricepanel"><div class="pp-cell"><div class="pp-label">計画基準価格（下落率の起点）</div><div class="pp-value num">' + fmtYen(ins.planBasePrice) + '</div></div>'
+    + '<div class="pp-cell"><div class="pp-label">最新終値' + (ins.closePrice !== null ? "（" + esc(ins.closeDate || "日付不明") + (ins.closeSource === "json" ? "・終値データ" : "・手入力") + (ins.closeSource === "json" && quote && quote.stale ? "・前回データ（取得失敗のため）" : "") + "）" : "") + '</div><div class="pp-value num">' + (ins.closePrice !== null ? fmtYen(ins.closePrice) : "未取得") + (ins.closeSource === "manual" ? ' <span class="pill warn">手入力</span>' : "") + '</div></div>'
+    + '<div class="pp-cell"><div class="pp-label">計画基準価格からの下落率</div><div class="pp-value">' + (curChg === null ? "—" : chgPill(curChg)) + "</div></div>"
+    + (ins.holding.qty > 0 ? '<div class="pp-cell"><div class="pp-label">建玉の評価損益率（終値÷平均建値−1）</div><div class="pp-value">' + (ins.closePrice !== null && ins.closePrice > 0 && holdRate !== null ? chgPill(holdRate) : "—") + "</div></div>" : "")
+    + "</div>"
+    + (quote && quote.recentSplits && quote.recentSplits.length ? '<div class="notice warn" style="margin-top:10px"><strong>株式分割がありました（' + quote.recentSplits.map(function(sp){ return esc(sp.date) + "・比率 " + esc(sp.ratio); }).join("、") + '）。</strong>計画基準価格が分割前の価格でないか確認してください。分割前の価格のままだと、下落率や想定購入価格が大きくずれる可能性があります。</div>' : "")
+    + '<div class="formgrid" style="margin-top:10px">' + fld("最新終値を手入力で上書き（円）", '<input type="number" id="f_close" min="0" step="1" value="' + (ins.closePrice === null ? "" : ins.closePrice) + '" placeholder="未入力">') + fld("終値の日付", '<input type="date" id="f_closedate" value="' + esc(ins.closeDate || "") + '">') + "</div>"
+    + (ins.closeSource === "manual"
+        ? '<p class="hint">現在は<strong>手入力価格</strong>で計算しています。手入力価格は終値データの自動取得では上書きされません。</p><div class="rowflex"><button class="btn small" id="revertClose" type="button">自動取得の終値に戻す</button></div>'
+        : '<p class="hint">終値を手入力すると「手入力」と明示され、その価格で騰落率・評価損益を計算します（自動取得の終値がある銘柄でも上書きできます）。</p>')
+    + '<h3 style="margin-top:16px">現在の保有（実績）</h3>'
+    + '<p class="sub">この銘柄を実際に保有している場合に入力します。建代金（数量×平均建値）と評価損益（最新終値との差）は自動計算します。シミュレーションはこの保有を起点に、未実行の計画段階だけを追加します。計画段階の「実行済み」実績はここへ反映でき、二重計上はしません。</p>'
+    + '<div class="formgrid">'
+    + fld("保有数量（" + (ins.type === "ETF" ? "口" : "株") + "）", '<input type="number" id="f_hqty" min="0" step="1" value="' + ins.holding.qty + '">')
+    + fld("平均建値（円）", '<input type="number" id="f_havg" min="0" step="0.01" value="' + ins.holding.avgPrice + '">')
+    + fld("買建・売建", '<select id="f_hside"><option value="buy"' + (ins.holding.side === "buy" ? " selected" : "") + '>買建</option><option value="sell"' + (ins.holding.side === "sell" ? " selected" : "") + ">売建</option></select>")
+    + '<div class="calc"><div class="cl">建代金（自動計算）</div><div class="cv num">' + fmtYen(holdPrin) + "</div></div>"
+    + "</div>"
+    + (ins.holding.qty > 0
+        ? '<p class="hint">現在の評価損益（最新終値基準）：<strong class="num">' + (ins.closePrice !== null && ins.closePrice > 0 ? fmtSignedYen(holdPnl.pnl) : "最新終値が未取得のため未計算") + '</strong>' + (holdPnl.approx ? "（終値がないため概算扱い）" : "") + "</p>"
+        : '<p class="hint">保有がなければ数量0のままで構いません。</p>')
     + '<div class="rowflex mt"><button class="btn small" id="dupIns">この銘柄の計画を複製</button><button class="btn small danger-outline" id="delIns">この銘柄を削除</button></div></div>'
 
     + '<div class="card" style="margin-top:0"><h2>参考指数（比較用）</h2>'
@@ -1064,55 +1340,136 @@ function renderPlan(){
         + '<div class="pp-cell"><div class="pp-label">基準日からの騰落率</div><div class="pp-value">' + (refChg === null ? "—" : chgPill(refChg)) + "</div></div></div>"
         + (!ixBase ? '<div style="margin-top:10px">' + fld("基準日の終値を手入力", '<input type="number" id="f_refbase" min="0" step="0.01" value="' + (ins.ref.baseValue === null ? "" : ins.ref.baseValue) + '" placeholder="終値データに無い場合は手入力">') + "</div>" : "")
         + (!ixLatest ? '<div style="margin-top:10px">' + fld("最新値を手入力", '<input type="number" id="f_refcur" min="0" step="0.01" value="' + (ins.ref.currentValue === null ? "" : ins.ref.currentValue) + '" placeholder="終値データに無い場合は手入力">') + "</div>" : "")
+        + (indexQualityNotes(ixLatest, ins.ref.name) ? '<div class="notice warn" style="margin-top:10px">' + esc(indexQualityNotes(ixLatest, ins.ref.name)) + "</div>" : "")
         + '<p class="hint">' + ((ixLatest || ixBase) ? "終値データ（prices.json）から自動表示しています。" : "この指数の終値データは未取得のため、手入力値で騰落率を計算します。") + "</p>")
     + "</div></div>";
 
+  /* ---------- 購入計画の一括設定（第5節） ---------- */
+  if (!ui.bulk) ui.bulk = { total: 1000000, start: 5, end: 65, step: 5, mode: "equal" };
+  var bulk = ui.bulk;
+  var bp = (ui.bulkPreview && ui.bulkPreview.insId === ins.id) ? ui.bulkPreview : null;
+  html += '<div class="card"><h2>購入計画の一括設定</h2>'
+    + '<p class="sub">総予算・下落率の範囲・間隔・配分方式から、未実行の購入段階をまとめて生成します。まずプレビューで内容を確認し、「この内容で適用する」を押したときだけ計画が置き換わります。<strong>実行済みの段階と現在の保有建玉は変更されません。</strong>生成後は各段階を従来どおり個別に編集でき、変更すると全体が即時再計算されます。</p>'
+    + '<div class="formgrid">'
+    + fld("総購入予算（円）", '<input type="number" id="b_total" min="0" step="10000" value="' + bulk.total + '">')
+    + fld("購入開始下落率（%）", '<input type="number" id="b_start" min="0" max="100" step="0.5" value="' + bulk.start + '">')
+    + fld("購入終了下落率（%）", '<input type="number" id="b_end" min="0" max="100" step="0.5" value="' + bulk.end + '">')
+    + fld("購入間隔（%）", '<input type="number" id="b_step" min="0.5" max="100" step="0.5" value="' + bulk.step + '">')
+    + fld("配分方式", '<select id="b_mode"><option value="equal"' + (bulk.mode === "equal" ? " selected" : "") + '>均等配分</option><option value="deeper"' + (bulk.mode === "deeper" ? " selected" : "") + '>下落が深いほど購入額を増やす</option><option value="shallower"' + (bulk.mode === "shallower" ? " selected" : "") + ">下落が浅い段階で多く購入する</option></select>")
+    + "</div>"
+    + '<div class="rowflex mt"><button class="btn" id="bulkPreviewBtn" type="button">プレビューを生成</button></div>';
+  if (bp){
+    var bpBudgetSum = bp.rows.reduce(function(a, r){ return a + r.budget; }, 0);
+    var bpCostSum = 0;
+    html += '<div class="tblwrap mt"><table class="dt"><thead><tr><th>下落率</th><th>購入額（予算）</th><th>想定価格</th><th>購入数量</th><th>実購入予定額</th></tr></thead><tbody>';
+    bp.rows.forEach(function(r){
+      var price = MarginSim.stagePrice(ins.planBasePrice, r.dropPct);
+      var qty = MarginSim.qtyFor(r.budget, price, ins.unit);
+      var cost = qty * price; bpCostSum += cost;
+      html += '<tr><td class="num">−' + r.dropPct + '%</td><td class="num" data-label="購入額（予算）">' + fmtYenShort(r.budget) + '円</td><td class="num" data-label="想定価格">' + (ins.planBasePrice > 0 ? fmtYenShort(price) + "円" : "—") + '</td><td class="num" data-label="購入数量">' + qty.toLocaleString("ja-JP") + '</td><td class="num" data-label="実購入予定額">' + fmtYenShort(cost) + "円</td></tr>";
+    });
+    html += "</tbody></table></div>"
+      + '<p class="hint">合計：予算 <strong class="num">' + fmtYen(bpBudgetSum) + '</strong>（設定した総予算 ' + fmtYen(bulk.total) + ' を超えません）／実購入予定額の合計 <strong class="num">' + fmtYen(bpCostSum) + '</strong>（売買単位 ' + ins.unit + ' で丸めた後の金額。予算との差は丸めによる未使用分です）'
+      + (ins.planBasePrice > 0 ? "" : " ※計画基準価格が未設定のため、想定価格・実購入予定額は計算できません。先に計画基準価格を入力してください。") + "</p>"
+      + '<div class="rowflex"><button class="btn primary" id="bulkApplyBtn" type="button">この内容で適用する（未実行の計画を置き換え）</button></div>';
+  }
+  html += "</div>";
+
   var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
   html += '<div class="card"><h2>ナンピン購入計画（' + esc(normalizeCode(ins.code)) + " " + esc(ins.name) + '）</h2>'
-    + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は取得価格×(1−下落率)を円未満切り捨て。変更は全体の維持率シミュレーションへ即時反映されます。</p>'
+    + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は計画基準価格×(1−下落率)を円未満切り捨て。実際に購入した段階は「実行済み」にすると実績として記録され、将来シミュレーションでは再購入しません（実績は上の「現在の保有」へ反映して管理します）。未実行の段階は実行済みの実績を残したまま自由に変更できます。</p>'
     + '<div class="rowflex"><button class="btn primary small" id="addStage">＋ 購入段階を追加</button><button class="btn small" id="resetPlan">計画を初期化</button></div>'
     + '<div id="stageList">';
   sorted.forEach(function(sg){
     var r = sim.stageRes[sg.id] || { price: 0, qty: 0, cost: 0, feasible: false, reason: "", cumBudget: 0 };
-    var statusPill = !sg.enabled ? '<span class="pill mute">無効</span>'
+    var passed = stagePassed(ins, sg);
+    var statusPill = sg.executed ? '<span class="pill info">実行済み（実績）</span>'
+      : (!sg.enabled ? '<span class="pill mute">無効</span>'
       : (r.qty <= 0 ? '<span class="pill danger">実行不能：' + esc(r.reason) + "</span>"
-      : (r.feasible ? '<span class="pill safe">実行予定</span>' : '<span class="pill danger">実行不能（概算判定）</span>'));
-    html += '<div class="stagerow' + (sg.enabled ? "" : " off") + '" data-stage="' + sg.id + '">'
+      : (r.feasible ? '<span class="pill safe">実行予定</span>' : '<span class="pill danger">実行不能（概算判定）</span>')));
+    html += '<div class="stagerow' + (sg.enabled && !sg.executed ? "" : " off") + '" data-stage="' + sg.id + '">'
       + '<div class="sr-top"><label class="switchlabel"><input type="checkbox" data-act="toggle" ' + (sg.enabled ? "checked" : "") + "> 有効</label>"
+      + '<label class="switchlabel"><input type="checkbox" data-act="execToggle" ' + (sg.executed ? "checked" : "") + "> 実行済み</label>"
       + "<strong>−" + sg.dropPct + "% 段階</strong>" + statusPill
-      + '<span style="margin-left:auto"></span><button class="btn small danger-outline" data-act="del">この段階を削除</button></div>'
-      + '<div class="sr-grid">'
-      + fld("下落率（%）", '<input type="number" data-act="drop" aria-label="下落率（%）" min="0" max="100" step="0.5" value="' + sg.dropPct + '">')
-      + '<div class="calc"><div class="cl">想定購入価格</div><div class="cv num" data-cell="price">' + fmtYen(r.price) + "</div></div>"
-      + fld("追加購入予定額（予算・円）", '<input type="number" data-act="budget" aria-label="追加購入予定額（予算・円）" min="0" step="1000" value="' + sg.budget + '">')
-      + '<div class="calc"><div class="cl">累計購入予定額（予算）</div><div class="cv num" data-cell="cum">' + fmtYen(r.cumBudget) + "</div></div>"
-      + "</div>"
-      + '<label class="flabel" style="margin-top:8px">購入額スライダー（0〜100万円）</label><input type="range" data-act="slider" min="0" max="1000000" step="2500" value="' + Math.min(sg.budget, 1000000) + '" aria-label="購入額スライダー">'
-      + '<div class="sr-grid">'
-      + '<div class="calc"><div class="cl">購入数量（' + (ins.type === "ETF" ? "口" : "株") + '）</div><div class="cv num" data-cell="qty">' + r.qty.toLocaleString("ja-JP") + "</div></div>"
-      + '<div class="calc"><div class="cl">実購入予定額</div><div class="cv num" data-cell="cost">' + fmtYen(r.cost) + "</div></div>"
-      + '<div class="calc"><div class="cl">予算との差</div><div class="cv num" data-cell="diff">' + fmtYen(sg.budget - r.cost) + "</div></div>"
-      + '<div class="calc"><div class="cl">実行状態の詳細</div><div style="font-size:.8rem" data-cell="reason">' + (sg.enabled ? esc(r.feasible ? "トリガー到達時点で必要保証金を満たす見込み（概算）" : r.reason) : "無効のため計算対象外") + "</div></div>"
-      + "</div></div>";
+      + '<span style="margin-left:auto"></span><button class="btn small danger-outline" data-act="del">この段階を削除</button></div>';
+    if (passed){
+      html += '<div class="notice warn" style="margin-top:10px"><strong>現在価格がすでにこの段階を通過しています。</strong> 最新終値 ' + fmtYen(ins.closePrice) + ' は、この段階の想定価格 ' + fmtYen(r.price) + ' を下回っています。過去の購入を自動では仮定しません。実際に購入済みなら「実行済みにする」、まだ買っていない場合は未実行のままにしてください。<div class="rowflex mt"><button class="btn small primary" data-act="markExec">この段階を実行済みにする</button></div></div>';
+    }
+    if (sg.executed){
+      html += '<div class="sr-grid">'
+        + fld("実際の購入価格（円）", '<input type="number" data-act="execPrice" aria-label="実際の購入価格（円）" min="0" step="0.01" value="' + (sg.execPrice === null ? "" : sg.execPrice) + '" placeholder="未記録">')
+        + fld("実際の購入数量（" + (ins.type === "ETF" ? "口" : "株") + "）", '<input type="number" data-act="execQty" aria-label="実際の購入数量" min="0" step="1" value="' + (sg.execQty === null ? "" : sg.execQty) + '" placeholder="未記録">')
+        + fld("実際の購入額（円）", '<input type="number" data-act="execAmount" aria-label="実際の購入額（円）" min="0" step="1" value="' + (sg.execAmount === null ? "" : sg.execAmount) + '" placeholder="未記録">')
+        + '<div class="calc"><div class="cl">想定価格（計画）</div><div class="cv num">' + fmtYen(r.price) + "</div></div>"
+        + "</div>"
+        + '<p class="hint">この段階は実績のため、将来シミュレーションには加算されません。実績は保有建玉として数えるため、下のボタンで「現在の保有」へ反映してください（反映後は二重に数えません）。' + (sg.reflected ? " <strong>保有へ反映済みです。</strong>" : "") + '</p>'
+        + (sg.reflected ? "" : '<div class="rowflex"><button class="btn small" data-act="reflect">この実績を現在の保有へ反映（数量・平均建値を更新）</button></div>');
+    } else {
+      html += '<div class="sr-grid">'
+        + fld("下落率（%）", '<input type="number" data-act="drop" aria-label="下落率（%）" min="0" max="100" step="0.5" value="' + sg.dropPct + '">')
+        + '<div class="calc"><div class="cl">想定購入価格</div><div class="cv num" data-cell="price">' + fmtYen(r.price) + "</div></div>"
+        + fld("追加購入予定額（予算・円）", '<input type="number" data-act="budget" aria-label="追加購入予定額（予算・円）" min="0" step="1000" value="' + sg.budget + '">')
+        + '<div class="calc"><div class="cl">累計購入予定額（予算）</div><div class="cv num" data-cell="cum">' + fmtYen(r.cumBudget) + "</div></div>"
+        + "</div>"
+        + '<label class="flabel" style="margin-top:8px">購入額スライダー（0〜100万円）</label><input type="range" data-act="slider" min="0" max="1000000" step="2500" value="' + Math.min(sg.budget, 1000000) + '" aria-label="購入額スライダー">'
+        + '<div class="sr-grid">'
+        + '<div class="calc"><div class="cl">購入数量（' + (ins.type === "ETF" ? "口" : "株") + '）</div><div class="cv num" data-cell="qty">' + r.qty.toLocaleString("ja-JP") + "</div></div>"
+        + '<div class="calc"><div class="cl">実購入予定額</div><div class="cv num" data-cell="cost">' + fmtYen(r.cost) + "</div></div>"
+        + '<div class="calc"><div class="cl">予算との差</div><div class="cv num" data-cell="diff">' + fmtYen(sg.budget - r.cost) + "</div></div>"
+        + '<div class="calc"><div class="cl">実行状態の詳細</div><div style="font-size:.8rem" data-cell="reason">' + (sg.enabled ? esc(r.feasible ? "トリガー到達時点で必要保証金を満たす見込み（概算）" : r.reason) : "無効のため計算対象外") + "</div></div>"
+        + "</div>";
+    }
+    html += "</div>";
   });
-  var planBudgetIns = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ return a + s.budget; }, 0);
-  var planCostIns = ins.stages.filter(function(s){ return s.enabled; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
-  html += '</div><p class="hint">この銘柄の計画：予算合計 <strong class="num">' + fmtYen(planBudgetIns) + '</strong>／実購入予定合計 <strong class="num">' + fmtYen(planCostIns) + "</strong>（差は売買単位への丸めによる未使用分）</p></div>";
+  var planBudgetIns = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
+  var planCostIns = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
+  var execAmountIns = ins.stages.filter(function(s){ return s.executed; }).reduce(function(a, s){ return a + (s.execAmount || 0); }, 0);
+  html += '</div><p class="hint">この銘柄の今後の計画：予算合計 <strong class="num">' + fmtYen(planBudgetIns) + '</strong>／実購入予定合計 <strong class="num">' + fmtYen(planCostIns) + '</strong>（差は売買単位への丸めによる未使用分）' + (execAmountIns > 0 ? '／実行済みの実購入額合計 <strong class="num">' + fmtYen(execAmountIns) + "</strong>（実績・シミュレーション対象外）" : "") + "</p></div>";
   el.innerHTML = html;
   bindPlanCommon(el);
   bindInstrumentForm(el, ins);
   bindStages(el, ins);
+  bindBulk(el, ins);
+}
+function bindBulk(el, ins){
+  var pv = el.querySelector("#bulkPreviewBtn");
+  if (pv) pv.onclick = function(){
+    function gv(id, fb){ var n = el.querySelector(id); return n ? num(n.value, fb) : fb; }
+    ui.bulk = { total: Math.max(0, Math.round(gv("#b_total", 0))), start: gv("#b_start", 5), end: gv("#b_end", 65), step: Math.max(0.5, gv("#b_step", 5)),
+                mode: (function(){ var s = el.querySelector("#b_mode"); return s ? s.value : "equal"; })() };
+    ui.bulkPreview = { insId: ins.id, rows: generateBulkStages(ui.bulk) };
+    renderPlan();
+    toast("プレビューを生成しました。内容を確認してから適用してください。");
+  };
+  var ap = el.querySelector("#bulkApplyBtn");
+  if (ap) ap.onclick = function(){
+    if (!ui.bulkPreview || ui.bulkPreview.insId !== ins.id) return;
+    var rows = ui.bulkPreview.rows;
+    function doApply(){
+      var kept = ins.stages.filter(function(s){ return s.executed; });
+      var news = rows.map(function(r){ return { id: uid("st"), dropPct: r.dropPct, budget: r.budget, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }; });
+      ins.stages = kept.concat(news);
+      ui.bulkPreview = null;
+      recalc(); renderPlan();
+      toast("一括設定を適用しました（未実行 " + news.length + " 段階を生成" + (kept.length ? "、実行済み " + kept.length + " 段階はそのまま保持" : "") + "）。");
+    }
+    var unexec = ins.stages.filter(function(s){ return !s.executed; }).length;
+    if (unexec > 0){
+      confirmModal("未実行の計画を上書きしますか", "現在の未実行の購入段階（" + unexec + "件）は、プレビューの内容（" + rows.length + "段階）に置き換わります。実行済みの段階と現在の保有は変更されません。", "上書きして適用する", doApply);
+    } else doApply();
+  };
 }
 function fld(label, inner){ var m = inner.match(/id="([^"]+)"/); var f = m ? ' for="' + m[1] + '"' : ""; return '<div class="field"><label class="flabel"' + f + ">" + esc(label) + "</label>" + inner + "</div>"; }
 function bindPlanCommon(el){
   el.querySelectorAll("[data-ins]").forEach(function(b){ b.onclick = function(){ ui.selectedInsId = b.getAttribute("data-ins"); renderPlan(); }; });
   var add = el.querySelector("#addIns");
   if (add) add.onclick = function(){
-    var ni = { id: uid("ins"), code: "", name: "", type: "stock", acquiredPrice: 0, closePrice: null, closeDate: "", closeSource: "", unit: 100, baseIsSample: false,
+    var ni = { id: uid("ins"), code: "", name: "", type: "stock", planBasePrice: 0, closePrice: null, closeDate: "", closeSource: "", unit: 100, baseIsSample: false,
+               holding: { qty: 0, avgPrice: 0, side: "buy" },
                ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null },
-               stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true }] };
+               stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] };
     state.instruments.push(ni); ui.selectedInsId = ni.id; state.meta.isSample = false;
-    recalc(); renderPlan(); toast("銘柄を追加しました。コード・取得価格を入力してください。");
+    recalc(); renderPlan(); toast("銘柄を追加しました。コード・計画基準価格を入力してください。");
   };
 }
 function commitIns(ins, patch){ Object.keys(patch).forEach(function(k){ ins[k] = patch[k]; }); recalc(); }
@@ -1143,7 +1500,10 @@ function bindInstrumentForm(el, ins){
   on("#f_name", function(n){ ins.name = n.value.trim().slice(0, 80); });
   on("#f_type", function(n){ ins.type = n.value === "stock" ? "stock" : "ETF"; });
   on("#f_unit", function(n){ ins.unit = Math.max(1, Math.round(num(n.value, 1))); });
-  on("#f_acq", function(n){ ins.acquiredPrice = clamp(num(n.value, 0), 0, 1e9); ins.baseIsSample = false; });
+  on("#f_base", function(n){ ins.planBasePrice = clamp(num(n.value, 0), 0, 1e9); ins.baseIsSample = false; });
+  on("#f_hqty", function(n){ ins.holding.qty = clamp(Math.round(num(n.value, 0)), 0, 1e9); });
+  on("#f_havg", function(n){ ins.holding.avgPrice = clamp(num(n.value, 0), 0, 1e9); });
+  on("#f_hside", function(n){ ins.holding.side = n.value === "sell" ? "sell" : "buy"; });
   on("#f_close", function(n){ ins.closePrice = n.value === "" ? null : clamp(num(n.value, 0), 0, 1e9); if (ins.closePrice !== null) ins.closeSource = "manual"; });
   on("#f_closedate", function(n){ ins.closeDate = n.value; });
   var fq = el.querySelector("#fetchQuote");
@@ -1162,6 +1522,13 @@ function bindInstrumentForm(el, ins){
     filled.push(q.closeDate + " 終値 " + fmtYen(q.close));
     recalc(); renderPlan();
     toast("銘柄情報を取り込みました：" + filled.join("・"));
+  };
+  var rc = el.querySelector("#revertClose");
+  if (rc) rc.onclick = function(){
+    var q = PriceFeed.stock(pricesData, ins.code);
+    if (q){ ins.closePrice = q.close; ins.closeDate = q.closeDate; ins.closeSource = "json"; toast("自動取得の終値（" + q.closeDate + "・" + fmtYen(q.close) + "）に戻しました。"); }
+    else { ins.closePrice = null; ins.closeDate = ""; ins.closeSource = ""; toast("この銘柄の自動取得終値はないため、終値を未取得に戻しました。"); }
+    recalc(); renderPlan();
   };
   on("#f_refname", function(n){ ins.ref.name = n.value; });
   on("#f_refdate", function(n){ ins.ref.baseDate = n.value; });
@@ -1194,7 +1561,7 @@ function bindInstrumentForm(el, ins){
   var addStage = el.querySelector("#addStage");
   if (addStage) addStage.onclick = function(){
     var maxDrop = ins.stages.length ? Math.max.apply(null, ins.stages.map(function(s){ return s.dropPct; })) : 0;
-    ins.stages.push({ id: uid("st"), dropPct: Math.min(100, maxDrop + 5), budget: 100000, enabled: true });
+    ins.stages.push({ id: uid("st"), dropPct: Math.min(100, maxDrop + 5), budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false });
     recalc(); renderPlan();
   };
   var reset = el.querySelector("#resetPlan");
@@ -1202,7 +1569,7 @@ function bindInstrumentForm(el, ins){
     confirmModal("購入計画を初期化しますか", ins.code === "1308"
       ? "この銘柄の計画を初期サンプル（−5%〜−65%、累計予算 4,500,000円）に戻します。"
       : "この銘柄の購入計画をすべて削除し、−5%・10万円の1段階だけの初期状態に戻します。", "初期化する", function(){
-      ins.stages = ins.code === "1308" ? sampleStages() : [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true }];
+      ins.stages = ins.code === "1308" ? sampleStages() : [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }];
       recalc(); renderPlan(); toast("購入計画を初期化しました。");
     });
   };
@@ -1233,6 +1600,47 @@ function bindStages(el, ins){
         });
         ctrl.addEventListener("change", function(){ renderPlan(); });
       }
+      else if (act === "execToggle" || act === "markExec"){
+        ctrl.addEventListener("click", function(){
+          var toExec = act === "markExec" ? true : ctrl.checked;
+          if (toExec && !sg.executed){
+            /* 実行済みにする際は、計画値（想定価格・数量・実購入予定額）を実績の初期値として下書きする。実際の値と違えば実績欄で直せる */
+            var r = sim.stageRes[sg.id];
+            if (r){ if (sg.execPrice === null) sg.execPrice = r.price; if (sg.execQty === null) sg.execQty = r.qty; if (sg.execAmount === null) sg.execAmount = r.cost; }
+          }
+          sg.executed = toExec;
+          recalc(); renderPlan();
+          toast(toExec ? "段階を実行済みにしました。実績は「現在の保有」へ反映して管理してください。" : "段階を未実行に戻しました。");
+        });
+      }
+      else if (act === "execPrice" || act === "execQty"){
+        ctrl.addEventListener("change", function(){
+          var v = ctrl.value === "" ? null : num(ctrl.value, NaN);
+          if (!isFinite(v)) v = null;
+          if (act === "execPrice") sg.execPrice = v === null ? null : clamp(v, 0, 1e9);
+          else sg.execQty = v === null ? null : clamp(Math.round(v), 0, 1e9);
+          if (sg.execPrice !== null && sg.execQty !== null) sg.execAmount = Math.round(sg.execPrice * sg.execQty);
+          recalc(); renderPlan();
+        });
+      }
+      else if (act === "execAmount"){
+        ctrl.addEventListener("change", function(){
+          sg.execAmount = ctrl.value === "" ? null : clamp(Math.round(num(ctrl.value, 0)), 0, 1e12);
+          recalc(); renderPlan();
+        });
+      }
+      else if (act === "reflect"){
+        ctrl.addEventListener("click", function(){
+          if (sg.execQty === null || sg.execPrice === null || !(sg.execQty > 0)){
+            toast("先に実際の購入価格と購入数量を入力してください。"); return;
+          }
+          var merged = mergeHolding(ins.holding, "buy", sg.execQty, sg.execPrice);
+          if (!merged){ toast("現在の保有が売建のため、買いの実績は反映できませんでした。保有欄で区分を確認してください。"); return; }
+          ins.holding = merged; sg.reflected = true;
+          recalc(); renderPlan();
+          toast("実績を現在の保有へ反映しました（保有 " + merged.qty.toLocaleString("ja-JP") + "・平均建値 " + fmtYen(merged.avgPrice) + "）。");
+        });
+      }
     });
   });
 }
@@ -1245,7 +1653,7 @@ function refreshStageRow(row, ins, sg){
 }
 function refreshMinibar(){
   var bar = document.querySelector("#view-plan .minibar");
-  if (bar) bar.innerHTML = '<span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmt ? "−" + sim.firstMgmt.drop + "%" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
+  if (bar) bar.innerHTML = '<span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%（0.1%精度）" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
 }
 
 /* ================= 口座・保有状況 ================= */
@@ -1260,12 +1668,12 @@ function renderAccount(){
     + fld("証券会社表示の保証金維持率（%・任意）", '<input type="number" id="a_brokerRate" min="0" step="0.1" value="' + (a.brokerRate === null ? "" : a.brokerRate) + '" placeholder="未入力">')
     + fld("情報更新日時", '<input type="text" id="a_updated" value="' + esc(state.meta.updatedAt) + '" placeholder="例：2026-11-17 11:30">')
     + "</div>"
-    + '<dl class="kv mt"><dt>推計保証金残高（現在）</dt><dd class="num">' + fmtYen(cur.balance) + '</dd>'
-    + '<dt>推計維持率（既存建玉のみ）</dt><dd class="num">' + fmtPct(cur.rate) + (cur.pnlApprox ? "（評価損益未入力分あり・概算）" : "") + "</dd>"
+    + '<dl class="kv mt"><dt>推計保証金残高（現在・実質保証金）</dt><dd class="num">' + fmtYen(cur.balance) + (cur.belowMinMargin ? '（最低保証金額 ' + fmtYen(state.settings.minMargin) + ' 未満：差し入れが必要になる場合があります）' : '（最低保証金額 ' + fmtYen(state.settings.minMargin) + ' 以上）') + '</dd>'
+    + '<dt>推計維持率（現在の保有＋既存建玉）</dt><dd class="num">' + fmtPct(cur.rate) + (cur.pnlApprox ? "（評価損益未入力分あり・概算）" : "") + "</dd>"
     + (a.brokerRate !== null && cur.rate !== null ? '<dt>証券会社表示との差</dt><dd class="num">' + (a.brokerRate - cur.rate >= 0 ? "+" : "−") + Math.abs(a.brokerRate - cur.rate).toFixed(1) + " pt（計算モデルが異なるため差が生じます）</dd>" : "")
     + "</dl></div>";
 
-  html += '<div class="card"><h2>既存の信用建玉</h2><p class="sub">購入計画とは別に、すでに保有している信用建玉を登録します。評価損益は空欄（未入力）にできます。その場合シミュレーションでは概算として扱い、勝手な値で補完しません。</p>'
+  html += '<div class="card"><h2>計画銘柄以外の既存建玉</h2><p class="sub">購入計画の対象銘柄<strong>以外</strong>で、すでに保有している信用建玉を登録します。計画対象銘柄の保有は「購入計画」画面の銘柄ごとの「現在の保有」で管理してください。<strong>同じ建玉を両方に登録すると二重計上になります。</strong>全体の計算では、銘柄別保有とここの建玉を合算します。評価損益は空欄（未入力）にできます。その場合シミュレーションでは概算として扱い、勝手な値で補完しません。</p>'
     + '<div class="rowflex"><button class="btn primary small" id="addPos">＋ 建玉を追加</button></div><div id="posList">';
   state.positions.forEach(function(p){
     html += '<div class="posrow" data-pos="' + p.id + '"><div class="rowflex"><strong>' + esc(p.code || "コード未設定") + " " + esc(p.name || "") + '</strong><span class="pill ' + (p.side === "buy" ? "info" : "warn") + '">' + (p.side === "buy" ? "買建" : "売建") + '</span><span style="margin-left:auto"></span><button class="btn small danger-outline" data-pact="del">削除</button></div>'
@@ -1278,7 +1686,7 @@ function renderAccount(){
       + "</div></div>";
   });
   var totP = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
-  html += '</div><p class="hint">既存建玉の建代金合計：<strong class="num">' + fmtYen(totP) + "</strong>（担保は銘柄ごとに重複計上せず、口座全体で一度だけ計算します）</p></div>";
+  html += '</div><p class="hint">計画銘柄以外の既存建玉の建代金合計：<strong class="num">' + fmtYen(totP) + '</strong>／銘柄別保有の建代金合計：<strong class="num">' + fmtYen(cur.holdingsPrincipal) + '</strong>（担保は銘柄ごとに重複計上せず、口座全体で一度だけ計算します）</p></div>';
   el.innerHTML = html;
 
   function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderAccount(); }); }
@@ -1328,16 +1736,20 @@ function renderSettings(){
     + fld("最大想定下落率（%）", '<input type="number" id="s_maxdrop" min="5" max="100" step="5" value="' + s.maxDrop + '">')
     + fld("シミュレーション刻み幅（%）", '<input type="number" id="s_step" min="1" max="50" step="1" value="' + s.step + '">')
     + fld("控除費用（円）", '<input type="number" id="s_fees" min="0" step="100" value="' + s.fees + '">')
+    + fld("最低保証金額（円）", '<input type="number" id="s_minmargin" min="0" step="10000" value="' + s.minMargin + '">')
     + fld("担保の価格変動条件", '<select id="s_colmode"><option value="same"' + (s.collateralMode === "same" ? " selected" : "") + '>市場と同率で下落</option><option value="half"' + (s.collateralMode === "half" ? " selected" : "") + '>市場の半分だけ下落</option><option value="strong"' + (s.collateralMode === "strong" ? " selected" : "") + '>市場の1.2倍下落</option><option value="none"' + (s.collateralMode === "none" ? " selected" : "") + '>変動しない</option><option value="custom"' + (s.collateralMode === "custom" ? " selected" : "") + ">任意の割合（下で指定）</option></select>")
     + fld("担保の連動割合（%・任意時）", '<input type="number" id="s_colcustom" min="0" max="300" step="5" value="' + s.collateralCustom + '">')
     + "</div>"
-    + '<label class="switchlabel"><input type="checkbox" id="s_profit" ' + (s.includeProfit ? "checked" : "") + "> 建玉の評価益も維持率の計算に算入する（オフの場合は評価損のみ算入）</label>"
-    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ 建玉評価損益 − 控除費用）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。将来の制度変更（最低保証金額・保証金拘束など）はこの計算モジュール側で拡張する設計です。</p></div>'
+    + '<p class="hint"><strong>評価損益の保証金算入方法（SBI証券公式ルール準拠）：</strong>委託保証金率の計算では、評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算します。そのため本ツールでも、維持率の分子では建玉評価損益を min(評価損益, 0) として扱い、<strong>評価益は維持率に算入しません</strong>（従来の「評価益も算入する」方式から変更しました。ダッシュボード等での評価損益そのものの表示は、従来どおりプラスも表示します）。この算入方法は制度に合わせた固定仕様のため、設定では切り替えません。</p>'
+    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。実質保証金 ＝ 保証金現金 ＋ 代用評価額 ＋ min(建玉評価損益, 0) − 控除費用。新規建てには委託保証金が最低保証金額（初期値300,000円・上で変更可能）以上必要で、実質保証金がこれを下回ると差し入れが必要になるため、現在値とシミュレーション各行で警告します。</p></div>'
 
     + '<div class="card"><h2>データ管理</h2><p class="sub">入力したデータは、この端末のブラウザ内（IndexedDB）に形式バージョン付きで自動保存され、再起動後も自動で復元されます。保存先はこの端末・このブラウザ内のみで、他の端末とは同期されません。機種変更やブラウザのデータ消去に備えて、JSONバックアップも併用してください。</p>'
     + '<p class="hint" id="persistInfo">' + esc(persistInfoText()) + "</p>"
+    + '<p class="hint">アプリのバージョン：アプリ v' + APP_VERSION + '（基本バージョン）／データ形式バージョン：v' + DATA_VERSION + '／Service Workerキャッシュ名：' + SW_CACHE_NAME + '。</p>'
+    + '<div class="rowflex" style="margin-bottom:10px"><button class="btn small" id="checkUpdateBtn">更新を確認</button><span class="hint" id="updateResult" role="status" style="margin-top:0"></span></div>'
+    + '<p class="hint">このアプリは公開パス（/margin-nanpin/）配下に置かれ、専用のキャッシュ名と専用のIndexedDB名を使うため、他の公開アプリと保存先やキャッシュが競合しない構成になっています。</p>'
     + '<p class="hint">' + pricesStatusText() + '</p><div class="rowflex" style="margin-bottom:10px"><button class="btn small" id="reloadPricesBtn">終値データを再読み込み</button></div>'
-    + '<p class="hint">終値データの形式：アプリと同じ場所に置く prices.json（{ version, updatedAt, source, stocks: { 銘柄コード: { name, type, unit, close, closeDate } }, indices: { 指数名: { latestClose, latestDate, history: { "YYYY-MM-DD": 終値 } } } }）。定期ジョブが大引け後に最新化する想定です。取得できない環境では終値を手入力できます。</p>'
+    + '<p class="hint">終値データの形式：アプリと同じ場所に置く prices.json（v2形式：{ version, generatedAt, source, stocks: { 銘柄コード: { name, type, unit, close, closeDate, stale, recentSplits } }, indices: { 指数名: { latestClose, latestDate, history, dataQuality, anomalies, stale, closeIsProxy } } }）。取得日時（generatedAt）と各終値の対象営業日を表示し、古いデータ・暫定データ・大きな変動・前回データの使い回し・株式分割は該当箇所に警告として表示します。定期ジョブが大引け後に最新化する想定です。取得できない環境では終値を手入力できます。</p>'
     + (storageBlocked ? '<div class="notice danger" style="margin:0 0 10px">保存データの形式バージョン（' + loadWarningVersion + '）がこのアプリ（' + DATA_VERSION + '）より新しいため読み込めませんでした。<div class="rowflex mt"><button class="btn danger-outline small" id="clearStoredBtn">保存データを消去して自動保存を再開</button></div></div>' : "")
     + (loadWarning === "corrupt" ? '<div class="notice warn" style="margin:0 0 10px">前回の保存データが破損していたため読み込めず、退避しました。現在のデータは自動保存されています。</div>' : "")
     + '<div class="rowflex"><button class="btn" id="saveNowBtn">今すぐ保存</button><button class="btn primary" id="exportBtn">JSONで書き出す（バックアップ）</button><button class="btn" id="importBtn">JSONを読み込む（復元）</button><button class="btn danger-outline" id="resetBtn">初期サンプルデータに戻す</button></div>'
@@ -1348,7 +1760,13 @@ function renderSettings(){
     + '<ul style="margin:6px 0 0;padding-left:1.2em;font-size:.88rem">'
     + "<li>簡易シナリオ：すべての対象銘柄が同じ割合で下落し、担保は設定した連動割合で下落します（銘柄ごとに異なる下落率を設定する詳細シナリオは今後の拡張用にデータ構造のみ用意）。</li>"
     + "<li>購入段階は下落率の到達順に実行し、各段階の必要保証金（実購入額×新規建保証金率）を、到達時点の推計保証金と比較して実行可否を判定します。これは概算判定であり、維持率だけで新規建ての可否を判断していません。正確な新規建余力の再現に必要な情報が不足する項目は「概算」と明示しています。</li>"
-    + "<li>既存建玉の評価損益の将来推計は「現在の時価（建代金＋現在評価損益）が下落率ぶん変動する」近似です。評価損益が未入力の建玉は現在損益0として概算し、その旨を表示します。</li>"
+    + "<li>価格は計画基準価格（下落率の起点・購入しても自動変更しない）／平均建値（実保有の約定平均）／最新終値（終値データ）の3つを分離して管理します。シミュレーションの起点は現在の保有建玉（銘柄別保有＋計画銘柄以外の既存建玉）で、未実行の計画段階だけを今後の下落に応じて追加購入します。実行済みの段階は実績として保有側で表し、シミュレーションで再購入しません（二重計上防止）。</li>"
+    + "<li>既存建玉の評価損益の将来推計は「現在の時価（建代金＋現在評価損益）が下落率ぶん変動する」近似です。評価損益が未入力の建玉は計算から除外し（現在損益0として下落変動のみ反映）、維持率は概算である旨を該当表示の近くに明示します。</li>"
+    + "<li>評価損益の保証金算入はSBI証券公式の委託保証金率の計算に準拠します：評価損益合計がマイナスの場合のみ差し引き、プラスの場合はゼロとして計算します（評価益は維持率に算入しません）。変更理由は、評価益を算入すると実際の制度より維持率が高く出て、リスクを過小評価するためです。</li>"
+    + "<li>管理基準・追証基準への到達下落率は、表・グラフの刻み（初期値5%）とは別に、内部計算を0.1%刻みに細分化し、各購入段階のトリガー直前・直後も評価点に含めて算出します（段階購入で維持率が不連続に落ちるケースを見落とさないため）。到達しない場合は「最大下落率の範囲内では到達しません」と明示します。</li>"
+    + "<li>最低保証金：制度上、新規建てには委託保証金が最低保証金額（初期値300,000円）以上必要です。実質保証金（現金＋代用評価額−評価損−控除費用）がこれを下回る場合、現在値とシミュレーション各行で文字による警告を表示します。</li>"
+    + "<li>下落率の起点の区別：シミュレーションの下落率は各銘柄の<strong>計画基準価格を起点</strong>とする下落率です。代用有価証券の連動設定は<strong>現在の代用評価額に対する変動の想定</strong>であり、両者は起点が異なります（計算方法自体は従来どおりです）。</li>"
+    + "<li>新規建て条件（新規建保証金率）を満たせなくなる段階がある場合、その段階を詳細表で「新規建て条件を満たさない可能性」と文字でマークし、「購入可能な段階までで止めた場合の最終維持率」を補助指標として、本体のシミュレーション結果（購入可能な段階をすべて実行した場合）と区別して表示します。</li>"
     + "<li>維持率が追証基準に到達することと、実際に追証が発生することは同一ではありません。</li>"
     + "<li>金額は円単位、数量は売買単位で一貫して切り捨てます。浮動小数点誤差を避けるため、価格・数量は整数化してから金額を計算します。</li>"
     + "</ul></div>"
@@ -1365,10 +1783,9 @@ function renderSettings(){
   on("#s_maxdrop", function(n){ s.maxDrop = clamp(Math.round(num(n.value, 80)), 5, 100); });
   on("#s_step", function(n){ s.step = clamp(num(n.value, 5), 1, 50); });
   on("#s_fees", function(n){ s.fees = clamp(num(n.value, 0), 0, 1e12); });
+  on("#s_minmargin", function(n){ s.minMargin = clamp(num(n.value, 300000), 0, 1e12); });
   on("#s_colmode", function(n){ s.collateralMode = n.value; });
   on("#s_colcustom", function(n){ s.collateralCustom = clamp(num(n.value, 100), 0, 300); });
-  var prof = el.querySelector("#s_profit");
-  if (prof) prof.addEventListener("change", function(){ s.includeProfit = prof.checked; recalc(); toast("評価益の算入設定を反映しました。"); });
 
   var saveBtn = el.querySelector("#saveNowBtn");
   if (saveBtn) saveBtn.onclick = function(){
@@ -1386,6 +1803,27 @@ function renderSettings(){
         renderSettings(); toast("保存データを消去し、自動保存を再開しました。");
       }).catch(function(){ toast("保存データを消去できませんでした。"); });
     });
+  };
+  var updBtn = el.querySelector("#checkUpdateBtn");
+  if (updBtn) updBtn.onclick = function(){
+    var out = el.querySelector("#updateResult");
+    function say(t){ if (out) out.textContent = t; }
+    if (!("serviceWorker" in navigator)){ say("この環境ではService Workerが利用できないため、更新確認はできません。通常の再読み込みで最新版が表示されます。"); return; }
+    say("更新を確認中…");
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if (!reg){ say("Service Workerが登録されていないため、更新確認はできません（埋め込み表示など）。単独配置（GitHub Pages等）では利用できます。"); return; }
+      var settled = false;
+      function found(){ if (settled) return; settled = true; say("新しいバージョンがあります。再読み込みすると更新されます。"); var rb = document.createElement("button"); rb.className = "btn small primary"; rb.textContent = "今すぐ再読み込み"; rb.style.marginLeft = "8px"; rb.onclick = function(){ location.reload(); }; if (out && out.parentNode) out.parentNode.appendChild(rb); }
+      if (reg.waiting) { found(); return; }
+      reg.addEventListener("updatefound", function(){
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", function(){ if (nw.state === "installed" && navigator.serviceWorker.controller) found(); });
+      });
+      reg.update().then(function(){
+        setTimeout(function(){ if (!settled){ settled = true; say(reg.waiting ? "" : "最新です（アプリ v" + APP_VERSION + "）。"); if (reg.waiting) found(); } }, 1500);
+      }).catch(function(){ if (!settled){ settled = true; say("更新の確認に失敗しました。通信環境を確認して再読み込みしてください。"); } });
+    }).catch(function(){ say("更新の確認に失敗しました。"); });
   };
   var rpBtn = el.querySelector("#reloadPricesBtn");
   if (rpBtn) rpBtn.onclick = function(){ loadPrices(); toast("終値データを再読み込みしました。"); };
@@ -1461,7 +1899,7 @@ function runSelfTests(){
   t("購入額変更時に全体の結果が更新される", r2.planCost !== r1.planCost && r2.rows[1].totalPrincipal !== r1.rows[1].totalPrincipal, "第1段階の予算を変更すると計画購入総額と建玉総額が変化");
   /* 3 複数銘柄の合算 */
   var s3 = sampleState();
-  s3.instruments.push({ id: "t2", code: "7203", name: "テスト株", type: "stock", acquiredPrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "t2s", dropPct: 10, budget: 90000, enabled: true }] });
+  s3.instruments.push({ id: "t2", code: "7203", name: "テスト株", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "t2s", dropPct: 10, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] });
   var r3 = MarginSim.simulate(s3);
   var row10 = r3.rows.filter(function(r){ return r.drop === 10; })[0];
   t("複数銘柄の建玉が正しく合算される", row10 && row10.totalPrincipal === 64800 + r3.stageRes["t2s"].cost + (r1.rows.filter(function(r){ return r.drop === 10; })[0].newPrincipal), "−10%時点の建玉総額＝既存＋銘柄A計画＋銘柄B計画");
@@ -1473,9 +1911,9 @@ function runSelfTests(){
   t("建玉ゼロでゼロ除算しない", r5.current.rate === null && r5.rows.every(function(r){ return r.rate === null; }), "建代金0のとき維持率は null（画面表示は「対象外」）で NaN にならない");
   /* 6 数量の売買単位 */
   var okUnit = true, okBudget = true;
-  Object.keys(r1.stageRes).forEach(function(k){ var rr = r1.stageRes[k]; if (rr.qty % 10 !== 0) okUnit = false; });
+  Object.keys(r1.stageRes).forEach(function(k){ var rr = r1.stageRes[k]; if (rr.qty % s1.instruments[0].unit !== 0) okUnit = false; });
   s1.instruments[0].stages.forEach(function(sg){ var rr = r1.stageRes[sg.id]; if (rr.cost > sg.budget) okBudget = false; });
-  t("購入数量が売買単位に適合し予算を超えない", okUnit && okBudget, "全段階で数量は売買単位10の倍数、実購入額は予算以下");
+  t("購入数量が売買単位に適合し予算を超えない", okUnit && okBudget, "全段階で数量は売買単位（サンプル1308は1口）の倍数、実購入額は予算以下");
   /* 7 保証金不足 */
   var s7 = sampleState(); s7.account.collateral = 1000; s7.account.cash = 0;
   var r7 = MarginSim.simulate(s7);
@@ -1484,13 +1922,13 @@ function runSelfTests(){
   var roundtrip = sanitizeState(JSON.parse(JSON.stringify(state)));
   t("保存・復元で数値が変化しない", JSON.stringify(roundtrip) === JSON.stringify(sanitizeState(state)), "JSON化→検証付き復元で全数値が一致");
   /* 9 不正入力の除去 */
-  var dirty = sampleState(); dirty.instruments[0].stages[0].budget = "abc"; dirty.instruments[0].acquiredPrice = -500; dirty.settings.maxDrop = 9999;
+  var dirty = sampleState(); dirty.instruments[0].stages[0].budget = "abc"; dirty.instruments[0].planBasePrice = -500; dirty.settings.maxDrop = 9999;
   var clean9 = sanitizeState(dirty);
-  t("不正な入力値が計算に混入しない", clean9.instruments[0].stages[0].budget === 0 && clean9.instruments[0].acquiredPrice === 0 && clean9.settings.maxDrop === 100, "文字列・負数・範囲外の値を検証で除去／丸め");
+  t("不正な入力値が計算に混入しない", clean9.instruments[0].stages[0].budget === 0 && clean9.instruments[0].planBasePrice === 0 && clean9.settings.maxDrop === 100, "文字列・負数・範囲外の値を検証で除去／丸め");
   /* 10 手計算との一致 */
   var s10 = { version: 1, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 1000000, collateralBasis: "after", cash: 0, brokerRate: null }, positions: [],
-    instruments: [{ id: "h1", code: "9999", name: "手計算", type: "stock", acquiredPrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "h1s", dropPct: 10, budget: 90000, enabled: true }] }],
+    instruments: [{ id: "h1", code: "9999", name: "手計算", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "h1s", dropPct: 10, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] }],
     settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5, collateralMode: "same", collateralCustom: 100, includeProfit: true, fees: 0 } };
   var r10 = MarginSim.simulate(s10);
   var stg = r10.stageRes["h1s"];
@@ -1512,15 +1950,15 @@ function runSelfTests(){
     stocks: { "200A": { name: "テストETF", type: "ETF", unit: 1, close: 3081, closeDate: "2026-11-16" }, "BAD": { close: -5, closeDate: "2026-11-16" }, "NODATE": { close: 100, closeDate: "" } },
     indices: { "TOPIX": { latestClose: 3100, latestDate: "2026-11-16", history: { "2026-11-13": 3000, "2026-11-16": 3100 } } } });
   t("終値データ（prices.json）を検証して取り込む", !!feed13 && !!feed13.stocks["200A"] && !feed13.stocks["BAD"] && !feed13.stocks["NODATE"] && feed13.indices["TOPIX"].latestClose === 3100, "正常な銘柄・指数だけを取り込み、価格不正・日付なしの項目は除外する");
-  /* 14 取得価格と最新終値の騰落率 */
+  /* 14 計画基準価格と最新終値の騰落率 */
   var chg14 = changePct(5500, 3081);
-  t("取得価格と最新終値から騰落率を計算する", chg14 !== null && Math.abs(chg14 - (-43.9818)) < 0.001 && changePct(0, 100) === null && changePct(100, null) === null, "取得価格5,500円・終値3,081円 → −43.98%。取得価格未設定・終値未取得では計算しない");
+  t("計画基準価格と最新終値から騰落率を計算する", chg14 !== null && Math.abs(chg14 - (-43.9818)) < 0.001 && changePct(0, 100) === null && changePct(100, null) === null, "計画基準価格5,500円・終値3,081円 → −43.98%。計画基準価格未設定・終値未取得では計算しない");
   /* 15 旧形式（基準価格・現在価格）からの移行 */
   var old15 = sampleState();
   old15.instruments[0].basePrice = 5500; old15.instruments[0].currentPrice = 3500;
-  delete old15.instruments[0].acquiredPrice; delete old15.instruments[0].closePrice;
+  delete old15.instruments[0].planBasePrice; delete old15.instruments[0].closePrice;
   var mig15 = sanitizeState(old15);
-  t("旧形式データを新しい価格形式へ移行する", mig15.instruments[0].acquiredPrice === 5500 && mig15.instruments[0].closePrice === 3500, "旧「基準価格」は取得価格へ、旧「現在価格」は最新終値へ引き継ぐ");
+  t("旧形式データを新しい価格形式へ移行する", mig15.instruments[0].planBasePrice === 5500 && mig15.instruments[0].closePrice === 3500, "旧「基準価格」は計画基準価格へ、旧「現在価格」は最新終値へ引き継ぐ（下落率の起点は変わらない）");
   /* 16 参考指数の基準日終値の解決 */
   var base16 = PriceFeed.indexCloseOn(feed13, "TOPIX", "2026-11-15");
   var exact16 = PriceFeed.indexCloseOn(feed13, "TOPIX", "2026-11-13");
@@ -1545,6 +1983,149 @@ function runSelfTests(){
   pricesData = savedFeed18; pricesStatus = savedStatus18;
   t("コード入力中のヒントが正規化したコードで照合される", hint18a.indexOf("登録あり") >= 0 && hint18a.indexOf("8,392円") >= 0 && hint18b.indexOf("未登録") >= 0 && hint18c.indexOf("未登録") >= 0,
     "小文字・空白つきで入力しても「登録あり」と表示され、未登録コードは「未登録」と表示される（取得ボタンを押す前でも正しく判定）。1346はテスト用フィードに無いため未登録になるのが正しい");
+  /* 19 形式v2（取得価格）からv3（計画基準価格）への移行でデータを失わない */
+  var v2data = sampleState();
+  v2data.instruments[0].acquiredPrice = 5500;
+  delete v2data.instruments[0].planBasePrice; delete v2data.instruments[0].holding;
+  v2data.instruments[0].stages.forEach(function(sg){ delete sg.executed; delete sg.execPrice; delete sg.execQty; delete sg.execAmount; delete sg.reflected; });
+  var mig19 = unpackState({ app: "margin-nanpin-planner", version: 2, data: v2data });
+  t("形式v2の保存データをv3へ移行して読み込める", mig19.ok && mig19.state.instruments[0].planBasePrice === 5500
+    && mig19.state.instruments[0].holding.qty === 0 && mig19.state.instruments[0].stages.every(function(sg){ return sg.executed === false && sg.execAmount === null; }),
+    "v2の「取得価格」5500円は計画基準価格として引き継がれ、保有は空・段階は未実行で補完される（ユーザーデータは失われない）");
+  /* 20 銘柄別保有：建代金・評価損益・評価損益率の自動計算と現在値への合算 */
+  var s20 = sampleState(); s20.positions = [];
+  s20.instruments[0].planBasePrice = 3000; s20.instruments[0].closePrice = 2000; s20.instruments[0].stages = [];
+  s20.instruments[0].holding = { qty: 100, avgPrice: 2500, side: "buy" };
+  var r20 = MarginSim.simulate(s20);
+  var hp20 = MarginSim.holdingPnlNow(s20.instruments[0]);
+  t("銘柄別保有の建代金と評価損益を自動計算する", MarginSim.holdingPrincipal(s20.instruments[0]) === 250000 && hp20.pnl === -50000
+    && r20.current.principal === 250000 && r20.current.pnl === -50000 && Math.abs((hp20.pnl / 250000) * 100 - (-20)) < 1e-9,
+    "保有100口・平均建値2,500円・終値2,000円 → 建代金250,000円・評価損益−50,000円（−20%）が現在値に合算される");
+  /* 21 実行済み段階は将来シミュレーションで再購入しない */
+  var s21 = sampleState();
+  var stg21id = s21.instruments[0].stages[0].id;
+  s21.instruments[0].stages[0].executed = true;
+  var r21 = MarginSim.simulate(s21);
+  var cost21before = r21.stageRes[stg21id].cost;
+  s21.instruments[0].stages[0].execAmount = cost21before;
+  var row21 = r21.rows.filter(function(r){ return r.drop === 5; })[0];
+  t("実行済み段階がシミュレーションから除外される", r21.planBudget === 4500000 - 100000 && r21.planCost === r1.planCost - cost21before
+    && row21.newPrincipal === 0 && r21.stageRes[stg21id].executed === true,
+    "−5%段階を実行済みにすると、未実行の予算合計は4,400,000円になり、−5%時点の累計購入額にその段階は含まれない");
+  /* 22 現在価格が段階を通過しているかの判定（自動で実行済みにしないための表示用） */
+  var ins22 = { planBasePrice: 5500, closePrice: 3081 };
+  var passed22a = stagePassed(ins22, { dropPct: 40, executed: false });
+  var passed22b = stagePassed(ins22, { dropPct: 50, executed: false });
+  var passed22c = stagePassed(ins22, { dropPct: 40, executed: true });
+  var passed22d = stagePassed({ planBasePrice: 5500, closePrice: null }, { dropPct: 40, executed: false });
+  t("現在価格が未実行段階を通過しているか判定できる", passed22a === true && passed22b === false && passed22c === false && passed22d === false,
+    "計画基準5,500円・終値3,081円では想定価格3,300円の−40%段階は通過済み、2,750円の−50%段階は未通過。実行済み段階と終値未取得では判定しない");
+  /* 23 実行実績の保有への反映（加重平均・区分違いは混ぜない） */
+  var mg23 = mergeHolding({ qty: 100, avgPrice: 2000, side: "buy" }, "buy", 100, 3000);
+  var mg23ng = mergeHolding({ qty: 100, avgPrice: 2000, side: "sell" }, "buy", 100, 3000);
+  t("実行実績を保有へ反映すると平均建値が加重平均になる", !!mg23 && mg23.qty === 200 && mg23.avgPrice === 2500 && mg23ng === null,
+    "100口@2,000円の保有に100口@3,000円を反映 → 200口・平均建値2,500円。売建の保有には買いの実績を混ぜない");
+  /* 24 実行済み実績と保有の二重計上をしない */
+  var s24 = sampleState();
+  s24.instruments[0].stages[0].executed = true; s24.instruments[0].stages[0].reflected = true;
+  s24.instruments[0].holding = { qty: 35, avgPrice: 2850, side: "buy" };
+  var r24 = MarginSim.simulate(s24);
+  var row24 = r24.rows.filter(function(r){ return r.drop === 5; })[0];
+  t("実行済み段階と保有建玉が二重計上されない", row24.newPrincipal === 0 && row24.holdingsPrincipal === 35 * 2850
+    && row24.totalPrincipal === 64800 + 35 * 2850,
+    "−5%時点の建玉総額は既存建玉64,800円＋保有（35口×2,850円）のみで、実行済み段階の購入額は加算されない");
+  /* 25 評価益は維持率へ算入しない（SBI証券公式ルール）／評価損は算入する */
+  var s25 = sampleState(); s25.instruments[0].stages = []; s25.instruments[0].holding = { qty: 0, avgPrice: 0, side: "buy" };
+  s25.account.collateral = 500000; s25.account.cash = 0;
+  s25.positions = [{ id: "p25", code: "", name: "評価益テスト", side: "buy", principal: 100000, pnl: 50000 }];
+  var r25gain = MarginSim.simulate(s25);
+  s25.positions = [{ id: "p25", code: "", name: "評価損テスト", side: "buy", principal: 100000, pnl: -50000 }];
+  var r25loss = MarginSim.simulate(s25);
+  t("評価益は維持率へ算入されず、評価損は算入される（SBI公式ルール）", r25gain.current.balance === 500000 && Math.abs(r25gain.current.rate - 500) < 1e-9
+    && r25loss.current.balance === 450000 && Math.abs(r25loss.current.rate - 450) < 1e-9,
+    "評価益+50,000円では実質保証金は500,000円のまま（維持率500%）。評価損−50,000円では450,000円（維持率450%）に下がる");
+  /* 26 到達下落率の精緻化（0.1%精度・購入段階の直前/直後を評価） */
+  var s26 = { version: 3, meta: { isSample: false, updatedAt: "" },
+    account: { broker: "", collateral: 1000000, collateralBasis: "after", cash: 0, brokerRate: null }, positions: [],
+    instruments: [{ id: "h26", code: "9998", name: "精緻化テスト", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [{ id: "h26s", dropPct: 10, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] }],
+    settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 100, step: 5, collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000 } };
+  var r26 = MarginSim.simulate(s26);
+  var s26b = JSON.parse(JSON.stringify(s26));
+  s26b.account.collateral = 200000;
+  s26b.positions = [{ id: "p26", code: "", name: "既存", side: "buy", principal: 100000, pnl: 0 }];
+  s26b.settings.management = 100; s26b.settings.maxDrop = 80;
+  var r26b = MarginSim.simulate(sanitizeState(s26b));
+  t("到達下落率を0.1%精度で算出し、段階の直前・直後も評価する", r26.firstMgmtPrecise === 89.8 && r26.firstCallPrecise === 90.2 && r26b.firstMgmtPrecise === 10,
+    "手計算ケースでは管理基準到達 −89.8%・追証基準到達 −90.2%（5%刻みの表では得られない精度）。段階購入で維持率が不連続に落ちるケースでは、トリガー −10% ちょうどを到達点として検出する");
+  /* 27 最低保証金額のチェック（現在値・各行・閾値変更） */
+  var s27 = sampleState(); s27.instruments[0].stages = []; s27.instruments[0].holding = { qty: 0, avgPrice: 0, side: "buy" };
+  s27.account.collateral = 200000; s27.account.cash = 0;
+  s27.positions = [{ id: "p27", code: "", name: "最低保証金テスト", side: "buy", principal: 10000, pnl: 0 }];
+  var r27 = MarginSim.simulate(s27);
+  var s27b = JSON.parse(JSON.stringify(s27)); s27b.settings.minMargin = 100000;
+  var r27b = MarginSim.simulate(sanitizeState(s27b));
+  t("実質保証金が最低保証金額を下回ると警告対象になる", r27.current.balance === 200000 && r27.current.belowMinMargin === true
+    && r27.rows[0].belowMinMargin === true && r27.firstMinMarginPrecise === 0 && r27b.current.belowMinMargin === false,
+    "実質保証金200,000円は初期値300,000円を下回るため現在値・各行とも未達。閾値を100,000円に変更すると未達ではなくなる");
+  /* 28 購入不能の段階で止めた場合の補助指標 */
+  var s28 = sampleState(); s28.account.collateral = 1000; s28.account.cash = 0;
+  var r28 = MarginSim.simulate(s28);
+  t("購入可能な段階までで止めた場合の最終維持率を補助指標として出す", !!r28.firstInfeasible && r28.firstInfeasible.drop === 5
+    && r28.finalPrincipalStopped === 64800 && r28.finalRateStopped !== null && r28.finalRateAll !== null,
+    "担保極小では最初の −5% 段階から新規建て条件を満たさず、購入を止めた場合の建玉総額は既存建玉64,800円のみ。本体（購入可能な段階をすべて実行）の最終維持率とは区別して保持する");
+  /* 29 旧データの includeProfit=true はSBIルールへ移行し、minMargin は初期値で補完される */
+  var old29 = sampleState(); old29.settings.includeProfit = true; delete old29.settings.minMargin;
+  var mig29 = sanitizeState(old29);
+  t("旧設定をSBIルールと最低保証金の初期値へ移行する", mig29.settings.includeProfit === false && mig29.settings.minMargin === 300000,
+    "旧形式の「評価益も算入する」設定は引き継がず、最低保証金額は初期値300,000円で補完される");
+  /* 30 購入計画の一括生成：段階の並び・予算合計・配分方式の傾向 */
+  var bulk30eq = generateBulkStages({ total: 4500000, start: 5, end: 65, step: 5, mode: "equal" });
+  var bulk30deep = generateBulkStages({ total: 1000000, start: 5, end: 25, step: 5, mode: "deeper" });
+  var bulk30shal = generateBulkStages({ total: 1000000, start: 5, end: 25, step: 5, mode: "shallower" });
+  function sum30(a){ return a.reduce(function(s, r){ return s + r.budget; }, 0); }
+  var mono30deep = bulk30deep.every(function(r, i){ return i === 0 || r.budget >= bulk30deep[i - 1].budget; });
+  var mono30shal = bulk30shal.every(function(r, i){ return i === 0 || r.budget <= bulk30shal[i - 1].budget; });
+  t("購入計画を一括生成でき、予算合計が総予算を超えない", bulk30eq.length === 13 && bulk30eq[0].dropPct === 5 && bulk30eq[12].dropPct === 65
+    && sum30(bulk30eq) <= 4500000 && sum30(bulk30eq) > 4500000 - 1300 && sum30(bulk30deep) <= 1000000 && sum30(bulk30shal) <= 1000000 && mono30deep && mono30shal,
+    "均等配分では−5%〜−65%の13段階が生成され予算合計は総予算以内。「深いほど増やす」では予算が単調増加、「浅い段階で多く」では単調減少になる");
+  /* 31 prices.json v2形式の信頼性情報を取り込む */
+  var feed31 = PriceFeed.sanitize({ version: 2, generatedAt: "2026-11-17T07:05:00+09:00", source: "test",
+    stocks: { "285A": { name: "テスト株", type: "stock", unit: 100, close: 2797, closeDate: "2026-11-16", stale: true, recentSplits: [{ date: "2026-09-29", ratio: "3:1" }, { date: "bad", ratio: "2:1" }] } },
+    indices: { "TOPIX": { latestClose: 1000, latestDate: "2026-11-16", history: { "2026-11-16": 1000 }, dataQuality: "provisional", anomalies: [{ date: "2026-03-30" }, { date: "2026-03-31" }], closeIsProxy: true },
+               "日経平均": { latestClose: 50000, latestDate: "2026-11-16", history: {}, dataQuality: "suspect", anomalies: 1, stale: true } } });
+  t("価格データv2の信頼性情報（品質・異常値・分割・前回データ・代替値）を取り込む", !!feed31 && feed31.generatedAt === "2026-11-17T07:05:00+09:00"
+    && feed31.stocks["285A"].stale === true && feed31.stocks["285A"].recentSplits.length === 1 && feed31.stocks["285A"].recentSplits[0].ratio === "3:1"
+    && feed31.indices["TOPIX"].dataQuality === "provisional" && feed31.indices["TOPIX"].anomalyCount === 2 && feed31.indices["TOPIX"].closeIsProxy === true
+    && feed31.indices["日経平均"].dataQuality === "suspect" && feed31.indices["日経平均"].anomalyCount === 1 && feed31.indices["日経平均"].stale === true
+    && indexQualityNotes(feed31.indices["TOPIX"], "TOPIX").indexOf("暫定データ") >= 0 && indexQualityNotes(feed31.indices["TOPIX"], "TOPIX").indexOf("1306") >= 0
+    && indexQualityNotes(feed31.indices["日経平均"], "日経平均").indexOf("株式分割等") >= 0 && indexQualityNotes(feed31.indices["日経平均"], "日経平均").indexOf("前回データ") >= 0,
+    "generatedAt・dataQuality・異常値候補件数・stale・recentSplits・closeIsProxyを検証して取り込み、表示用の注記文（暫定／大きな変動／前回データ／TOPIX代替）も生成できる。不正な日付の分割情報は除外する");
+  /* 32 価格データの鮮度判定 */
+  var savedFeed32 = pricesData, savedStatus32 = pricesStatus;
+  var oldDate32 = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
+  pricesData = PriceFeed.sanitize({ version: 2, generatedAt: oldDate32, source: "test", stocks: { "1308": { name: "x", type: "ETF", unit: 1, close: 100, closeDate: "2026-11-16" } }, indices: {} });
+  pricesStatus = "ok";
+  var fresh32old = priceFreshness();
+  pricesData = PriceFeed.sanitize({ version: 2, generatedAt: new Date().toISOString(), source: "test", stocks: { "1308": { name: "x", type: "ETF", unit: 1, close: 100, closeDate: new Date().toISOString().slice(0, 10) } }, indices: {} });
+  var fresh32new = priceFreshness();
+  pricesData = savedFeed32; pricesStatus = savedStatus32;
+  t("価格データが古い場合に鮮度警告を出す", fresh32old.stale === true && fresh32old.reasons.length > 0 && fresh32new.stale === false,
+    "取得日時が2日以上前のデータは「古い可能性あり」と判定し、取得直後のデータは警告しない");
+  /* 33 手入力の終値は自動取得で上書きされない */
+  var savedState33 = state, savedFeed33 = pricesData, savedStatus33 = pricesStatus;
+  state = sampleState();
+  state.instruments[0].closePrice = 1234; state.instruments[0].closeDate = "2026-11-17"; state.instruments[0].closeSource = "manual";
+  pricesData = PriceFeed.sanitize({ version: 2, generatedAt: new Date().toISOString(), source: "test", stocks: { "1308": { name: "上場インデックスファンドTOPIX", type: "ETF", unit: 1, close: 4054, closeDate: "2026-11-16" } }, indices: {} });
+  pricesStatus = "ok";
+  applyPricesToState();
+  var manualKept33 = state.instruments[0].closePrice === 1234 && state.instruments[0].closeSource === "manual";
+  state.instruments[0].closeSource = "json";
+  applyPricesToState();
+  var autoApplied33 = state.instruments[0].closePrice === 4054;
+  state = savedState33; pricesData = savedFeed33; pricesStatus = savedStatus33;
+  sim = MarginSim.simulate(state);
+  t("手入力の終値は自動取得で上書きされず、自動取得に戻すと反映される", manualKept33 && autoApplied33,
+    "手入力（manual）の終値1234円は終値データの4054円で上書きされない。出典を自動取得に戻すと終値データの値が反映される");
   return T;
 }
 
