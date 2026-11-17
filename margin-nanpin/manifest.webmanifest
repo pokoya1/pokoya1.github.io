@@ -1,0 +1,31 @@
+{
+  "background_color": "#f2f5f7",
+  "description": "信用取引のナンピン購入計画と保証金維持率シミュレーション",
+  "display": "standalone",
+  "icons": [
+    {
+      "purpose": "any",
+      "sizes": "192x192",
+      "src": "icon-192.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
+      "sizes": "512x512",
+      "src": "icon-512.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "maskable",
+      "sizes": "512x512",
+      "src": "icon-512.png",
+      "type": "image/png"
+    }
+  ],
+  "lang": "ja",
+  "name": "信用ナンピン計画・リスク管理",
+  "scope": "./",
+  "short_name": "ナンピン計画",
+  "start_url": "./",
+  "theme_color": "#0d3b34"
+}
