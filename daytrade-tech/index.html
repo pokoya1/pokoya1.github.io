@@ -128,7 +128,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.2.1 ／ 工程2〜4</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.3 ／ 工程2〜4</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -169,7 +169,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全ルールON・ATR基準「現在足」で実行すると、正本（Node）の実測 <b>総数310件</b> と一致しなければなりません（「極値時点」では309件）。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全16ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 0.3／defs 0.2-draft）の実測 <b>総数855件</b> と一致しなければなりません（「極値時点」では854件）。純GBM seed 7 では、全16ルール有効・ATR基準「現在足」で <b>総数857件</b> です。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -254,11 +254,11 @@
         <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。照合は数値を有効数字10桁に丸めて行います。生成器の超越関数計算は実行環境（Node/ブラウザ）により相対1e-12程度の浮動小数点差を生じるためで、実際の判定データの乖離はそれより桁違いに大きく、検出には影響しません。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.2）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.3）</h3>
         <ul class="tight">
           <li>単体テスト：<b>21/21 合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）</b>。</li>
           <li>因果性テスト：4系列×12時点で prefix 実行と全データ実行を意味的に比較し、確定済みイベントの深い一致 8,039 件を確認。未来足の置換に対する不変性も合格。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数310件（現在足）／309件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも322件。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数855件（現在足）／854件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも857件。</li>
         </ul>
         <h3>統計監査（v0.1 バッチの再監査）</h3>
         <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
@@ -281,6 +281,14 @@
 
       <section aria-labelledby="h-report" class="report">
         <h2 id="h-report">実装・検証レポート（2026-11-18／v0.2.1更新）</h2>
+        <h3>v0.3 更新（2026-11-18、工程5-B-1）</h3>
+        <ul class="tight">
+          <li><b>検出器を 0.3 に更新し、ローソク足ルールをJSON定義（defs 0.2）駆動に移行</b>しました。</li>
+          <li><b>新規6ルールを追加し全16ルール化</b>：長い上ヒゲ、丸坊主、弱気包み足、はらみ足、金槌・首吊り線、明けの明星・宵の明星（窓なし型・独自）を追加しました。</li>
+          <li>イベントに <b>variant</b> と <b>coverage</b> を追加しました。</li>
+          <li>正本一致ハッシュ照合の期待値を <b>855／854／857／857件</b> と各ハッシュに更新しました。</li>
+          <li>既存10ルールのみでは旧版アンカー（310／309／322／322件）と旧ハッシュが完全一致することを互換確認済みです。</li>
+        </ul>
         <h3>v0.2 からの差分（v0.2.1）</h3>
         <ul class="tight">
           <li>ハッシュ照合の正規化に有効数字10桁の量子化を導入（実行環境由来の浮動小数点微差の吸収）。公開版で書き出された228件の全フィールド照合により、差異が実測値末尾桁のみであることを確認済み。Service Worker のキャッシュ名を technical-lab-v0.2.1 に変更しました（検出器バージョンは 0.2 のまま）。</li>
@@ -309,7 +317,7 @@
         </ul>
         <h3>検証結果（実測）</h3>
         <ul class="tight">
-          <li>組み込み検出器はNode正本 v0.2 と同一コードで、検証アンカー（拡張 seed 42・現在足：総数310件、包み足101・十字線86・下ヒゲ75・クロス強気18／弱気17・RSI買われすぎ5／売られすぎ4・赤三兵2・ダブルトップ1・ダブルボトム1）に一致します。v0.2 ではさらに、正規化イベント列の SHA-256 が4条件（拡張 seed 42／純GBM seed 7 × 現在足／極値時点）すべてで Node 正本と一致することを確認済みです。この画面のサマリーと検証節のハッシュチェックでも同じ照合ができます。</li>
+          <li>組み込み検出器はNode正本 v0.3 と同一コードで、検証アンカー（拡張モデル seed 42・全16ルール有効・ZigZag現在足方式：総数855件、十字線86・長い下ヒゲ75・長い上ヒゲ60・丸坊主115・強気包み足101・弱気包み足87・はらみ足188・金槌・首吊り線75・赤三兵2・明けの明星・宵の明星（窓なし型・独自）20・SMA強気クロス18・SMA弱気クロス17・RSI売られすぎ4・RSI買われすぎ5・ダブルトップ1・ダブルボトム1）に一致します。v0.3 ではさらに、正規化イベント列の SHA-256 が4条件（拡張 seed 42／純GBM seed 7 × 現在足／極値時点）すべてで Node 正本と一致することを確認済みです。この画面のサマリーと検証節のハッシュチェックでも同じ照合ができます。</li>
           <li>Node正本：単体テスト21/21合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）。因果性は4系列×12時点の意味的比較で確定済みイベントの深い一致 8,039 件を確認し、未来足の置換に対する不変性も合格。バッチは純GBM／拡張モデル各1000日を測定（要約表は上の節）。</li>
           <li>アプリ内チェック（再現性・入力不変）とハッシュチェックは上の節でその場で実行できます。</li>
         </ul>
@@ -329,7 +337,7 @@
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.2.1 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.3 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -382,6 +390,168 @@ function generate(seed=1, options={}) {
   return {seed,config:c,bars:bars.slice(-(c.history+66))};
 }
 
+/* ===== 正本コード2：テクニカル検出器 v0.3（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
+// Technical extraction engine (detector) v0.3
+// v0.3 changes (2026-11-18, Stage 5-B-1): the candle rules are JSON-driven —
+// metadata, parameters and lookback come from defs.generated.mjs (generated
+// one-directionally from defs/catalog.json, defs 0.2); JS keeps the math.
+// Six representative candle rules are added (long-upper-shadow, marubozu,
+// harami, bearish-engulfing, hammer-context, morning-evening-star-windowless).
+// Events gain top-level `variant` (null when the rule has no variants) and
+// `coverage` (evaluable scoring weight / planned scoring weight, section 13);
+// neither field is part of the v0.2 normalized hash field list, so the v0.2
+// canonical hashes remain comparable for the ten pre-existing rules.
+// New rules use critN/scoreOf2: pass=null and match=null mark data-unavailable
+// criteria, and the score renormalizes over evaluable criteria only.
+// The ten pre-existing rules keep their exact v0.2 behaviour (legacy scoring).
+// Technical extraction engine (detector) v0.2
+// Stages 2-3 of the daytrade-game technical plan: adapter, features, causal ZigZag,
+// rule registry and evaluation. Pure JS, no external libraries.
+// The detector NEVER receives generator internals (variance, jumps).
+// v0.2 changes (2026-11-18, per project doc section 08): ZigZag gains an optional
+// pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
+// events/bars carry extension metadata (category, family, timeframe, isSessionStart)
+// that no rule reads, so metadata never changes detection results.
+const DETECTOR_VERSION = '0.3';
+// GENERATED from defs/catalog.json by defs/build_detector_defs.py — do not edit by hand.
+// JSON is the source of truth for metadata, parameters and lookback of the
+// JSON-driven candle rules; JS remains the source of truth for the math.
+const DEFS_VERSION = '0.2-draft';
+const DEFS_DIGEST = 'cc85208d75ebe4b474ad0cd07e5dc0ae8169baa65e94c4f4fbce14594425ef5e';
+const DEFS = {
+ "doji": {
+  "catalogRuleId": "doji",
+  "name": "十字線",
+  "nameEn": "Doji",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.1,
+   "approxBodyRatioMax": 0.2
+  }
+ },
+ "long-lower-shadow": {
+  "catalogRuleId": "long-lower-shadow",
+  "name": "長い下ヒゲ",
+  "nameEn": "Long Lower Shadow",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "lowerVsBody": 2,
+   "lowerVsRange": 0.6,
+   "approxLowerVsBody": 1.5,
+   "approxLowerVsRange": 0.5
+  }
+ },
+ "long-upper-shadow": {
+  "catalogRuleId": "long-upper-shadow",
+  "name": "長い上ヒゲ",
+  "nameEn": "Long Upper Shadow",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "upperVsBody": 2,
+   "upperVsRange": 0.6,
+   "approxUpperVsBody": 1.5,
+   "approxUpperVsRange": 0.5
+  }
+ },
+ "marubozu": {
+  "catalogRuleId": "marubozu",
+  "name": "丸坊主",
+  "nameEn": "Marubozu",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMin": 0.9,
+   "approxBodyRatioMin": 0.8
+  }
+ },
+ "bullish-engulfing": {
+  "catalogRuleId": "engulfing",
+  "name": "強気包み足",
+  "nameEn": "Engulfing Pattern",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "approxCoverRatio": 0.8
+  }
+ },
+ "bearish-engulfing": {
+  "catalogRuleId": "engulfing",
+  "name": "弱気包み足",
+  "nameEn": "Engulfing Pattern",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "approxCoverRatio": 0.8
+  }
+ },
+ "harami": {
+  "catalogRuleId": "harami",
+  "name": "はらみ足",
+  "nameEn": "Harami",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "smallBodyRatioMax": 0.5
+  }
+ },
+ "hammer-context": {
+  "catalogRuleId": "hammer-context",
+  "name": "金槌・首吊り線",
+  "nameEn": "Hammer / Hanging Man",
+  "category": "candlestick",
+  "family": "context-single",
+  "lookback": 12,
+  "parameters": {
+   "lowerVsBody": 2,
+   "lowerVsRange": 0.6,
+   "approxLowerVsBody": 1.5,
+   "approxLowerVsRange": 0.5,
+   "contextBars": 10
+  }
+ },
+ "three-soldiers": {
+  "catalogRuleId": "three-soldiers",
+  "name": "赤三兵・三羽烏",
+  "nameEn": "Three White Soldiers / Three Black Crows",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 13,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "upperRatioMax": 0.25,
+   "contextBars": 10
+  }
+ },
+ "morning-evening-star-windowless": {
+  "catalogRuleId": "morning-evening-star-windowless",
+  "name": "明けの明星・宵の明星（窓なし型・独自）",
+  "nameEn": "Morning/Evening Star (Windowless)",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 13,
+  "parameters": {
+   "bigBodyRatioMin": 0.5,
+   "starBodyRatioMax": 0.3,
+   "penetrationMin": 0.5,
+   "approxPenetrationMin": 0.35,
+   "approxStarBodyRatioMax": 0.45,
+   "contextBars": 10
+  }
+ }
+};
+const TIMEFRAME = '5m';
+
+// ---------- Stage 2: input adapter & validation ----------
 function adaptBars(rawBars, meta = {}) {
   if (!Array.isArray(rawBars) || rawBars.length === 0) throw new Error('empty input');
   const volumeDeclaredOff = meta && meta.config && meta.config.volume === false;
@@ -393,10 +563,11 @@ function adaptBars(rawBars, meta = {}) {
       open: +b.open, high: +b.high, low: +b.low, close: +b.close,
       volume: volumeDeclaredOff ? null : (b.volume == null ? null : +b.volume),
       complete: b.complete !== false,
-      isSessionStart: false,
+      isSessionStart: false, // set below
     };
     return bar;
   });
+  // If every volume is 0 and no declaration exists, treat volume as missing (documented heuristic).
   let volumeMissing = volumeDeclaredOff;
   if (!volumeDeclaredOff && bars.every(b => b.volume === 0)) { bars.forEach(b => b.volume = null); volumeMissing = true; }
   const errors = [];
@@ -413,6 +584,9 @@ function adaptBars(rawBars, meta = {}) {
     }
   }
   if (errors.length) throw new Error('invalid bars: ' + errors.slice(0, 5).join('; '));
+  // Session boundary metadata (v0.2): first bar, a day change, or a minute
+  // regression marks a session start. No rule reads this; it is reserved for
+  // future gap/session-aware extensions and must not affect detection.
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i], p = bars[i - 1];
     b.isSessionStart = i === 0 || b.day !== p.day || (b.minute != null && p.minute != null && b.minute < p.minute);
@@ -420,6 +594,7 @@ function adaptBars(rawBars, meta = {}) {
   return { bars, volumeMissing };
 }
 
+// ---------- Stage 2: common features (all causal: index i uses bars <= i only) ----------
 function computeFeatures(bars) {
   const n = bars.length;
   const F = {
@@ -444,17 +619,20 @@ function computeFeatures(bars) {
     F.bodyRatio[i] = F.range[i] > 0 ? F.body[i] / F.range[i] : null;
     F.dir[i] = Math.sign(b.close - b.open);
     F.tr[i] = i === 0 ? F.range[i] : Math.max(F.range[i], Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close));
+    // ATR14 Wilder
     if (i === 13) { let s = 0; for (let k = 0; k <= 13; k++) s += F.tr[k]; atr = s / 14; }
     else if (i > 13) atr = (13 * atr + F.tr[i]) / 14;
     if (i >= 13) F.atr14[i] = atr;
     F.sma5[i] = sma(closes, i, 5);
     F.sma20[i] = sma(closes, i, 20);
+    // EMA (seeded by SMA)
     if (i === 11) ema12 = sma(closes, i, 12);
     else if (i > 11) ema12 = ema12 + (2 / 13) * (closes[i] - ema12);
     if (i >= 11) F.ema12[i] = ema12;
     if (i === 25) ema26 = sma(closes, i, 26);
     else if (i > 25) ema26 = ema26 + (2 / 27) * (closes[i] - ema26);
     if (i >= 25) F.ema26[i] = ema26;
+    // RSI14 Wilder
     if (i >= 1) {
       const d = closes[i] - closes[i - 1], g = Math.max(d, 0), l = Math.max(-d, 0);
       if (i === 14) { let sg = 0, sl = 0; for (let k = 1; k <= 14; k++) { const dd = closes[k] - closes[k - 1]; sg += Math.max(dd, 0); sl += Math.max(-dd, 0); } avgGain = sg / 14; avgLoss = sl / 14; }
@@ -463,7 +641,8 @@ function computeFeatures(bars) {
     }
     if (i >= 19) {
       const m = F.sma20[i]; let v = 0; for (let k = i - 19; k <= i; k++) v += (closes[k] - m) ** 2;
-      F.sd20[i] = Math.sqrt(v / 20);
+      F.sd20[i] = Math.sqrt(v / 20); // population SD
+      // linear regression slope over 20 closes (x = 0..19)
       let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = 20;
       for (let k = 0; k < p; k++) { const x = k, y = closes[i - p + 1 + k]; sx += x; sy += y; sxy += x * y; sxx += x * x; }
       F.slope20[i] = (p * sxy - sx * sy) / (p * sxx - sx * sx);
@@ -474,15 +653,31 @@ function computeFeatures(bars) {
   return F;
 }
 
+// ---------- Stage 2: causal ZigZag on closes ----------
+// A pivot is confirmed only when the close has reversed from the candidate extreme
+// by >= k * ATR. Two ATR reference modes (v0.2), both fully causal:
+//  - 'current' (default, v0.1 definition): ATR14 of the bar where the reversal is
+//    tested. Note: a pure ATR decline can shrink the threshold and confirm a pivot
+//    with little price movement (documented artefact; see test-detector).
+//  - 'pivot': ATR14 frozen at the bar where the standing candidate extreme was set;
+//    the frozen value updates ONLY when the candidate extreme updates. If the
+//    candidate was set before ATR14 existed (first 13 bars), the frozen value is
+//    adopted at the first bar where ATR14 becomes available while that candidate
+//    stands (initial-adoption rule). Equal prices never update a candidate
+//    (strict > / <), in both modes and both directions.
+// Scales k = 1/2/3 are computed independently. Missing ATR (null or 0) blocks
+// confirmation in both modes. Initial direction is 'undetermined' until the
+// first pivot confirms.
+// Returns { pivots: [{index, price, type:'high'|'low', confirmedIndex}], candidate: {index, price, type} | null }
 function zigzag(bars, F, k, atrMode = 'current') {
   const closes = bars.map(b => b.close);
   const pivots = [];
-  let mode = 'undetermined';
+  let mode = 'undetermined'; // 'seekHigh' | 'seekLow'
   let candHigh = { index: 0, price: closes[0], atr: null }, candLow = { index: 0, price: closes[0], atr: null };
   let candidate = null;
   const thr = (cand, atrNow) => {
     if (atrMode === 'pivot') {
-      if (cand.atr == null && atrNow != null) cand.atr = atrNow;
+      if (cand.atr == null && atrNow != null) cand.atr = atrNow; // initial adoption
       return cand.atr != null && cand.atr > 0 ? k * cand.atr : null;
     }
     return atrNow != null && atrNow > 0 ? k * atrNow : null;
@@ -513,11 +708,36 @@ function zigzag(bars, F, k, atrMode = 'current') {
   return { pivots, candidate };
 }
 
-const DETECTOR_VERSION = '0.2';
+// ---------- Stage 3: rule registry & evaluation ----------
+// A rule is an independent module: { id, version, name, category, family, lookback,
+// parameters, evaluate(ctx) -> events[] }. ctx = { bars, F, zigzags: {1,2,3} }.
+// Events: { eventId, ruleId, ruleVersion, state, score, direction, startIndex, endIndex,
+// detectedIndex, criteria: [{name, measured, threshold, pass, match, weight, mandatory}],
+// missingCriteria: [names], overlays: [], explanation, history: [{state, index}] }
+// state: confirmed | forming | approximate | observation | expired (pattern invalidation)
+// direction is the TRADITIONAL interpretation, not a prediction.
 const RULES = [];
 function registerRule(rule) { RULES.push(rule); return rule; }
+
 function crit(name, measured, threshold, pass, match, weight, mandatory) {
   return { name, measured, threshold, pass: !!pass, match: match == null ? (pass ? 1 : 0) : Math.max(0, Math.min(1, match)), weight, mandatory: !!mandatory };
+}
+// critN (v0.3, new rules): pass=null / match=null mean data-unavailable.
+// scoreOf2 renormalizes the score over evaluable criteria and reports coverage.
+function critN(name, measured, threshold, pass, match, weight, mandatory) {
+  return { name, measured, threshold, pass: pass == null ? null : !!pass, match: match == null ? null : Math.max(0, Math.min(1, match)), weight, mandatory: !!mandatory };
+}
+function scoreOf2(criteria) {
+  let tw = 0, ew = 0, s = 0;
+  for (const c of criteria) { tw += c.weight; if (c.match != null) { ew += c.weight; s += c.weight * c.match; } }
+  return { score: ew > 0 ? Math.round(100 * s / ew) : null, coverage: tw > 0 ? ew / tw : null };
+}
+// Factory for JSON-driven rules: metadata/parameters/lookback come from DEFS
+// (the JSON source of truth); the literal supplies only id, version, evaluate.
+function defRule(id, literal) {
+  const d = DEFS[id];
+  if (!d) throw new Error('missing DEFS entry: ' + id);
+  return { ...literal, id, name: d.name, category: d.category, family: d.family, lookback: d.lookback, parameters: d.parameters, catalogRuleId: d.catalogRuleId };
 }
 function scoreOf(criteria) {
   let sw = 0, s = 0; for (const c of criteria) { sw += c.weight; s += c.weight * c.match; }
@@ -526,7 +746,9 @@ function scoreOf(criteria) {
 function makeEvent(rule, o) {
   const missing = o.criteria.filter(c => c.mandatory && !c.pass).map(c => c.name);
   return {
-    eventId: `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version, category: rule.category, family: rule.family, timeframe: '5m',
+    eventId: o.variant ? `${rule.id}:${o.variant}@${o.startIndex}-${o.detectedIndex}` : `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version,
+    variant: o.variant ?? null, coverage: o.coverage === undefined ? 1 : o.coverage,
+    category: rule.category, family: rule.family, timeframe: TIMEFRAME,
     state: o.state, score: o.score, direction: o.direction ?? null,
     startIndex: o.startIndex, endIndex: o.endIndex, detectedIndex: o.detectedIndex,
     criteria: o.criteria, missingCriteria: missing, overlays: o.overlays ?? [],
@@ -536,9 +758,9 @@ function makeEvent(rule, o) {
 }
 const fmt = (x, d = 2) => x == null ? '—' : (+x).toFixed(d);
 
-registerRule({
-  id: 'doji', version: '0.1', name: '十字線', category: 'candlestick', family: 'single-bar', lookback: 1,
-  parameters: { bodyRatioMax: 0.1, approxBodyRatioMax: 0.2 },
+// 1. Doji
+registerRule(defRule('doji', {
+  id: 'doji', version: '0.1',
   evaluate(ctx) {
     const { bars, F } = ctx, ev = [], P = this.parameters;
     for (let i = 0; i < bars.length; i++) {
@@ -551,11 +773,11 @@ registerRule({
     }
     return ev;
   }
-});
+}));
 
-registerRule({
-  id: 'long-lower-shadow', version: '0.1', name: '長い下ヒゲ', category: 'candlestick', family: 'single-bar', lookback: 1,
-  parameters: { lowerVsBody: 2, lowerVsRange: 0.6, approxLowerVsBody: 1.5, approxLowerVsRange: 0.5 },
+// 2. Long lower shadow
+registerRule(defRule('long-lower-shadow', {
+  id: 'long-lower-shadow', version: '0.1',
   evaluate(ctx) {
     const { bars, F } = ctx, ev = [], P = this.parameters;
     for (let i = 0; i < bars.length; i++) {
@@ -569,11 +791,11 @@ registerRule({
     }
     return ev;
   }
-});
+}));
 
-registerRule({
-  id: 'bullish-engulfing', version: '0.1', name: '強気包み足', category: 'candlestick', family: 'two-bar', lookback: 2,
-  parameters: { approxCoverRatio: 0.8 },
+// 3. Bullish engulfing
+registerRule(defRule('bullish-engulfing', {
+  id: 'bullish-engulfing', version: '0.1',
   evaluate(ctx) {
     const { bars, F } = ctx, ev = [], P = this.parameters;
     for (let i = 1; i < bars.length; i++) {
@@ -593,11 +815,11 @@ registerRule({
     }
     return ev;
   }
-});
+}));
 
-registerRule({
-  id: 'three-soldiers', version: '0.1', name: '赤三兵', category: 'candlestick', family: 'three-bar', lookback: 13,
-  parameters: { bodyRatioMin: 0.5, upperRatioMax: 0.25, contextBars: 10 },
+// 4. Red three soldiers (three white soldiers)
+registerRule(defRule('three-soldiers', {
+  id: 'three-soldiers', version: '0.1',
   evaluate(ctx) {
     const { bars, F } = ctx, ev = [], P = this.parameters;
     for (let i = 2; i < bars.length; i++) {
@@ -607,6 +829,7 @@ registerRule({
       const openInPrevBody = j => bars[j].open >= Math.min(bars[j - 1].open, bars[j - 1].close) && bars[j].open <= Math.max(bars[j - 1].open, bars[j - 1].close);
       if (!(openInPrevBody(i - 1) && openInPrevBody(i))) continue;
       const brOK = idx.every(j => F.bodyRatio[j] >= P.bodyRatioMin), upOK = idx.every(j => F.upper[j] / F.range[j] <= P.upperRatioMax);
+      // preceding context (scored, not mandatory): downtrend/flat before the pattern
       let contextPass = null, slopePrev = null;
       if (i - 2 - P.contextBars >= 0) {
         const j0 = i - 2 - P.contextBars, j1 = i - 3;
@@ -620,13 +843,185 @@ registerRule({
                   crit('各上ヒゲ/値幅 ≤ 0.25', Math.max(...idx.map(j => F.upper[j] / F.range[j])), P.upperRatioMax, upOK, 1 - Math.max(...idx.map(j => F.upper[j] / F.range[j])), 1, true),
                   crit('前方の下落文脈（10本回帰傾き ≤ 0）', slopePrev, 0, contextPass === true, contextPass == null ? null : (contextPass ? 1 : 0), 1, false)];
       const shapeOK = brOK && upOK;
-      if (shapeOK && contextPass === true) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `3本連続陽線で終値が上昇し、前方の下落文脈も確認でき、赤三兵が成立。` }));
-      else if (shapeOK) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `形状は赤三兵だが、前方の下落文脈が${contextPass == null ? '判定不能（データ不足）' : '確認できない'}ため近似とする。` }));
+      if (shapeOK && contextPass === true) ev.push(makeEvent(this, { coverage: contextPass == null ? 5 / 6 : 1, state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `3本連続陽線で終値が上昇し、前方の下落文脈も確認でき、赤三兵が成立。` }));
+      else if (shapeOK) ev.push(makeEvent(this, { coverage: contextPass == null ? 5 / 6 : 1, state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `形状は赤三兵だが、前方の下落文脈が${contextPass == null ? '判定不能（データ不足）' : '確認できない'}ため近似とする。` }));
     }
     return ev;
   }
-});
+}));
 
+
+// 4b. Long upper shadow (v0.3, JSON-driven; mirror of long-lower-shadow)
+registerRule(defRule('long-upper-shadow', {
+  id: 'long-upper-shadow', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0) continue;
+      const up = F.upper[i], bo = F.body[i], ra = F.range[i];
+      const ratioBody = bo > 0 ? up / bo : (up > 0 ? Infinity : 0), ratioRange = up / ra;
+      const cs = [critN('上ヒゲ ≥ 実体×2', ratioBody === Infinity ? 99 : ratioBody, P.upperVsBody, ratioBody >= P.upperVsBody, Math.min(1, ratioBody / 3), 2, true),
+                  critN('上ヒゲ ≥ 値幅×0.6', ratioRange, P.upperVsRange, ratioRange >= P.upperVsRange, ratioRange, 2, true)];
+      const sc = scoreOf2(cs);
+      if (ratioBody >= P.upperVsBody && ratioRange >= P.upperVsRange) ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `上ヒゲ=${fmt(up)}円（実体の${fmt(ratioBody, 1)}倍、値幅の${fmt(ratioRange * 100, 0)}%）で長い上ヒゲが成立。伝統的には上値での売り圧力のサインと解釈される（予測ではない）。` }));
+      else if (ratioBody >= P.approxUpperVsBody && ratioRange >= P.approxUpperVsRange) ev.push(makeEvent(this, { state: 'approximate', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `上ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%で、長い上ヒゲに近似（成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4c. Marubozu (v0.3, JSON-driven; variant = direction of the bar)
+registerRule(defRule('marubozu', {
+  id: 'marubozu', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null || F.dir[i] === 0) continue;
+      const br = F.bodyRatio[i], variant = F.dir[i] > 0 ? 'bullish' : 'bearish';
+      const cs = [critN('値幅が正', F.range[i], '>0', true, 1, 1, true),
+                  critN('実体/値幅 ≥ 0.9', br, P.bodyRatioMin, br >= P.bodyRatioMin, br, 3, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br >= P.bodyRatioMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `実体/値幅=${fmt(br, 3)}（閾値0.9以上）で丸坊主（${variant === 'bullish' ? '陽線' : '陰線'}）が成立。ヒゲがほぼなく一方向への勢いを示す形状（予測ではない）。` }));
+      else if (br >= P.approxBodyRatioMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `実体/値幅=${fmt(br, 3)}で丸坊主に近似（成立閾値0.9は未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4d. Bearish engulfing (v0.3, JSON-driven; mirror of bullish-engulfing, catalog 'engulfing')
+registerRule(defRule('bearish-engulfing', {
+  id: 'bearish-engulfing', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      const p = bars[i - 1], c = bars[i];
+      if (!(F.dir[i - 1] > 0 && F.dir[i] < 0)) continue;
+      const prevBodyTop = p.close, prevBodyBot = p.open, prevBody = prevBodyTop - prevBodyBot;
+      if (prevBody <= 0) continue;
+      const coverTop = c.open - prevBodyTop, coverBot = prevBodyBot - c.close;
+      const coverRatio = Math.min(c.open, prevBodyTop) - Math.max(c.close, prevBodyBot);
+      const full = coverTop >= 0 && coverBot >= 0;
+      const cs = [critN('前足が陽線', F.dir[i - 1], 1, true, 1, 1, true),
+                  critN('当足が陰線', F.dir[i], -1, true, 1, 1, true),
+                  critN('実体が前実体を包含', Math.min(coverTop, coverBot), 0, full, full ? 1 : Math.max(0, coverRatio / prevBody), 3, true)];
+      const sc = scoreOf2(cs);
+      if (full) ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陰線の実体（${fmt(c.close)}〜${fmt(c.open)}円）が前陽線の実体（${fmt(prevBodyBot)}〜${fmt(prevBodyTop)}円）を包含し、弱気包み足が成立。` }));
+      else if (coverRatio / prevBody >= P.approxCoverRatio) ev.push(makeEvent(this, { state: 'approximate', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `実体の被覆率は${fmt(coverRatio / prevBody * 100, 0)}%で完全包含に届かず近似。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4e. Harami (v0.3, JSON-driven; containment is non-strict, current body strictly smaller;
+// opposite colour is typical and scored, never mandatory — section 16/17 decision)
+registerRule(defRule('harami', {
+  id: 'harami', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      const body1 = F.body[i - 1], body2 = F.body[i];
+      if (body1 <= 0 || body2 <= 0 || F.dir[i - 1] === 0) continue;
+      const p = bars[i - 1], c = bars[i];
+      const top1 = Math.max(p.open, p.close), bot1 = Math.min(p.open, p.close);
+      const top2 = Math.max(c.open, c.close), bot2 = Math.min(c.open, c.close);
+      const contained = bot2 >= bot1 && top2 <= top1;
+      const overlap = Math.max(0, Math.min(top1, top2) - Math.max(bot1, bot2));
+      const smaller = body2 < body1;
+      const opposite = F.dir[i] === -F.dir[i - 1];
+      const strong = body2 <= P.smallBodyRatioMax * body1;
+      const variant = F.dir[i - 1] < 0 ? 'bullish' : 'bearish';
+      const cs = [critN('当足実体が前足実体内に包含', overlap / body2, 1, contained, overlap / body2, 3, true),
+                  critN('当足実体 < 前足実体', body2 / body1, 1, smaller, 1 - Math.min(1, body2 / body1), 2, true),
+                  critN('当足が前足と逆方向（典型形）', F.dir[i], -F.dir[i - 1], opposite, opposite ? 1 : 0, 1, false),
+                  critN('当足実体 ≤ 前足実体の0.5倍（強い包含）', body2 / body1, P.smallBodyRatioMax, strong, strong ? 1 : 0, 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (contained && smaller) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `当足の実体（${fmt(bot2)}〜${fmt(top2)}円）が前足の実体（${fmt(bot1)}〜${fmt(top1)}円）の内側に収まり、はらみ足が成立（${variant === 'bullish' ? '前足が陰線の底型' : '前足が陽線の天井型'}）。` }));
+      else if (smaller && bot2 >= p.low && top2 <= p.high) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `当足実体は前足の値幅内にあるが実体の包含には届かず、はらみ足に近似。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4f. Hammer / hanging man (v0.3, JSON-driven; shape = long lower shadow, the prior
+// 10-bar close-regression slope is a mandatory context that selects the variant.
+// When the context cannot be judged (insufficient history) no event is emitted.)
+registerRule(defRule('hammer-context', {
+  id: 'hammer-context', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0) continue;
+      if (i - P.contextBars < 0) continue; // context unavailable -> no event (documented)
+      let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = P.contextBars;
+      for (let k = 0; k < p; k++) { const x = k, y = bars[i - p + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+      const slope = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+      const variant = slope <= 0 ? 'hammer' : 'hanging-man';
+      const lo = F.lower[i], bo = F.body[i], ra = F.range[i];
+      const ratioBody = bo > 0 ? lo / bo : (lo > 0 ? Infinity : 0), ratioRange = lo / ra;
+      const cs = [critN('下ヒゲ ≥ 実体×2', ratioBody === Infinity ? 99 : ratioBody, P.lowerVsBody, ratioBody >= P.lowerVsBody, Math.min(1, ratioBody / 3), 2, true),
+                  critN('下ヒゲ ≥ 値幅×0.6', ratioRange, P.lowerVsRange, ratioRange >= P.lowerVsRange, ratioRange, 2, true),
+                  critN('直前文脈（10本終値の回帰傾き）で金槌/首吊りを区別', slope, 0, true, 1, 1, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'hammer' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      const shapeFull = ratioBody >= P.lowerVsBody && ratioRange >= P.lowerVsRange;
+      const shapeApprox = ratioBody >= P.approxLowerVsBody && ratioRange >= P.approxLowerVsRange;
+      if (shapeFull) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `${variant === 'hammer' ? '下落・横ばい文脈（傾き' + fmt(slope, 2) + '）で金槌' : '上昇文脈（傾き' + fmt(slope, 2) + '）で首吊り線'}が成立。下ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%。伝統的解釈であり予測ではない。` }));
+      else if (shapeApprox) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `${variant === 'hammer' ? '金槌' : '首吊り線'}の形状に近似（下ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4g. Morning/evening star, windowless type (v0.3, JSON-driven, ORIGINAL definition —
+// not the traditional gap-based pattern; the name carries 窓なし型（独自）per section 16/18.
+// The star is identified by its close sitting outside the first bar's close, and the
+// third bar by its penetration into the first bar's body.)
+registerRule(defRule('morning-evening-star-windowless', {
+  id: 'morning-evening-star-windowless', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete && F.range[j] > 0 && F.bodyRatio[j] != null)) continue;
+      const d1 = F.dir[i - 2];
+      if (d1 === 0 || F.body[i - 2] <= 0) continue;
+      const morning = d1 < 0, variant = morning ? 'morning' : 'evening';
+      const dir3ok = morning ? F.dir[i] > 0 : F.dir[i] < 0;
+      const b1 = bars[i - 2], bs = bars[i - 1];
+      const pen = morning ? (bars[i].close - b1.close) / (b1.open - b1.close) : (b1.close - bars[i].close) / (b1.close - b1.open);
+      const starOutside = morning ? bs.close <= b1.close : bs.close >= b1.close;
+      const bigOk = F.bodyRatio[i - 2] >= P.bigBodyRatioMin;
+      const starOk = F.bodyRatio[i - 1] <= P.starBodyRatioMax;
+      const penOk = pen >= P.penetrationMin;
+      // preceding context (scored, not mandatory): trend in the first bar's direction
+      let contextPass = null, slopePrev = null;
+      if (i - 2 - P.contextBars >= 0) {
+        const j0 = i - 2 - P.contextBars, j1 = i - 3;
+        let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = j1 - j0 + 1;
+        for (let k = 0; k < p; k++) { const x = k, y = bars[j0 + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+        slopePrev = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+        contextPass = morning ? slopePrev <= 0 : slopePrev >= 0;
+      }
+      const cs = [critN('第1足が大実体（実体/値幅 ≥ 0.5）', F.bodyRatio[i - 2], P.bigBodyRatioMin, bigOk, F.bodyRatio[i - 2], 2, true),
+                  critN('第2足（星）が小幅（実体/値幅 ≤ 0.3）', F.bodyRatio[i - 1], P.starBodyRatioMax, starOk, 1 - F.bodyRatio[i - 1], 2, true),
+                  critN('星の終値が第1足終値の外側', bs.close, b1.close, starOutside, starOutside ? 1 : 0, 2, true),
+                  critN('第3足が逆方向', F.dir[i], morning ? 1 : -1, dir3ok, dir3ok ? 1 : 0, 1, true),
+                  critN('第3足が第1足実体へ50%以上切り込む', pen, P.penetrationMin, penOk, Math.max(0, Math.min(1, pen)), 3, true),
+                  critN('直前文脈（10本回帰傾き）', slopePrev, 0, contextPass, contextPass == null ? null : (contextPass ? 1 : 0), 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: morning ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs };
+      if (bigOk && starOk && starOutside && dir3ok && penOk) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `${morning ? '明けの明星' : '宵の明星'}（窓なし型・独自）が成立。第3足の切り込みは第1足実体の${fmt(pen * 100, 0)}%。窓を必須とする原型とは別の独自定義による成立であり、原型の成立ではない。` }));
+      else if (bigOk && starOutside && dir3ok && pen >= P.approxPenetrationMin && F.bodyRatio[i - 1] <= P.approxStarBodyRatioMax) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `${morning ? '明けの明星' : '宵の明星'}（窓なし型・独自）に近似（切り込み${fmt(pen * 100, 0)}%、星の実体/値幅=${fmt(F.bodyRatio[i - 1], 3)}）。独自定義の近似であり原型の成立ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// 5/6. SMA5/20 crosses
 function crossRule(id, name, bullish) {
   return {
     id, version: '0.1', name, category: 'trend', family: 'moving-average', lookback: 21, parameters: {},
@@ -650,6 +1045,7 @@ function crossRule(id, name, bullish) {
 registerRule(crossRule('sma-cross-bullish', 'SMA5/20 強気クロス', true));
 registerRule(crossRule('sma-cross-bearish', 'SMA5/20 弱気クロス', false));
 
+// 7/8. RSI14 threshold entries (with re-arm hysteresis)
 function rsiRule(id, name, oversold) {
   return {
     id, version: '0.1', name, category: 'oscillator', family: 'rsi', lookback: 15,
@@ -675,6 +1071,9 @@ function rsiRule(id, name, oversold) {
 registerRule(rsiRule('rsi-oversold', 'RSI14 売られすぎ進入', true));
 registerRule(rsiRule('rsi-overbought', 'RSI14 買われすぎ進入', false));
 
+// 9/10. Double top / double bottom (ZigZag pivots, default scale x2)
+// Prior-trend definition (formalised): the first pivot must be the extreme close of the
+// 20 bars up to and including itself (top: highest close; bottom: lowest close).
 function doubleRule(id, name, top) {
   return {
     id, version: '0.1', name, category: 'pattern', family: 'double', lookback: 90,
@@ -705,6 +1104,7 @@ function doubleRule(id, name, top) {
                     crit(top ? 'ネックライン終値下抜け' : 'ネックライン終値上抜け', null, mid.price, false, 0, 20, true)];
         const shapePass = cs[0].pass && cs[1].pass && cs[2].pass;
         if (!shapePass) continue;
+        // scan forward from p2.confirmedIndex for neckline break / invalidation (causal)
         const neck = mid.price, limit = Math.min(bars.length - 1, p2.confirmedIndex + P.expireBars);
         let outcome = null;
         for (let j = p2.confirmedIndex + 1; j <= limit; j++) {
@@ -728,6 +1128,10 @@ function doubleRule(id, name, top) {
 registerRule(doubleRule('double-top', 'ダブルトップ', true));
 registerRule(doubleRule('double-bottom', 'ダブルボトム', false));
 
+// ---------- runner ----------
+// options.enabled: array of rule ids (default: all). Disabled rules are NOT executed at all
+// (separation by on/off, per product decision 2026-11-18).
+// options.zigzagAtrMode: 'current' (default) | 'pivot' — see zigzag() notes.
 function runDetector(bars, options = {}) {
   const F = computeFeatures(bars);
   const atrMode = options.zigzagAtrMode === 'pivot' ? 'pivot' : 'current';
@@ -740,7 +1144,7 @@ function runDetector(bars, options = {}) {
     for (const e of rule.evaluate(ctx)) events.push(e);
   }
   events.sort((a, b) => a.detectedIndex - b.detectedIndex || a.ruleId.localeCompare(b.ruleId));
-  return { events, features: F, zigzags, zigzagAtrMode: atrMode };
+  return { events, features: F, zigzags, defs: { version: DEFS_VERSION, digest: DEFS_DIGEST } };
 }
 
 function quantize(v) {
@@ -759,7 +1163,7 @@ function normalizeEvents(events) {
   })));
 }
 function ruleCatalog() {
-  return RULES.map(r => ({ id: r.id, version: r.version, name: r.name, category: r.category, family: r.family, lookback: r.lookback, parameters: r.parameters }));
+  return RULES.map(r => ({ id: r.id, version: r.version, name: r.name, category: r.category, family: r.family, lookback: r.lookback, parameters: r.parameters, catalogRuleId: r.catalogRuleId ?? null }));
 }
 
 /* ===== UI層（検出器coreとは分離。ルール追加でここ以外は不変） ===== */
@@ -945,7 +1349,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数309件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数854件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -1044,8 +1448,8 @@ function renderDetail(e) {
     return esc(STATE_LABEL[h.state] || h.state) + '（' + (h.index + 1) + '本目' + (hb ? '・' + dayLabel(hb.day) + ' ' + timeLabel(hb.minute) : '') + '）';
   }).join(' → ');
   p.innerHTML =
-    '<h3 style="margin-top:0;">' + esc(ruleName(e.ruleId)) + ' <span class="badge b-' + esc(e.state) + '">' + esc(STATE_LABEL[e.state] || e.state) + '</span></h3>' +
-    '<p class="mono">検出時点：' + (b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : '') + '（' + (e.detectedIndex + 1) + '本目）／ 対象：' + (e.startIndex + 1) + '〜' + (e.endIndex + 1) + '本目 ／ 適合度：' + (e.score == null ? '評価不能' : e.score) + ' ／ 方向（伝統的解釈）：' + esc(e.direction || 'なし') + ' ／ ルール版：' + esc(e.ruleVersion) + ' ／ カテゴリ：' + esc(e.category || '') + ' ／ ファミリー：' + esc(e.family || '') + ' ／ 時間足：' + esc(e.timeframe || '') + '</p>' +
+    '<h3 style="margin-top:0;">' + esc(ruleName(e.ruleId)) + (e.variant ? '（' + esc(e.variant) + '）' : '') + ' <span class="badge b-' + esc(e.state) + '">' + esc(STATE_LABEL[e.state] || e.state) + '</span></h3>' +
+    '<p class="mono">検出時点：' + (b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : '') + '（' + (e.detectedIndex + 1) + '本目）／ 対象：' + (e.startIndex + 1) + '〜' + (e.endIndex + 1) + '本目 ／ 適合度：' + (e.score == null ? '評価不能' : e.score) + (e.coverage != null && e.coverage < 1 ? ' ／ coverage ' + fmtN(e.coverage, 2) : '') + ' ／ 方向（伝統的解釈）：' + esc(e.direction || 'なし') + ' ／ ルール版：' + esc(e.ruleVersion) + ' ／ カテゴリ：' + esc(e.category || '') + ' ／ ファミリー：' + esc(e.family || '') + ' ／ 時間足：' + esc(e.timeframe || '') + '</p>' +
     '<p>' + esc(e.explanation) + '</p>' +
     '<h3>未成立の必須条件</h3><p>' + miss + '</p>' +
     '<h3>条件の内訳</h3><div class="table-scroll"><table><thead><tr><th>条件</th><th class="num">実測値</th><th class="num">閾値</th><th>合否</th><th class="num">一致度</th><th class="num">重み</th><th>種別</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
@@ -1219,7 +1623,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.2.1', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.3', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -1259,10 +1663,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '8812720c0d09168a9bb2de9f2a24bd6fd92804e8d0e32a71c725f7952d0d29ce', expectedCount: 310 },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '545f200c4985a7b6a405befc9d135f06243ca07185a07b10b41e7ab0f39c265b', expectedCount: 309 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '15b2f8a4e4fe00c47d07b284369c5df098ea03b35461360525acf06197aa66d4', expectedCount: 322 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '6834d37f853a4da8ff8931cdb8c127c0349c7d65fcbe772d9e177baba718554a', expectedCount: 322 }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '955d7aae12a08d7c7e4e0947685c914af91b1e621ea88df60542f5a760abf9d0', expectedCount: 855 },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '7ab4d6838486d4ee86e14ea0b6fedb7cc9c9d2bc842888db29b5268dbe1d1a38', expectedCount: 854 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '2d950ffbc35a022828a2dec2e4a72af170f35fe4083ab05825f201ce5cbd75b9', expectedCount: 857 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '8cbe9f6c09cf9bb0979aa294adf5565b97dec6d6d4cca51ff63439a22dbdad60', expectedCount: 857 }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
@@ -1308,6 +1712,7 @@ function runHashCheck() {
       '<div class="table-scroll"><table><thead><tr><th>対象</th><th>ATR基準</th><th class="num">件数</th><th>計算ハッシュ（SHA-256）</th><th>Node正本ハッシュ</th><th>判定</th></tr></thead><tbody>' +
       rows.map(function (r) { return r.html; }).join('') + '</tbody></table></div>' +
       '<p>組み込みサンプルの照合結果：<b class="' + (allMatch ? 'pass' : 'fail') + '">' + (allMatch ? 'すべて一致' : '不一致があります（合わせ込みはせず、実際の値を表示しています）') + '</b></p>' +
+      '<p class="sub">定義版：defs ' + esc(DEFS_VERSION) + ' ／ digest：<span class="mono">' + esc(DEFS_DIGEST) + '</span></p>' +
       '<p class="sub">このチェックは画面のルールON/OFF・状態フィルタ・スライダー・ATR基準セレクタの状態には依存しません。検出器バージョン：' + esc(DETECTOR_VERSION) + '。</p>';
   }).catch(function (e) {
     box.innerHTML = '<p class="error">ハッシュチェックを実行できませんでした：' + esc(e.message) + '</p>';
