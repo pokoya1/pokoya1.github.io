@@ -128,7 +128,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.2 ／ 工程2〜4</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.2.1 ／ 工程2〜4</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -251,7 +251,7 @@
         <div class="row"><button id="btnRunChecks" class="primary">チェックを実行</button></div>
         <div id="checkResults"><p class="sub">現在のデータで、①同一入力の2回実行が完全一致すること、②検出の前後で入力データが不変であること、を確認します。</p></div>
         <h3>正本一致ハッシュチェック（その場で実行）</h3>
-        <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。</p>
+        <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。照合は数値を有効数字10桁に丸めて行います。生成器の超越関数計算は実行環境（Node/ブラウザ）により相対1e-12程度の浮動小数点差を生じるためで、実際の判定データの乖離はそれより桁違いに大きく、検出には影響しません。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
         <h3>Node正本の検証実績（静的記録・v0.2）</h3>
@@ -280,7 +280,11 @@
       </section>
 
       <section aria-labelledby="h-report" class="report">
-        <h2 id="h-report">実装・検証レポート（2026-11-18／v0.2更新）</h2>
+        <h2 id="h-report">実装・検証レポート（2026-11-18／v0.2.1更新）</h2>
+        <h3>v0.2 からの差分（v0.2.1）</h3>
+        <ul class="tight">
+          <li>ハッシュ照合の正規化に有効数字10桁の量子化を導入（実行環境由来の浮動小数点微差の吸収）。公開版で書き出された228件の全フィールド照合により、差異が実測値末尾桁のみであることを確認済み。Service Worker のキャッシュ名を technical-lab-v0.2.1 に変更しました（検出器バージョンは 0.2 のまま）。</li>
+        </ul>
         <h3>v0.1 からの差分（v0.2）</h3>
         <ul class="tight">
           <li><b>検出器を正本 v0.2 に一元化</b>：埋め込み検出器を正本 detector.mjs v0.2 と同一にしました（DETECTOR_VERSION = '0.2'）。イベントに category・family・timeframe（'5m'）のメタデータを追加し、入力アダプターはセッション開始フラグ（isSessionStart）を付与、特徴量にも同フラグを公開します（判定条件自体は変更していません）。</li>
@@ -325,7 +329,7 @@
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.2 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.2.1 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -739,8 +743,14 @@ function runDetector(bars, options = {}) {
   return { events, features: F, zigzags, zigzagAtrMode: atrMode };
 }
 
+function quantize(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? Number(v.toPrecision(10)) : v;
+  if (Array.isArray(v)) return v.map(quantize);
+  if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = quantize(v[k]); return o; }
+  return v;
+}
 function normalizeEvents(events) {
-  return JSON.stringify(events.map(e => ({
+  return JSON.stringify(events.map(e => quantize({
     eventId: e.eventId, ruleId: e.ruleId, ruleVersion: e.ruleVersion, category: e.category, family: e.family,
     timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction,
     startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex,
@@ -1209,7 +1219,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.2', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.2.1', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -1249,10 +1259,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '6d76942ee4846a72874ca74e59843672f3a552d341a1a389ec9481b83b4fd9f7', expectedCount: 310 },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '918515c686916a200f1e1fe0488960c3cfba9a8e25ca2b225d44476303a25eb5', expectedCount: 309 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: 'f2b272e1b67f2e11803d32345a05a59d5c5a7fa3f4cad7eec7929abdcaa83f77', expectedCount: 322 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '74d5c89edddff3ed90e868949ab07df90e552af97f5b52d64572fa060570c5da', expectedCount: 322 }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '8812720c0d09168a9bb2de9f2a24bd6fd92804e8d0e32a71c725f7952d0d29ce', expectedCount: 310 },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '545f200c4985a7b6a405befc9d135f06243ca07185a07b10b41e7ab0f39c265b', expectedCount: 309 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '15b2f8a4e4fe00c47d07b284369c5df098ea03b35461360525acf06197aa66d4', expectedCount: 322 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '6834d37f853a4da8ff8931cdb8c127c0349c7d65fcbe772d9e177baba718554a', expectedCount: 322 }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
