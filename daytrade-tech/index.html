@@ -128,7 +128,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.3 ／ 工程2〜4</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.4 ／ 工程2〜4</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -169,7 +169,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全16ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 0.3／defs 0.2-draft）の実測 <b>総数855件</b> と一致しなければなりません（「極値時点」では854件）。純GBM seed 7 では、全16ルール有効・ATR基準「現在足」で <b>総数857件</b> です。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全47ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 0.6／defs 0.5-draft）の実測 <b>総数2082件</b> と一致しなければなりません（「極値時点」では2081件）。純GBM seed 7 では、全47ルール有効・ATR基準「現在足」で <b>総数2036件</b> です。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -254,11 +254,12 @@
         <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。照合は数値を有効数字10桁に丸めて行います。生成器の超越関数計算は実行環境（Node/ブラウザ）により相対1e-12程度の浮動小数点差を生じるためで、実際の判定データの乖離はそれより桁違いに大きく、検出には影響しません。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.3）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.4）</h3>
         <ul class="tight">
-          <li>単体テスト：<b>21/21 合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）</b>。</li>
-          <li>因果性テスト：4系列×12時点で prefix 実行と全データ実行を意味的に比較し、確定済みイベントの深い一致 8,039 件を確認。未来足の置換に対する不変性も合格。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数855件（現在足）／854件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも857件。</li>
+          <li>単体テスト：基本21/21、5-B-1追加9/9、5-B-2試行10/10、5-B-2次バッチ12/12、5-B-2最終バッチ9/9（<b>全61件合格</b>）。</li>
+          <li>因果性テスト：<b>53,890件（全47ルール、prefix因果性の深い等価比較で全一致）</b>。未来足の置換に対する不変性も合格。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数2082件（現在足）／2081件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも2036件。</li>
+          <li>互換確認：旧版アンカーの再現として、旧10ルールで310／309／322／322件（v0.2）、既存16ルールで855／854／857／857件（v0.3）、既存25ルールで1337／1336／1383／1383件（v0.4）、既存39ルールで1947／1946／1898／1898件（v0.5）がそれぞれ完全一致。</li>
         </ul>
         <h3>統計監査（v0.1 バッチの再監査）</h3>
         <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
@@ -280,64 +281,13 @@
       </section>
 
       <section aria-labelledby="h-report" class="report">
-        <h2 id="h-report">実装・検証レポート（2026-11-18／v0.3更新）</h2>
-        <h3>v0.3 更新（2026-11-18、工程5-B-1）</h3>
-        <ul class="tight">
-          <li><b>検出器を 0.3 に更新し、ローソク足ルールをJSON定義（defs 0.2）駆動に移行</b>しました。</li>
-          <li><b>新規6ルールを追加し全16ルール化</b>：長い上ヒゲ、丸坊主、弱気包み足、はらみ足、金槌・首吊り線、明けの明星・宵の明星（窓なし型・独自）を追加しました。</li>
-          <li>イベントに <b>variant</b> と <b>coverage</b> を追加しました。</li>
-          <li>正本一致ハッシュ照合の期待値を <b>855／854／857／857件</b> と各ハッシュに更新しました。</li>
-          <li>既存10ルールのみでは旧版アンカー（310／309／322／322件）と旧ハッシュが完全一致することを互換確認済みです。</li>
-        </ul>
-        <h3>v0.2 からの差分（v0.2.1）</h3>
-        <ul class="tight">
-          <li>ハッシュ照合の正規化に有効数字10桁の量子化を導入（実行環境由来の浮動小数点微差の吸収）。公開版で書き出された228件の全フィールド照合により、差異が実測値末尾桁のみであることを確認済み。Service Worker のキャッシュ名を technical-lab-v0.2.1 に変更しました（検出器バージョンは 0.2 のまま）。</li>
-        </ul>
-        <h3>v0.1 からの差分（v0.2）</h3>
-        <ul class="tight">
-          <li><b>検出器を正本 v0.2 に一元化</b>：埋め込み検出器を正本 detector.mjs v0.2 と同一にしました（DETECTOR_VERSION = '0.2'）。イベントに category・family・timeframe（'5m'）のメタデータを追加し、入力アダプターはセッション開始フラグ（isSessionStart）を付与、特徴量にも同フラグを公開します（判定条件自体は変更していません）。</li>
-          <li><b>ZigZag ATR基準の両方式対応</b>：反転閾値のATRを「現在足」（既定・v0.1と同一挙動）と「極値時点（固定）」（候補の極値が設定された足のATRを固定し、極値更新時のみ更新。候補設定時にATRが無い場合は、その候補が立っている間にATRが利用可能になった最初の足で採用）から選べるようにしました。設定セレクタから切り替えでき、チャート描画とダブル系判定に反映します。</li>
-          <li><b>表示の一元化</b>：イベント詳細は正本が出力する criteria・missingCriteria・explanation・history・overlays をそのまま描画し、この画面で条件を再分解・再計算しません。v0.1 で画面独自だった強気包み足の5条件分解（重み4/4/2等）は解消し、正本の criteria 配列（3条件）をそのまま表示します。一覧・サマリー・描画（ネックライン、転換点）も正本の overlays を使用します。</li>
-          <li><b>ハッシュ検証の追加</b>：検証節に正本一致ハッシュチェックを追加しました。組み込みサンプルを全566本・全ルール有効・全量で実行した結果を正規化し SHA-256 で Node 正本と照合します（上の検証節でその場で実行できます）。</li>
-          <li><b>統計監査結果の反映</b>：v0.1 バッチの再監査結果（状態分離と集計単位の対応付けによる再計算）を検証節に反映しました。ダブルボトム等の v0.1 報告値は集計方法由来であり、成立イベントのみではゼロと整合します。</li>
-          <li>Service Worker のキャッシュ名を technical-lab-v0.2 に変更しました。価格生成器（組み込みサンプル生成を含む）には一切手を入れていません。</li>
-        </ul>
-        <h3>実装内容</h3>
-        <ul class="tight">
-          <li>工程2：入力アダプター（時刻順・有限値・正価格・OHLC関係・出来高を検証し、variance/jumps等の内部情報は型の段階で落とす。v0.2でセッション開始フラグ isSessionStart を追加）、共通数学部品（実体・ヒゲ・TR・ATR14＝Wilder平滑、SMA、EMA、RSI14、標準偏差、回帰傾き、最高・最安）、終値ベースの因果的ZigZag（尺度×1/×2/×3、反転閾値はATR×倍率。ATR基準は現在足／極値時点の両方式、確定点は不変、最後の点は候補のみ）。</li>
-          <li>工程3：ルール登録方式の共通判定機構。ルールは id・version・name・category・family・lookback・parameters・evaluate を持つ独立モジュールで、追加時にcoreの変更は不要。必須条件と加点条件を分け、加重平均で適合度（0〜100）を算出。状態は confirmed / forming / approximate / expired 等を区別し、パターンの終了時刻と検出可能時刻を分けています。</li>
-          <li>工程4：仮ルール10種（十字線、長い下ヒゲ、強気包み足、赤三兵、ダブルトップ、ダブルボトム、SMA5/20強気・弱気クロス、RSI14売られすぎ・買われすぎ進入）と、この実験室UI（読み込み、チャート、時点スライダー、ON/OFF、詳細、全件一覧、JSON/CSV出力）。</li>
-        </ul>
-        <h3>計画への改良として採用した点</h3>
-        <ul class="tight">
-          <li><b>懸念対策のマスタースイッチ</b>：検出器を内部モジュールとして分離し、接続/切断のON/OFFを付けました。OFFでは検出を実行せず、大量検出に埋もれず生チャートを観察できます。ルール別・カテゴリ別のON/OFFも「表示フィルタではなく実行の切替」として実装しています。</li>
-          <li>バッチ測定は生成条件を実験室と揃え、history=500 のウォームアップ付きで当日足のみ集計（Node正本で実施）。</li>
-          <li>ダブル系の「直前の上昇/下落」は「第1極値が直前20本の最高（最安）終値であること」と数式化し、加点条件として明示。ZigZagの閾値ATRは v0.1 では反転判定を行う現在の足の値で固定していましたが、v0.2 では極値時点方式と切替可能にし、既定は現在足のままにしました。ダブル系の既定尺度は×2。RSIは再発火ヒステリシス（売られすぎは35、買われすぎは65に戻るまで再発火しない）を明文化。</li>
-          <li>転換点の3尺度同時表示はせず、選択中の尺度だけを表示（既定×2）。</li>
-        </ul>
-        <h3>検証結果（実測）</h3>
-        <ul class="tight">
-          <li>組み込み検出器はNode正本 v0.3 と同一コードで、検証アンカー（拡張モデル seed 42・全16ルール有効・ZigZag現在足方式：総数855件、十字線86・長い下ヒゲ75・長い上ヒゲ60・丸坊主115・強気包み足101・弱気包み足87・はらみ足188・金槌・首吊り線75・赤三兵2・明けの明星・宵の明星（窓なし型・独自）20・SMA強気クロス18・SMA弱気クロス17・RSI売られすぎ4・RSI買われすぎ5・ダブルトップ1・ダブルボトム1）に一致します。v0.3 ではさらに、正規化イベント列の SHA-256 が4条件（拡張 seed 42／純GBM seed 7 × 現在足／極値時点）すべてで Node 正本と一致することを確認済みです。この画面のサマリーと検証節のハッシュチェックでも同じ照合ができます。</li>
-          <li>Node正本：単体テスト21/21合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）。因果性は4系列×12時点の意味的比較で確定済みイベントの深い一致 8,039 件を確認し、未来足の置換に対する不変性も合格。バッチは純GBM／拡張モデル各1000日を測定（要約表は上の節）。</li>
-          <li>アプリ内チェック（再現性・入力不変）とハッシュチェックは上の節でその場で実行できます。</li>
-        </ul>
-        <h3>問題点・未検証</h3>
-        <ul class="tight">
-          <li>ランダムウォーク相手では十字線・下ヒゲ・包み足が1日に合計約30件出ます（バッチ実測）。一覧は状態フィルタ既定（成立＋形成中）でも多く、ルールOFFやマスター切断で切り離せるようにしましたが、工程6の重複排除・頻度整理は未実施です。</li>
-          <li>ダブル系はZigZag尺度に強く依存します。尺度を変えると候補が大きく変わるため、較正は工程6の課題です。</li>
-          <li>検出後1/3/6足の条件付き収益率は、この画面では表示していません（バッチ側の観測項目として工程6で扱う想定）。v0.1 バッチの収益率報告には集計方法の問題があったことが再監査で判明したため、検証節の統計監査の記述に差し替えました。</li>
-          <li>未検証項目：ブラウザのコンソール出力、Service Workerの登録状態の直接確認、実機（スマホ）での表示は、環境制約により未確認の場合があります。Service Workerの登録状態と実機表示はビルド環境からは直接確認できない項目です。</li>
-        </ul>
-        <h3>アドバイス（次工程への提案）</h3>
-        <ul class="tight">
-          <li>工程5の180ルール着手前に、まず工程6側の「重複排除と頻度の物差し」を先に固めるのが安全です。ルールを増やすほどランダムデータでの誤検出も増えるためです。</li>
-          <li>反省ノート（工程7）では、適合度ではなく「独立した内容の数」で代表候補を選ぶ設計が既に計画にあるので、この実験室のイベントIDと状態遷移履歴をそのまま引き渡し形式に使うのがよいです。</li>
-          <li>マスタースイッチの考え方はゲーム統合（工程8）でも有効です。本番では「判定レイヤーを切って価格だけを眺める」デバッグ経路として残すことを勧めます。</li>
-        </ul>
+        <h2 id="h-report">実装・検証レポート</h2>
+        <p>現行版は <b>v0.4（検出器 0.6／defs 0.5／全47ルール）</b> です。</p>
+        <p>経緯・検証報告書はアイデアノートに集約しています：<a href="https://docs.google.com/document/d/1ORdhYxk0DAEL2z7uqryTE7IYHcGDCRSPiF7D61fZRmk/edit" target="_blank" rel="noopener">アイデアノート（Google ドキュメント）</a></p>
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.3 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.4 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -390,7 +340,7 @@ function generate(seed=1, options={}) {
   return {seed,config:c,bars:bars.slice(-(c.history+66))};
 }
 
-/* ===== 正本コード2：テクニカル検出器 v0.3（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
+/* ===== 正本コード2：テクニカル検出器 v0.6（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
 // Technical extraction engine (detector) v0.3
 // v0.3 changes (2026-11-18, Stage 5-B-1): the candle rules are JSON-driven —
 // metadata, parameters and lookback come from defs.generated.mjs (generated
@@ -412,12 +362,12 @@ function generate(seed=1, options={}) {
 // pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
 // events/bars carry extension metadata (category, family, timeframe, isSessionStart)
 // that no rule reads, so metadata never changes detection results.
-const DETECTOR_VERSION = '0.3';
+const DETECTOR_VERSION = '0.6';
 // GENERATED from defs/catalog.json by defs/build_detector_defs.py — do not edit by hand.
 // JSON is the source of truth for metadata, parameters and lookback of the
 // JSON-driven candle rules; JS remains the source of truth for the math.
-const DEFS_VERSION = '0.2-draft';
-const DEFS_DIGEST = 'cc85208d75ebe4b474ad0cd07e5dc0ae8169baa65e94c4f4fbce14594425ef5e';
+const DEFS_VERSION = '0.5-draft';
+const DEFS_DIGEST = '1658c629a6546e5b02683fcc2164830c314fa0a1c2978f11b8b81151fa597267';
 const DEFS = {
  "doji": {
   "catalogRuleId": "doji",
@@ -546,6 +496,393 @@ const DEFS = {
    "approxPenetrationMin": 0.35,
    "approxStarBodyRatioMax": 0.45,
    "contextBars": 10
+  }
+ },
+ "gravestone-doji": {
+  "catalogRuleId": "gravestone-doji",
+  "name": "上影十字線（墓石）",
+  "nameEn": "Gravestone Doji",
+  "category": "candlestick",
+  "family": "doji",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.1,
+   "approxBodyRatioMax": 0.2,
+   "upperRatioMin": 0.8,
+   "approxUpperRatioMin": 0.65,
+   "lowerRatioMax": 0.1,
+   "approxLowerRatioMax": 0.2
+  }
+ },
+ "dragonfly-doji": {
+  "catalogRuleId": "dragonfly-doji",
+  "name": "下影十字線（トンボ）",
+  "nameEn": "Dragonfly Doji",
+  "category": "candlestick",
+  "family": "doji",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.1,
+   "approxBodyRatioMax": 0.2,
+   "lowerRatioMin": 0.8,
+   "approxLowerRatioMin": 0.65,
+   "upperRatioMax": 0.1,
+   "approxUpperRatioMax": 0.2
+  }
+ },
+ "long-legged-doji": {
+  "catalogRuleId": "long-legged-doji",
+  "name": "長脚十字線",
+  "nameEn": "Long-legged Doji",
+  "category": "candlestick",
+  "family": "doji",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.1,
+   "approxBodyRatioMax": 0.2,
+   "legRatioMin": 0.3,
+   "approxLegRatioMin": 0.25
+  }
+ },
+ "spinning-top": {
+  "catalogRuleId": "spinning-top",
+  "name": "小幅線（コマ）",
+  "nameEn": "Spinning Top",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.35,
+   "approxBodyRatioMax": 0.45,
+   "shadowRatioMin": 0.15,
+   "approxShadowRatioMin": 0.1
+  }
+ },
+ "belt-hold": {
+  "catalogRuleId": "belt-hold",
+  "name": "寄せ切り線",
+  "nameEn": "Belt Hold",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMin": 0.7,
+   "approxBodyRatioMin": 0.6,
+   "approxOpenShadowRatioMax": 0.05
+  }
+ },
+ "harami-cross": {
+  "catalogRuleId": "harami-cross",
+  "name": "はらみ寄せ線",
+  "nameEn": "Harami Cross",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "dojiBodyRatioMax": 0.1,
+   "smallBodyRatioMax": 0.5
+  }
+ },
+ "shooting-star-context": {
+  "catalogRuleId": "shooting-star-context",
+  "name": "流れ星・逆金槌",
+  "nameEn": "Shooting Star / Inverted Hammer",
+  "category": "candlestick",
+  "family": "context-single",
+  "lookback": 12,
+  "parameters": {
+   "upperVsBody": 2,
+   "upperVsRange": 0.6,
+   "approxUpperVsBody": 1.5,
+   "approxUpperVsRange": 0.5,
+   "contextBars": 10
+  }
+ },
+ "piercing-line-windowless": {
+  "catalogRuleId": "piercing-line-windowless",
+  "name": "切り込み足（窓なし型・独自）",
+  "nameEn": "Piercing Pattern (Windowless)",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 12,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "penetrationMin": 0.5,
+   "approxPenetrationMin": 0.35,
+   "contextBars": 10
+  }
+ },
+ "dark-cloud-cover-windowless": {
+  "catalogRuleId": "dark-cloud-cover-windowless",
+  "name": "かぶせ線（窓なし型・独自）",
+  "nameEn": "Dark Cloud Cover (Windowless)",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 12,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "penetrationMin": 0.5,
+   "approxPenetrationMin": 0.35,
+   "contextBars": 10
+  }
+ },
+ "four-price-doji": {
+  "catalogRuleId": "four-price-doji",
+  "name": "四値同一十字線",
+  "nameEn": "Four Price Doji",
+  "category": "candlestick",
+  "family": "doji",
+  "lookback": 1,
+  "parameters": {}
+ },
+ "high-wave": {
+  "catalogRuleId": "high-wave",
+  "name": "寄せ線",
+  "nameEn": "High Wave Candle",
+  "category": "candlestick",
+  "family": "single-bar",
+  "lookback": 1,
+  "parameters": {
+   "bodyRatioMax": 0.4,
+   "approxBodyRatioMax": 0.5,
+   "legRatioMin": 0.3,
+   "approxLegRatioMin": 0.25
+  }
+ },
+ "tweezer": {
+  "catalogRuleId": "tweezer",
+  "name": "毛抜き（並び赤）",
+  "nameEn": "Tweezer Top / Bottom",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 15,
+  "parameters": {
+   "atrTolRatio": 0.1,
+   "approxAtrTolRatio": 0.25
+  }
+ },
+ "homing-pigeon": {
+  "catalogRuleId": "homing-pigeon",
+  "name": "帰り鳩",
+  "nameEn": "Homing Pigeon",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "smallBodyRatioMax": 0.5
+  }
+ },
+ "three-inside": {
+  "catalogRuleId": "three-inside",
+  "name": "はらみ三法",
+  "nameEn": "Three Inside Up / Down",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 3,
+  "parameters": {
+   "smallBodyRatioMax": 0.5
+  }
+ },
+ "three-outside": {
+  "catalogRuleId": "three-outside",
+  "name": "包み三法",
+  "nameEn": "Three Outside Up / Down",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 3,
+  "parameters": {
+   "approxCoverRatio": 0.8
+  }
+ },
+ "on-neck": {
+  "catalogRuleId": "on-neck",
+  "name": "首線乗り",
+  "nameEn": "On Neck Pattern",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 15,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "atrTolRatio": 0.1
+  }
+ },
+ "in-neck": {
+  "catalogRuleId": "in-neck",
+  "name": "入り首線",
+  "nameEn": "In Neck Pattern",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "penetrationMax": 0.25
+  }
+ },
+ "thrusting": {
+  "catalogRuleId": "thrusting",
+  "name": "突っ込み線",
+  "nameEn": "Thrusting Pattern",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "penetrationMin": 0.25,
+   "penetrationMax": 0.5
+  }
+ },
+ "counterattack": {
+  "catalogRuleId": "counterattack",
+  "name": "反撃線",
+  "nameEn": "Counterattack Lines",
+  "category": "candlestick",
+  "family": "equal-close",
+  "lookback": 15,
+  "parameters": {
+   "atrTolRatio": 0.1,
+   "approxAtrTolRatio": 0.25,
+   "bodyRatioMin": 0.5
+  }
+ },
+ "meeting-lines": {
+  "catalogRuleId": "meeting-lines",
+  "name": "出会い線",
+  "nameEn": "Meeting Lines",
+  "category": "candlestick",
+  "family": "equal-close",
+  "lookback": 15,
+  "parameters": {
+   "atrTolRatio": 0.1,
+   "approxAtrTolRatio": 0.25,
+   "bodyRatioMin": 0.5
+  }
+ },
+ "matching-low": {
+  "catalogRuleId": "matching-low",
+  "name": "同値安値",
+  "nameEn": "Matching Low",
+  "category": "candlestick",
+  "family": "equal-close",
+  "lookback": 15,
+  "parameters": {
+   "atrTolRatio": 0.1,
+   "approxAtrTolRatio": 0.25
+  }
+ },
+ "doji-star-windowless": {
+  "catalogRuleId": "doji-star-windowless",
+  "name": "寄せ十字星（窓なし型・独自）",
+  "nameEn": "Doji Star (Windowless)",
+  "category": "candlestick",
+  "family": "two-bar",
+  "lookback": 2,
+  "parameters": {
+   "bigBodyRatioMin": 0.5,
+   "starBodyRatioMax": 0.1,
+   "approxStarBodyRatioMax": 0.2
+  }
+ },
+ "three-methods": {
+  "catalogRuleId": "three-methods",
+  "name": "上げ三法・下げ三法",
+  "nameEn": "Rising / Falling Three Methods",
+  "category": "candlestick",
+  "family": "multi-bar",
+  "lookback": 5,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "middleBodyRatioMax": 0.5
+  }
+ },
+ "advance-block": {
+  "catalogRuleId": "advance-block",
+  "name": "先行ブロック",
+  "nameEn": "Advance Block",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 3,
+  "parameters": {
+   "upperRatioMin": 0.25
+  }
+ },
+ "stalled": {
+  "catalogRuleId": "stalled",
+  "name": "停滞線",
+  "nameEn": "Stalled Pattern",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 3,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "smallBodyRatioMax": 0.3,
+   "approxSmallBodyRatioMax": 0.5
+  }
+ },
+ "three-line-strike": {
+  "catalogRuleId": "three-line-strike",
+  "name": "三線打",
+  "nameEn": "Three Line Strike",
+  "category": "candlestick",
+  "family": "multi-bar",
+  "lookback": 5,
+  "parameters": {}
+ },
+ "unique-three-river": {
+  "catalogRuleId": "unique-three-river",
+  "name": "特異三川底",
+  "nameEn": "Unique Three River",
+  "category": "candlestick",
+  "family": "three-bar",
+  "lookback": 3,
+  "parameters": {
+   "bodyRatioMin": 0.5,
+   "lowerVsRangeMin": 0.5,
+   "smallBodyRatioMax": 0.5
+  }
+ },
+ "stick-sandwich": {
+  "catalogRuleId": "stick-sandwich",
+  "name": "スティックサンドイッチ",
+  "nameEn": "Stick Sandwich",
+  "category": "candlestick",
+  "family": "equal-close",
+  "lookback": 15,
+  "parameters": {
+   "atrTolRatio": 0.1,
+   "approxAtrTolRatio": 0.25
+  }
+ },
+ "ladder": {
+  "catalogRuleId": "ladder",
+  "name": "ラダー（底・天）",
+  "nameEn": "Ladder Bottom / Top",
+  "category": "candlestick",
+  "family": "multi-bar",
+  "lookback": 5,
+  "parameters": {
+   "shadowVsRangeMin": 0.5
+  }
+ },
+ "streak": {
+  "catalogRuleId": "streak",
+  "name": "連続足カウント",
+  "nameEn": "Consecutive Bar Streak",
+  "category": "candlestick",
+  "family": "multi-bar",
+  "lookback": 5,
+  "parameters": {
+   "minStreak": 4
+  }
+ },
+ "breakaway-windowless": {
+  "catalogRuleId": "breakaway-windowless",
+  "name": "離脱足（窓なし型・独自）",
+  "nameEn": "Breakaway (Windowless)",
+  "category": "candlestick",
+  "family": "multi-bar",
+  "lookback": 5,
+  "parameters": {
+   "bodyRatioMin": 0.5
   }
  }
 };
@@ -1021,6 +1358,627 @@ registerRule(defRule('morning-evening-star-windowless', {
   }
 }));
 
+// 4i. Gravestone doji (v0.4, JSON-driven, Stage 5-B-2 trial): doji body at the low
+// end of the range, long upper shadow, almost no lower shadow. No direction,
+// following the doji family convention.
+registerRule(defRule('gravestone-doji', {
+  id: 'gravestone-doji', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null) continue;
+      const br = F.bodyRatio[i], ur = F.upper[i] / F.range[i], lr = F.lower[i] / F.range[i];
+      const cs = [critN('値幅が正', F.range[i], '>0', true, 1, 1, true),
+                  critN('実体/値幅 ≤ 0.1', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br / 0.5, 3, true),
+                  critN('上ヒゲ/値幅 ≥ 0.8', ur, P.upperRatioMin, ur >= P.upperRatioMin, ur, 2, true),
+                  critN('下ヒゲ/値幅 ≤ 0.1', lr, P.lowerRatioMax, lr <= P.lowerRatioMax, 1 - lr, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br <= P.bodyRatioMax && ur >= P.upperRatioMin && lr <= P.lowerRatioMax) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `実体が値幅の下端にあり上ヒゲが値幅の${fmt(ur * 100, 0)}%を占め、上影十字線（墓石）が成立。方向性は示さない形状。` }));
+      else if (br <= P.approxBodyRatioMax && ur >= P.approxUpperRatioMin && lr <= P.approxLowerRatioMax) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `上影十字線（墓石）に近似（実体/値幅=${fmt(br, 3)}、上ヒゲ${fmt(ur * 100, 0)}%、下ヒゲ${fmt(lr * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4j. Dragonfly doji (v0.4, JSON-driven, Stage 5-B-2 trial): mirror of gravestone.
+registerRule(defRule('dragonfly-doji', {
+  id: 'dragonfly-doji', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null) continue;
+      const br = F.bodyRatio[i], ur = F.upper[i] / F.range[i], lr = F.lower[i] / F.range[i];
+      const cs = [critN('値幅が正', F.range[i], '>0', true, 1, 1, true),
+                  critN('実体/値幅 ≤ 0.1', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br / 0.5, 3, true),
+                  critN('下ヒゲ/値幅 ≥ 0.8', lr, P.lowerRatioMin, lr >= P.lowerRatioMin, lr, 2, true),
+                  critN('上ヒゲ/値幅 ≤ 0.1', ur, P.upperRatioMax, ur <= P.upperRatioMax, 1 - ur, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br <= P.bodyRatioMax && lr >= P.lowerRatioMin && ur <= P.upperRatioMax) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `実体が値幅の上端にあり下ヒゲが値幅の${fmt(lr * 100, 0)}%を占め、下影十字線（トンボ）が成立。方向性は示さない形状。` }));
+      else if (br <= P.approxBodyRatioMax && lr >= P.approxLowerRatioMin && ur <= P.approxUpperRatioMax) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `下影十字線（トンボ）に近似（実体/値幅=${fmt(br, 3)}、下ヒゲ${fmt(lr * 100, 0)}%、上ヒゲ${fmt(ur * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4k. Long-legged doji (v0.4, JSON-driven, Stage 5-B-2 trial): doji body with
+// long shadows on both sides. No direction.
+registerRule(defRule('long-legged-doji', {
+  id: 'long-legged-doji', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null) continue;
+      const br = F.bodyRatio[i], ur = F.upper[i] / F.range[i], lr = F.lower[i] / F.range[i];
+      const cs = [critN('値幅が正', F.range[i], '>0', true, 1, 1, true),
+                  critN('実体/値幅 ≤ 0.1', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br / 0.5, 3, true),
+                  critN('上ヒゲ/値幅 ≥ 0.3', ur, P.legRatioMin, ur >= P.legRatioMin, ur, 2, true),
+                  critN('下ヒゲ/値幅 ≥ 0.3', lr, P.legRatioMin, lr >= P.legRatioMin, lr, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br <= P.bodyRatioMax && ur >= P.legRatioMin && lr >= P.legRatioMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `実体が小さく上下ヒゲとも長く（上${fmt(ur * 100, 0)}%・下${fmt(lr * 100, 0)}%）、長脚十字線が成立。方向性は示さない形状。` }));
+      else if (br <= P.approxBodyRatioMax && ur >= P.approxLegRatioMin && lr >= P.approxLegRatioMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `長脚十字線に近似（実体/値幅=${fmt(br, 3)}、上ヒゲ${fmt(ur * 100, 0)}%、下ヒゲ${fmt(lr * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4l. Spinning top (v0.4, JSON-driven, Stage 5-B-2 trial): small but visible body
+// with shadows on both sides. The variant records the body color; the shape is
+// traditionally neutral, so no direction. A zero body is left to the doji family.
+registerRule(defRule('spinning-top', {
+  id: 'spinning-top', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null || F.body[i] <= 0 || F.dir[i] === 0) continue;
+      const br = F.bodyRatio[i], ur = F.upper[i] / F.range[i], lr = F.lower[i] / F.range[i];
+      const variant = F.dir[i] > 0 ? 'bullish' : 'bearish';
+      const cs = [critN('実体が正', F.body[i], '>0', true, 1, 1, true),
+                  critN('実体/値幅 ≤ 0.35', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br, 2, true),
+                  critN('上ヒゲ/値幅 ≥ 0.15', ur, P.shadowRatioMin, ur >= P.shadowRatioMin, ur, 2, true),
+                  critN('下ヒゲ/値幅 ≥ 0.15', lr, P.shadowRatioMin, lr >= P.shadowRatioMin, lr, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br <= P.bodyRatioMax && ur >= P.shadowRatioMin && lr >= P.shadowRatioMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `実体は値幅の${fmt(br * 100, 0)}%と小さく上下ヒゲが共にあり、小幅線（コマ）が成立。迷いを示す形状で方向性は示さない。` }));
+      else if (br <= P.approxBodyRatioMax && ur >= P.approxShadowRatioMin && lr >= P.approxShadowRatioMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `小幅線（コマ）に近似（実体/値幅=${fmt(br, 3)}、上ヒゲ${fmt(ur * 100, 0)}%、下ヒゲ${fmt(lr * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4m. Belt hold (v0.4, JSON-driven, Stage 5-B-2 trial): long body with NO shadow
+// on the opening side (bullish: opens at the low; bearish: opens at the high).
+// May co-occur with marubozu; that is accepted.
+registerRule(defRule('belt-hold', {
+  id: 'belt-hold', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null || F.dir[i] === 0) continue;
+      const br = F.bodyRatio[i];
+      const variant = F.dir[i] > 0 ? 'bullish' : 'bearish';
+      const osr = (F.dir[i] > 0 ? F.lower[i] : F.upper[i]) / F.range[i];
+      const cs = [critN('方向（陽線/陰線）', F.dir[i], F.dir[i] > 0 ? 1 : -1, true, 1, 1, true),
+                  critN('寄せ側ヒゲ/値幅 = 0', osr, 0, osr === 0, 1 - Math.min(1, osr / 0.1), 3, true),
+                  critN('実体/値幅 ≥ 0.7', br, P.bodyRatioMin, br >= P.bodyRatioMin, br, 3, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (osr === 0 && br >= P.bodyRatioMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `${variant === 'bullish' ? '安値で寄り付き（下ヒゲなし）' : '高値で寄り付き（上ヒゲなし）'}、実体が値幅の${fmt(br * 100, 0)}%を占め、寄せ切り線が成立。` }));
+      else if (osr <= P.approxOpenShadowRatioMax && br >= P.approxBodyRatioMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `寄せ切り線に近似（寄せ側ヒゲ/値幅=${fmt(osr, 3)}、実体/値幅=${fmt(br, 3)}で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4n. Harami cross (v0.4, JSON-driven, Stage 5-B-2 trial): harami containment with
+// a doji as the second bar (a zero body is allowed, unlike harami). When the
+// second body is zero, the opposite-color auxiliary cannot be judged (pass=null).
+registerRule(defRule('harami-cross', {
+  id: 'harami-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || F.range[i] <= 0 || F.range[i - 1] <= 0 || F.bodyRatio[i] == null) continue;
+      const body1 = F.body[i - 1], body2 = F.body[i];
+      if (body1 <= 0 || F.dir[i - 1] === 0) continue;
+      const p = bars[i - 1], c = bars[i];
+      const top1 = Math.max(p.open, p.close), bot1 = Math.min(p.open, p.close);
+      const top2 = Math.max(c.open, c.close), bot2 = Math.min(c.open, c.close);
+      const contained = bot2 >= bot1 && top2 <= top1;
+      const overlap = Math.max(0, Math.min(top1, top2) - Math.max(bot1, bot2));
+      const overlapRatio = body2 > 0 ? overlap / body2 : (contained ? 1 : 0);
+      const smaller = body2 < body1;
+      const dojiOk = F.bodyRatio[i] <= P.dojiBodyRatioMax;
+      const opposite = body2 > 0 ? (F.dir[i] === -F.dir[i - 1]) : null;
+      const strong = body2 <= P.smallBodyRatioMax * body1;
+      const variant = F.dir[i - 1] < 0 ? 'bullish' : 'bearish';
+      const cs = [critN('当足実体が前足実体内に包含', overlapRatio, 1, contained, overlapRatio, 3, true),
+                  critN('当足実体 < 前足実体', body2 / body1, 1, smaller, 1 - Math.min(1, body2 / body1), 2, true),
+                  critN('当足が十字（実体/値幅 ≤ 0.1）', F.bodyRatio[i], P.dojiBodyRatioMax, dojiOk, 1 - F.bodyRatio[i] / 0.5, 2, true),
+                  critN('当足が前足と逆方向（典型形）', body2 > 0 ? F.dir[i] : null, -F.dir[i - 1], opposite, opposite == null ? null : (opposite ? 1 : 0), 1, false),
+                  critN('当足実体 ≤ 前足実体の0.5倍（強い包含）', body2 / body1, P.smallBodyRatioMax, strong, strong ? 1 : 0, 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (contained && smaller && dojiOk) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `前足の実体（${fmt(bot1)}〜${fmt(top1)}円）の内側で十字となり、はらみ寄せ線が成立（${variant === 'bullish' ? '前足が陰線の底型' : '前足が陽線の天井型'}）。` }));
+      else if (smaller && dojiOk && bot2 >= p.low && top2 <= p.high) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `当足の十字は前足の値幅内にあるが実体の包含には届かず、はらみ寄せ線に近似。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4o. Shooting star / inverted hammer (v0.4, JSON-driven, Stage 5-B-2 trial):
+// mirror of hammer-context. Shape = long upper shadow; the prior 10-bar
+// close-regression slope is a mandatory context selecting the variant
+// (slope >= 0: shooting star; slope < 0: inverted hammer). No event when the
+// context cannot be judged.
+registerRule(defRule('shooting-star-context', {
+  id: 'shooting-star-context', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0) continue;
+      if (i - P.contextBars < 0) continue; // context unavailable -> no event (documented)
+      let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = P.contextBars;
+      for (let k = 0; k < p; k++) { const x = k, y = bars[i - p + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+      const slope = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+      const variant = slope >= 0 ? 'shooting-star' : 'inverted-hammer';
+      const up = F.upper[i], bo = F.body[i], ra = F.range[i];
+      const ratioBody = bo > 0 ? up / bo : (up > 0 ? Infinity : 0), ratioRange = up / ra;
+      const cs = [critN('上ヒゲ ≥ 実体×2', ratioBody === Infinity ? 99 : ratioBody, P.upperVsBody, ratioBody >= P.upperVsBody, Math.min(1, ratioBody / 3), 2, true),
+                  critN('上ヒゲ ≥ 値幅×0.6', ratioRange, P.upperVsRange, ratioRange >= P.upperVsRange, ratioRange, 2, true),
+                  critN('直前文脈（10本終値の回帰傾き）で流れ星/逆金槌を区別', slope, 0, true, 1, 1, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'shooting-star' ? 'bearish-traditional' : 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      const shapeFull = ratioBody >= P.upperVsBody && ratioRange >= P.upperVsRange;
+      const shapeApprox = ratioBody >= P.approxUpperVsBody && ratioRange >= P.approxUpperVsRange;
+      if (shapeFull) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `${variant === 'shooting-star' ? '上昇・横ばい文脈（傾き' + fmt(slope, 2) + '）で流れ星' : '下落文脈（傾き' + fmt(slope, 2) + '）で逆金槌'}が成立。上ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%。伝統的解釈であり予測ではない。` }));
+      else if (shapeApprox) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `${variant === 'shooting-star' ? '流れ星' : '逆金槌'}の形状に近似（上ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4p. Piercing pattern, windowless type (v0.4, JSON-driven, Stage 5-B-2 trial,
+// ORIGINAL definition — the traditional open condition cannot hold on continuous
+// bars (O[t]=C[t-1]) and is therefore not judged; penetration into the first
+// bar's body is the criterion. Not the traditional pattern's establishment.)
+registerRule(defRule('piercing-line-windowless', {
+  id: 'piercing-line-windowless', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || F.range[i - 1] <= 0) continue;
+      if (!(F.dir[i - 1] < 0 && F.dir[i] > 0)) continue;
+      const b1 = bars[i - 1], b2 = bars[i];
+      const body1 = b1.open - b1.close;
+      if (body1 <= 0) continue;
+      const br1 = F.bodyRatio[i - 1];
+      const pen = (b2.close - b1.close) / body1;
+      const within = b2.close < b1.open;
+      const solidOk = br1 >= P.bodyRatioMin;
+      let contextPass = null, slopePrev = null;
+      if (i - 1 - P.contextBars >= 0) {
+        const j0 = i - 1 - P.contextBars, j1 = i - 2;
+        let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = j1 - j0 + 1;
+        for (let k = 0; k < p; k++) { const x = k, y = bars[j0 + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+        slopePrev = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+        contextPass = slopePrev <= 0;
+      }
+      const cs = [critN('第1足が陰線', F.dir[i - 1], -1, true, 1, 1, true),
+                  critN('第1足が大実体（実体/値幅 ≥ 0.5）', br1, P.bodyRatioMin, solidOk, br1, 2, true),
+                  critN('第2足が陽線', F.dir[i], 1, true, 1, 1, true),
+                  critN('第2足終値が第1足始値を超えない（包み足と区別）', b2.close, b1.open, within, within ? 1 : 0, 2, true),
+                  critN('第2足が第1足実体へ50%以上切り込む', pen, P.penetrationMin, pen >= P.penetrationMin, Math.max(0, Math.min(1, pen)), 3, true),
+                  critN('直前文脈（10本回帰傾き ≤ 0）', slopePrev, 0, contextPass, contextPass == null ? null : (contextPass ? 1 : 0), 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (solidOk && within && pen >= P.penetrationMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `切り込み足（窓なし型・独自）が成立。第2足の切り込みは第1足実体の${fmt(pen * 100, 0)}%。始値条件は連続足では成立しないため含めない独自定義による成立であり、原型の成立ではない。` }));
+      else if (solidOk && within && pen >= P.approxPenetrationMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `切り込み足（窓なし型・独自）に近似（切り込み${fmt(pen * 100, 0)}%）。独自定義の近似であり原型の成立ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4q. Dark cloud cover, windowless type (v0.4, JSON-driven, Stage 5-B-2 trial,
+// ORIGINAL definition — mirror of piercing-line-windowless.)
+registerRule(defRule('dark-cloud-cover-windowless', {
+  id: 'dark-cloud-cover-windowless', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || F.range[i - 1] <= 0) continue;
+      if (!(F.dir[i - 1] > 0 && F.dir[i] < 0)) continue;
+      const b1 = bars[i - 1], b2 = bars[i];
+      const body1 = b1.close - b1.open;
+      if (body1 <= 0) continue;
+      const br1 = F.bodyRatio[i - 1];
+      const pen = (b1.close - b2.close) / body1;
+      const within = b2.close > b1.open;
+      const solidOk = br1 >= P.bodyRatioMin;
+      let contextPass = null, slopePrev = null;
+      if (i - 1 - P.contextBars >= 0) {
+        const j0 = i - 1 - P.contextBars, j1 = i - 2;
+        let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = j1 - j0 + 1;
+        for (let k = 0; k < p; k++) { const x = k, y = bars[j0 + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+        slopePrev = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+        contextPass = slopePrev >= 0;
+      }
+      const cs = [critN('第1足が陽線', F.dir[i - 1], 1, true, 1, 1, true),
+                  critN('第1足が大実体（実体/値幅 ≥ 0.5）', br1, P.bodyRatioMin, solidOk, br1, 2, true),
+                  critN('第2足が陰線', F.dir[i], -1, true, 1, 1, true),
+                  critN('第2足終値が第1足始値を下回らない（包み足と区別）', b2.close, b1.open, within, within ? 1 : 0, 2, true),
+                  critN('第2足が第1足実体へ50%以上かぶせる', pen, P.penetrationMin, pen >= P.penetrationMin, Math.max(0, Math.min(1, pen)), 3, true),
+                  critN('直前文脈（10本回帰傾き ≥ 0）', slopePrev, 0, contextPass, contextPass == null ? null : (contextPass ? 1 : 0), 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (solidOk && within && pen >= P.penetrationMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `かぶせ線（窓なし型・独自）が成立。第2足のかぶせは第1足実体の${fmt(pen * 100, 0)}%。始値条件は連続足では成立しないため含めない独自定義による成立であり、原型の成立ではない。` }));
+      else if (solidOk && within && pen >= P.approxPenetrationMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `かぶせ線（窓なし型・独自）に近似（かぶせ${fmt(pen * 100, 0)}%）。独自定義の近似であり原型の成立ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4r. Four price doji (v0.5, JSON-driven, Stage 5-B-2 batch): all four prices
+// equal (zero range). No approximate tier, no direction.
+registerRule(defRule('four-price-doji', {
+  id: 'four-price-doji', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] !== 0) continue;
+      const cs = [critN('四値が同一（値幅ゼロ）', F.range[i], 0, true, 1, 1, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: '始値・高値・安値・終値がすべて同一で四値同一十字線が成立。方向性は示さない形状。' }));
+    }
+    return ev;
+  }
+}));
+
+// 4s. High wave (v0.5, JSON-driven, Stage 5-B-2 batch): long shadows on both
+// sides with a small-to-medium body. Variant records the body color; the shape
+// is traditionally neutral, so no direction. Distinguished from long-legged
+// doji by the body-ratio ceiling.
+registerRule(defRule('high-wave', {
+  id: 'high-wave', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null) continue;
+      const br = F.bodyRatio[i], ur = F.upper[i] / F.range[i], lr = F.lower[i] / F.range[i];
+      const variant = F.body[i] > 0 ? (F.dir[i] > 0 ? 'bullish' : 'bearish') : null;
+      const cs = [critN('実体/値幅 ≤ 0.4', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br, 2, true),
+                  critN('上ヒゲ/値幅 ≥ 0.3', ur, P.legRatioMin, ur >= P.legRatioMin, ur, 2, true),
+                  critN('下ヒゲ/値幅 ≥ 0.3', lr, P.legRatioMin, lr >= P.legRatioMin, lr, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs };
+      if (br <= P.bodyRatioMax && ur >= P.legRatioMin && lr >= P.legRatioMin) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `上下ヒゲが長く（上${fmt(ur * 100, 0)}%・下${fmt(lr * 100, 0)}%）実体が小さく、寄せ線が成立。迷いを示す形状で方向性は示さない。` }));
+      else if (br <= P.approxBodyRatioMax && ur >= P.approxLegRatioMin && lr >= P.approxLegRatioMin) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `寄せ線に近似（実体/値幅=${fmt(br, 3)}、上ヒゲ${fmt(ur * 100, 0)}%、下ヒゲ${fmt(lr * 100, 0)}%で成立条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4t. Tweezer top/bottom (v0.5, JSON-driven, Stage 5-B-2 batch): two consecutive
+// bars with (nearly) equal highs (top) or lows (bottom). Equality is judged
+// against ATR14 (the catalog's provisional ATR basis, finalized in defs 0.4);
+// without a settled ATR the rule does not judge.
+registerRule(defRule('tweezer', {
+  id: 'tweezer', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      const atr = F.atr14[i];
+      if (atr == null || atr <= 0) continue;
+      const top = F.dir[i - 1] > 0 && F.dir[i] < 0, bottom = F.dir[i - 1] < 0 && F.dir[i] > 0;
+      if (!top && !bottom) continue;
+      const diff = top ? Math.abs(bars[i].high - bars[i - 1].high) : Math.abs(bars[i].low - bars[i - 1].low);
+      const variant = top ? 'top' : 'bottom';
+      const tol = P.atrTolRatio * atr;
+      const cs = [critN(top ? '陽線→陰線（天井型）' : '陰線→陽線（底型）', 1, 1, true, 1, 1, true),
+                  critN(top ? '高値の差 ≤ ATR×0.1' : '安値の差 ≤ ATR×0.1', diff, tol, diff <= tol, diff <= tol ? 1 : Math.max(0, 1 - diff / atr), 3, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: top ? 'bearish-traditional' : 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (diff <= tol) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `連続2本の${top ? '高値' : '安値'}がほぼ一致（差${fmt(diff)}円、ATRの${fmt(diff / atr * 100, 0)}%）し、毛抜き（${top ? '天井' : '底'}型）が成立。` }));
+      else if (diff <= P.approxAtrTolRatio * atr) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `毛抜きに近似（${top ? '高値' : '安値'}の差${fmt(diff)}円はATRの${fmt(diff / atr * 100, 0)}%で一致条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4u. Homing pigeon (v0.5, JSON-driven, Stage 5-B-2 batch): harami containment
+// with BOTH bars bearish (the original form only, per the catalog). The
+// same-color condition is what distinguishes it from harami.
+registerRule(defRule('homing-pigeon', {
+  id: 'homing-pigeon', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      if (!(F.dir[i - 1] < 0 && F.dir[i] < 0)) continue;
+      const body1 = F.body[i - 1], body2 = F.body[i];
+      if (body1 <= 0 || body2 <= 0) continue;
+      const p = bars[i - 1], c = bars[i];
+      const top1 = Math.max(p.open, p.close), bot1 = Math.min(p.open, p.close);
+      const top2 = Math.max(c.open, c.close), bot2 = Math.min(c.open, c.close);
+      const contained = bot2 >= bot1 && top2 <= top1;
+      const overlap = Math.max(0, Math.min(top1, top2) - Math.max(bot1, bot2));
+      const smaller = body2 < body1;
+      const strong = body2 <= P.smallBodyRatioMax * body1;
+      const cs = [critN('当足実体が前足実体内に包含', overlap / body2, 1, contained, overlap / body2, 3, true),
+                  critN('当足実体 < 前足実体', body2 / body1, 1, smaller, 1 - Math.min(1, body2 / body1), 2, true),
+                  critN('当足も陰線（同色）', F.dir[i], -1, true, 1, 1, true),
+                  critN('当足実体 ≤ 前足実体の0.5倍（強い包含）', body2 / body1, P.smallBodyRatioMax, strong, strong ? 1 : 0, 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (contained && smaller) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `陰線の実体（${fmt(bot2)}〜${fmt(top2)}円）が前陰線の実体（${fmt(bot1)}〜${fmt(top1)}円）の内側に収まり、帰り鳩が成立。` }));
+      else if (smaller && bot2 >= p.low && top2 <= p.high) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `当足実体は前足の値幅内にあるが実体の包含には届かず、帰り鳩に近似。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4v. Three inside up/down (v0.5, JSON-driven, Stage 5-B-2 batch): a harami
+// plus a third bar that closes beyond the first bar's body end.
+registerRule(defRule('three-inside', {
+  id: 'three-inside', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      const dir1 = F.dir[i - 2];
+      const body1 = F.body[i - 2], body2 = F.body[i - 1];
+      if (dir1 === 0 || body1 <= 0 || body2 <= 0) continue;
+      const b1 = bars[i - 2], b2 = bars[i - 1];
+      const top1 = Math.max(b1.open, b1.close), bot1 = Math.min(b1.open, b1.close), mid1 = (top1 + bot1) / 2;
+      const top2 = Math.max(b2.open, b2.close), bot2 = Math.min(b2.open, b2.close);
+      const contained = bot2 >= bot1 && top2 <= top1;
+      const overlap = Math.max(0, Math.min(top1, top2) - Math.max(bot1, bot2));
+      const smaller = body2 < body1;
+      const strong = body2 <= P.smallBodyRatioMax * body1;
+      const variant = dir1 < 0 ? 'bullish' : 'bearish';
+      const dir3ok = F.dir[i] === -dir1;
+      const closeBeyond = variant === 'bullish' ? bars[i].close > top1 : bars[i].close < bot1;
+      const closeMid = variant === 'bullish' ? bars[i].close > mid1 : bars[i].close < mid1;
+      const cs = [critN('第2足実体が第1足実体内に包含', overlap / body2, 1, contained, overlap / body2, 3, true),
+                  critN('第2足実体 < 第1足実体', body2 / body1, 1, smaller, 1 - Math.min(1, body2 / body1), 2, true),
+                  critN('第3足が第1足と逆方向', F.dir[i], -dir1, dir3ok, dir3ok ? 1 : 0, 1, true),
+                  critN('第3足終値が第1足実体端を超える', bars[i].close, variant === 'bullish' ? top1 : bot1, closeBeyond, closeBeyond ? 1 : 0, 3, true),
+                  critN('第2足実体 ≤ 第1足実体の0.5倍（強い包含）', body2 / body1, P.smallBodyRatioMax, strong, strong ? 1 : 0, 1, false)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs };
+      if (contained && smaller && dir3ok && closeBeyond) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `はらみ足に確認足が続き、第3足終値が第1足の実体端を超え、はらみ三法が成立（${variant === 'bullish' ? '上げ型' : '下げ型'}）。` }));
+      else if (contained && smaller && dir3ok && closeMid) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `はらみ三法に近似（第3足終値が第1足実体の中点は超えたが実体端には届かない）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4w. Three outside up/down (v0.5, JSON-driven, Stage 5-B-2 batch): an
+// engulfing pair plus a third bar continuing beyond the engulfing close.
+registerRule(defRule('three-outside', {
+  id: 'three-outside', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      if (F.dir[i - 2] === 0 || F.dir[i - 1] !== -F.dir[i - 2]) continue;
+      const b1 = bars[i - 2], b2 = bars[i - 1];
+      const body1 = F.body[i - 2];
+      if (body1 <= 0) continue;
+      const top1 = Math.max(b1.open, b1.close), bot1 = Math.min(b1.open, b1.close);
+      const top2 = Math.max(b2.open, b2.close), bot2 = Math.min(b2.open, b2.close);
+      const full = bot2 <= bot1 && top2 >= top1;
+      const coverRatio = (Math.min(top1, top2) - Math.max(bot1, bot2)) / body1;
+      const variant = F.dir[i - 1] > 0 ? 'bullish' : 'bearish';
+      const dir3ok = F.dir[i] === F.dir[i - 1];
+      const prog = variant === 'bullish' ? bars[i].close > b2.close : bars[i].close < b2.close;
+      const cs = [critN('第1足と第2足が逆方向', 1, 1, true, 1, 1, true),
+                  critN('第2足実体が第1足実体を包含', coverRatio, 1, full, Math.max(0, Math.min(1, coverRatio)), 3, true),
+                  critN('第3足が包みと同方向', F.dir[i], F.dir[i - 1], dir3ok, dir3ok ? 1 : 0, 1, true),
+                  critN('第3足終値が第2足終値を超える', bars[i].close, b2.close, prog, prog ? 1 : 0, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs };
+      if (full && dir3ok && prog) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `包み足に確認足が続き、第3足が同方向に進み、包み三法が成立（${variant === 'bullish' ? '上げ型' : '下げ型'}）。` }));
+      else if (coverRatio >= P.approxCoverRatio && dir3ok && prog) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `包み三法に近似（実体の被覆率${fmt(coverRatio * 100, 0)}%で完全包含に届かない）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4x. Neck family (v0.5, JSON-driven, Stage 5-B-2 batch): after a solid bearish
+// bar, a bullish bar that recovers only weakly. The three rules are separated
+// by the recovery yardstick: on-neck references the first bar's LOW (ATR
+// tolerance), in-neck / thrusting use penetration bands into the first body.
+// Confirmed only (no approximate tier); bearish-continuation reading.
+function neckPrecond(F, i, P) {
+  return F.dir[i - 1] < 0 && F.dir[i] > 0 && F.bodyRatio[i - 1] != null && F.bodyRatio[i - 1] >= P.bodyRatioMin && F.body[i - 1] > 0;
+}
+function neckCriteria(F, i, P, bandCrit) {
+  return [critN('第1足が陰線', F.dir[i - 1], -1, true, 1, 1, true),
+          critN('第1足が大実体（実体/値幅 ≥ 0.5）', F.bodyRatio[i - 1], P.bodyRatioMin, true, F.bodyRatio[i - 1], 2, true),
+          critN('第2足が陽線', F.dir[i], 1, true, 1, 1, true),
+          bandCrit];
+}
+registerRule(defRule('on-neck', {
+  id: 'on-neck', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || !neckPrecond(F, i, P)) continue;
+      const atr = F.atr14[i];
+      if (atr == null || atr <= 0) continue;
+      const diff = Math.abs(bars[i].close - bars[i - 1].low), tol = P.atrTolRatio * atr;
+      const cs = neckCriteria(F, i, P, critN('第2足終値と第1足安値の差 ≤ ATR×0.1', diff, tol, diff <= tol, diff <= tol ? 1 : Math.max(0, 1 - diff / atr), 3, true));
+      const sc = scoreOf2(cs);
+      if (diff <= tol) ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陽線の終値が前足安値とほぼ同水準（差${fmt(diff)}円）にとどまり、首線乗りが成立。弱い反発で下落継続の解釈とされる（予測ではない）。` }));
+    }
+    return ev;
+  }
+}));
+registerRule(defRule('in-neck', {
+  id: 'in-neck', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || !neckPrecond(F, i, P)) continue;
+      const b1 = bars[i - 1];
+      const pen = (bars[i].close - b1.close) / (b1.open - b1.close);
+      const ok = pen > 0 && pen <= P.penetrationMax;
+      const cs = neckCriteria(F, i, P, critN('侵入度が (0, 0.25]', pen, P.penetrationMax, ok, Math.max(0, Math.min(1, pen)), 3, true));
+      const sc = scoreOf2(cs);
+      if (ok) ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陽線が前足実体の下端付近まで入り（侵入度${fmt(pen * 100, 0)}%）、入り首線が成立。下落継続の解釈とされる（予測ではない）。` }));
+    }
+    return ev;
+  }
+}));
+registerRule(defRule('thrusting', {
+  id: 'thrusting', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || !neckPrecond(F, i, P)) continue;
+      const b1 = bars[i - 1];
+      const pen = (bars[i].close - b1.close) / (b1.open - b1.close);
+      const ok = pen > P.penetrationMin && pen < P.penetrationMax;
+      const cs = neckCriteria(F, i, P, critN('侵入度が (0.25, 0.5)', pen, P.penetrationMax, ok, Math.max(0, Math.min(1, pen)), 3, true));
+      const sc = scoreOf2(cs);
+      if (ok) ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, direction: 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陽線が前足実体の中点手前まで切り込み（侵入度${fmt(pen * 100, 0)}%）、突っ込み線が成立。切り込み足には届かない弱い形で、下落継続の解釈とされる（予測ではない）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4y. Counterattack / meeting lines (v0.5, JSON-driven, Stage 5-B-2 batch):
+// ONE shared judgment for both IDs (section 11): opposite directions, a solid
+// second bar, and closes meeting within an ATR tolerance. On continuous bars
+// their condition sets coincide; the original IDs are kept per the sources,
+// and the shared family (equal-close) records the relationship.
+function equalCloseRule(id) {
+  return defRule(id, {
+    id, version: '0.1',
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [], P = this.parameters;
+      for (let i = 1; i < bars.length; i++) {
+        if (!bars[i].complete || !bars[i - 1].complete) continue;
+        if (F.dir[i - 1] === 0 || F.dir[i] !== -F.dir[i - 1] || F.bodyRatio[i] == null) continue;
+        const atr = F.atr14[i];
+        if (atr == null || atr <= 0) continue;
+        const diff = Math.abs(bars[i].close - bars[i - 1].close), tol = P.atrTolRatio * atr;
+        const br2 = F.bodyRatio[i];
+        const variant = F.dir[i - 1] < 0 ? 'bullish' : 'bearish';
+        const cs = [critN('2足が逆方向', 1, 1, true, 1, 1, true),
+                    critN('第2足が大実体（実体/値幅 ≥ 0.5）', br2, P.bodyRatioMin, br2 >= P.bodyRatioMin, br2, 2, true),
+                    critN('終値の差 ≤ ATR×0.1', diff, tol, diff <= tol, diff <= tol ? 1 : Math.max(0, 1 - diff / atr), 3, true)];
+        const sc = scoreOf2(cs);
+        const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+        if (br2 >= P.bodyRatioMin && diff <= tol) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `逆方向の大実体が前足終値とほぼ同値（差${fmt(diff)}円）で引け、${this.name}が成立。連続足では反撃線と出会い線の条件は一致する（出典上の別IDとして保持）。` }));
+        else if (br2 >= P.bodyRatioMin && diff <= P.approxAtrTolRatio * atr) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `${this.name}に近似（終値の差${fmt(diff)}円はATRの${fmt(diff / atr * 100, 0)}%で一致条件未達）。` }));
+      }
+      return ev;
+    }
+  });
+}
+registerRule(equalCloseRule('counterattack'));
+registerRule(equalCloseRule('meeting-lines'));
+
+// 4z. Matching low (v0.5, JSON-driven, Stage 5-B-2 batch): two bearish bars
+// closing at (nearly) the same price. Shares the ATR equality judgment with
+// the equal-close family.
+registerRule(defRule('matching-low', {
+  id: 'matching-low', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      if (!(F.dir[i - 1] < 0 && F.dir[i] < 0)) continue;
+      const atr = F.atr14[i];
+      if (atr == null || atr <= 0) continue;
+      const diff = Math.abs(bars[i].close - bars[i - 1].close), tol = P.atrTolRatio * atr;
+      const cs = [critN('2足とも陰線', 1, 1, true, 1, 1, true),
+                  critN('終値の差 ≤ ATR×0.1', diff, tol, diff <= tol, diff <= tol ? 1 : Math.max(0, 1 - diff / atr), 3, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (diff <= tol) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `2本の陰線の終値がほぼ一致（差${fmt(diff)}円）し、同値安値が成立。下値の支持を示す解釈とされる（予測ではない）。` }));
+      else if (diff <= P.approxAtrTolRatio * atr) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `同値安値に近似（終値の差${fmt(diff)}円はATRの${fmt(diff / atr * 100, 0)}%で一致条件未達）。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4aa. Doji star, windowless type (v0.5, JSON-driven, Stage 5-B-2 batch,
+// ORIGINAL definition): a doji right after a solid bar, with the doji's close
+// outside the first bar's close (the star position, aligned with the finalized
+// morning/evening star windowless definition). Not the traditional pattern.
+registerRule(defRule('doji-star-windowless', {
+  id: 'doji-star-windowless', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete || F.bodyRatio[i] == null || F.bodyRatio[i - 1] == null) continue;
+      const dir1 = F.dir[i - 1];
+      if (dir1 === 0) continue;
+      const variant = dir1 < 0 ? 'morning' : 'evening';
+      const solidOk = F.bodyRatio[i - 1] >= P.bigBodyRatioMin;
+      const dojiOk = F.bodyRatio[i] <= P.starBodyRatioMax;
+      const starOutside = variant === 'morning' ? bars[i].close <= bars[i - 1].close : bars[i].close >= bars[i - 1].close;
+      const cs = [critN('第1足が大実体（実体/値幅 ≥ 0.5）', F.bodyRatio[i - 1], P.bigBodyRatioMin, solidOk, F.bodyRatio[i - 1], 2, true),
+                  critN('第2足が十字（実体/値幅 ≤ 0.1）', F.bodyRatio[i], P.starBodyRatioMax, dojiOk, 1 - F.bodyRatio[i] / 0.5, 2, true),
+                  critN('星の終値が第1足終値の外側', bars[i].close, bars[i - 1].close, starOutside, starOutside ? 1 : 0, 2, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: variant === 'morning' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs };
+      if (solidOk && dojiOk && starOutside) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: `寄せ十字星（窓なし型・独自）が成立。大実体の直後に十字が第1足終値の外側で引けた。窓を必須とする原型とは別の独自定義による成立であり、原型の成立ではない。` }));
+      else if (solidOk && starOutside && F.bodyRatio[i] <= P.approxStarBodyRatioMax) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `寄せ十字星（窓なし型・独自）に近似（第2足の実体/値幅=${fmt(F.bodyRatio[i], 3)}で十字条件未達）。独自定義の近似であり原型の成立ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// 4ab. Three methods (v0.5, JSON-driven, Stage 5-B-2 batch): a solid bar, three
+// small bars contained in its body, and a final bar closing beyond the first
+// close. The windowless mat-hold form is a VARIANT of this rule (section 11):
+// rising skeleton whose middle bars trade above the first bar's high while
+// their closes hold above the first body's midpoint.
+registerRule(defRule('three-methods', {
+  id: 'three-methods', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 4; i < bars.length; i++) {
+      const idx = [i - 4, i - 3, i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete && F.range[j] > 0)) continue;
+      const b1 = bars[i - 4], b5 = bars[i];
+      const dir1 = F.dir[i - 4], body1 = F.body[i - 4];
+      if (dir1 === 0 || body1 <= 0) continue;
+      const rising = dir1 > 0;
+      const top1 = Math.max(b1.open, b1.close), bot1 = Math.min(b1.open, b1.close), mid1 = (top1 + bot1) / 2;
+      const midIdx = [i - 3, i - 2, i - 1];
+      const solidOk = F.bodyRatio[i - 4] >= P.bodyRatioMin;
+      const smallOk = midIdx.every(j => F.body[j] <= P.middleBodyRatioMax * body1);
+      const contained = midIdx.every(j => Math.min(bars[j].open, bars[j].close) >= bot1 && Math.max(bars[j].open, bars[j].close) <= top1);
+      const counterOk = midIdx.every(j => F.dir[j] === -dir1 || F.dir[j] === 0);
+      const matHold = rising && !contained && midIdx.some(j => bars[j].high > b1.high) && midIdx.every(j => bars[j].close >= mid1);
+      const variant = contained ? (rising ? 'rising' : 'falling') : (matHold ? 'mat-hold' : null);
+      const dir5ok = F.dir[i] === dir1;
+      const closeBeyond = rising ? b5.close > b1.close : b5.close < b1.close;
+      const closeMid = rising ? b5.close > mid1 : b5.close < mid1;
+      const cs = [critN('第1足が大実体（実体/値幅 ≥ 0.5）', F.bodyRatio[i - 4], P.bodyRatioMin, solidOk, F.bodyRatio[i - 4], 2, true),
+                  critN('中間3本が小幅（実体 ≤ 第1足実体の0.5倍）', Math.max(...midIdx.map(j => F.body[j])) / body1, P.middleBodyRatioMax, smallOk, smallOk ? 1 : 0, 2, true),
+                  critN('中間足の位置（実体内包／マットホールド形）', contained ? 1 : 0, 1, contained || matHold, contained || matHold ? 1 : 0, 2, true),
+                  critN('中間3本が逆方向（典型形）', counterOk ? 1 : 0, 1, counterOk, counterOk ? 1 : 0, 1, false),
+                  critN('第5足が第1足と同方向でその終値を超える', b5.close, b1.close, dir5ok && closeBeyond, dir5ok && closeBeyond ? 1 : 0, 3, true)];
+      const sc = scoreOf2(cs);
+      const base = { score: sc.score, coverage: sc.coverage, variant, direction: rising ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 4, endIndex: i, detectedIndex: i, criteria: cs };
+      if (solidOk && smallOk && variant && dir5ok && closeBeyond) ev.push(makeEvent(this, { ...base, state: 'confirmed', explanation: variant === 'mat-hold' ? 'マットホールド（上げ三法の変種・窓なし形）が成立。中間足が高値で第1足の高値を超えて推移しつつ終値が実体中点を割り込まず、第5足が第1足終値を超えた。窓を必須とする原型の成立ではない。' : `${rising ? '上げ三法' : '下げ三法'}が成立。大実体の後に小幅足3本が実体内で続き、第5足が第1足終値を超えた。` }));
+      else if (solidOk && smallOk && contained && dir5ok && closeMid) ev.push(makeEvent(this, { ...base, state: 'approximate', explanation: `${rising ? '上げ三法' : '下げ三法'}に近似（第5足終値が第1足実体の中点は超えたが終値には届かない）。` }));
+    }
+    return ev;
+  }
+}));
+
 // 5/6. SMA5/20 crosses
 function crossRule(id, name, bullish) {
   return {
@@ -1042,6 +2000,244 @@ function crossRule(id, name, bullish) {
     }
   };
 }
+// ---- advance-block (defs-driven; Stage 5-B-2 final batch) ----
+registerRule(defRule('advance-block', {
+  id: 'advance-block', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      if (!idx.every(j => F.dir[j] > 0)) continue;
+      if (!(bars[i - 1].close > bars[i - 2].close && bars[i].close > bars[i - 1].close)) continue;
+      const inBody = (o, j) => o > Math.min(bars[j].open, bars[j].close) && o < Math.max(bars[j].open, bars[j].close);
+      if (!(inBody(bars[i - 1].open, i - 2) && inBody(bars[i].open, i - 1))) continue;
+      const upperRatio = F.range[i] > 0 ? F.upper[i] / F.range[i] : 0;
+      const upperOk = upperRatio >= P.upperRatioMin;
+      const shrinkAll = F.body[i] < F.body[i - 2] && F.body[i - 1] <= F.body[i - 2] && F.body[i] <= F.body[i - 1];
+      const shrinkAny = F.body[i] < F.body[i - 2];
+      if (!upperOk || !shrinkAny) continue;
+      const cs = [
+        critN('陽線3本・終値上昇・始値が前足実体内', 1, 1, true, 1, 2),
+        critN('実体が縮小（第3足<第1足、各足が非増大）', shrinkAll ? 1 : 0.5, 1, shrinkAll, shrinkAll ? 1 : 0.5, 3),
+        critN('第3足の上ヒゲ/値幅', upperRatio, P.upperRatioMin, upperOk, Math.min(1, upperRatio), 2),
+        critN('上ヒゲが増大（第3足>=第2足）', F.upper[i] - F.upper[i - 1], 0, F.upper[i] >= F.upper[i - 1], F.upper[i] >= F.upper[i - 1] ? 1 : 0, 1, false),
+      ];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: shrinkAll ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: null, direction: 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: '陽線が続くが実体が縮小し上ヒゲが伸びている。伝統解釈では上昇の勢いの減衰（先行ブロック）。' }));
+    }
+    return ev;
+  }
+}));
+
+// ---- stalled (defs-driven; Stage 5-B-2 final batch) ----
+registerRule(defRule('stalled', {
+  id: 'stalled', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      if (!(F.dir[i - 2] > 0 && F.dir[i - 1] > 0 && F.dir[i] >= 0)) continue;
+      if (!(bars[i - 1].close >= bars[i - 2].close && bars[i].close >= bars[i - 1].close)) continue;
+      const b1 = F.body[i - 2];
+      if (!(b1 > 0)) continue;
+      const solidOk = F.bodyRatio[i - 2] >= P.bodyRatioMin;
+      const midOk = F.body[i - 1] <= b1;
+      const ratio3 = F.body[i] / b1;
+      if (!solidOk || !midOk || ratio3 > P.approxSmallBodyRatioMax) continue;
+      const smallOk = ratio3 <= P.smallBodyRatioMax;
+      const cs = [
+        critN('第1足が大陽線（実体比）', F.bodyRatio[i - 2], P.bodyRatioMin, solidOk, Math.min(1, F.bodyRatio[i - 2]), 2),
+        critN('第2足の実体が第1足以下', F.body[i - 1] - b1, 0, midOk, midOk ? 1 : 0, 1),
+        critN('第3足が小実体（第1足比）', ratio3, P.smallBodyRatioMax, smallOk, smallOk ? 1 : 0.5, 3),
+      ];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: smallOk ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: null, direction: 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: '大陽線の後、小さな陽線が並んで停滞している。伝統解釈では上昇の停滞（停滞線）。第3足の小ささで判定し、上ヒゲは条件にしない（先行ブロックとの区別）。' }));
+    }
+    return ev;
+  }
+}));
+
+// ---- three-line-strike (defs-driven; Stage 5-B-2 final batch) ----
+registerRule(defRule('three-line-strike', {
+  id: 'three-line-strike', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 3; i < bars.length; i++) {
+      const idx = [i - 3, i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      const d = F.dir[i - 3];
+      if (d === 0 || F.dir[i - 2] !== d || F.dir[i - 1] !== d) continue;
+      const prog = d > 0
+        ? (bars[i - 2].close > bars[i - 3].close && bars[i - 1].close > bars[i - 2].close)
+        : (bars[i - 2].close < bars[i - 3].close && bars[i - 1].close < bars[i - 2].close);
+      if (!prog) continue;
+      if (F.dir[i] !== -d) continue;
+      const open1 = bars[i - 3].open;
+      const spanMid = (open1 + bars[i - 1].close) / 2;
+      const beyondOpen = d > 0 ? bars[i].close < open1 : bars[i].close > open1;
+      const beyondMid = d > 0 ? bars[i].close < spanMid : bars[i].close > spanMid;
+      if (!beyondMid) continue;
+      const cs = [
+        critN('3本が同方向で終値進行', 1, 1, true, 1, 2),
+        critN('第4足が逆方向', 1, 1, true, 1, 1),
+        critN('第4足終値が第1足始値を超える', beyondOpen ? 1 : 0.5, 1, beyondOpen, beyondOpen ? 1 : 0.5, 3),
+      ];
+      const sc = scoreOf2(cs);
+      const variant = F.dir[i] > 0 ? 'bullish' : 'bearish';
+      ev.push(makeEvent(this, { state: beyondOpen ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant, direction: F.dir[i] > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 3, endIndex: i, detectedIndex: i, criteria: cs, explanation: '同方向の3本を第4足が一気に打ち消した（三線打）。始値条件は連続足では等号に退化するため判定に含めない。' }));
+    }
+    return ev;
+  }
+}));
+
+// ---- unique-three-river (defs-driven; Stage 5-B-2 final batch) ----
+registerRule(defRule('unique-three-river', {
+  id: 'unique-three-river', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      if (!(F.dir[i - 2] < 0 && F.bodyRatio[i - 2] >= P.bodyRatioMin)) continue;
+      if (!(F.dir[i - 1] < 0 && F.body[i - 1] <= P.smallBodyRatioMax * F.body[i - 2])) continue;
+      const lowerRatio = F.range[i - 1] > 0 ? F.lower[i - 1] / F.range[i - 1] : 0;
+      if (lowerRatio < P.lowerVsRangeMin) continue;
+      const newLow = bars[i - 1].low < bars[i - 2].low;
+      const eqLow = bars[i - 1].low <= bars[i - 2].low;
+      if (!eqLow) continue;
+      if (!(F.dir[i] > 0 && F.body[i] <= P.smallBodyRatioMax * F.body[i - 2])) continue;
+      if (!(bars[i].close > bars[i - 1].close && bars[i].close < bars[i - 2].close)) continue;
+      const cs = [
+        critN('第1足が陰線の大実体', F.bodyRatio[i - 2], P.bodyRatioMin, true, Math.min(1, F.bodyRatio[i - 2]), 2),
+        critN('第2足の下ヒゲ/値幅', lowerRatio, P.lowerVsRangeMin, true, Math.min(1, lowerRatio), 2),
+        critN('第2足が安値を更新', newLow ? 1 : 0.5, 1, newLow, newLow ? 1 : 0.5, 2),
+        critN('第3足は小陽線で終値が第1足終値未満', 1, 1, true, 1, 1),
+      ];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: newLow ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: null, direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: '長い陰線、小実体で長い下ヒゲの陰線（安値更新）、小陽線の組み合わせ（特異三川底）。第3足の終値が第1足終値を下回る反発の弱さが特徴。' }));
+    }
+    return ev;
+  }
+}));
+
+// ---- stick-sandwich (defs-driven; Stage 5-B-2 final batch; equal-close family) ----
+registerRule(defRule('stick-sandwich', {
+  id: 'stick-sandwich', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      if (!(F.dir[i - 2] < 0 && F.dir[i - 1] > 0 && F.dir[i] < 0)) continue;
+      const atr = F.atr14[i];
+      if (atr == null || !(atr > 0)) continue; // no ATR history -> no judgment
+      const diff = Math.abs(bars[i].close - bars[i - 2].close);
+      const eq = diff <= P.atrTolRatio * atr;
+      const near = diff <= P.approxAtrTolRatio * atr;
+      if (!near) continue;
+      const cs = [
+        critN('陰線・陽線・陰線の並び', 1, 1, true, 1, 1),
+        critN('両端の終値差/ATR14', diff / atr, P.atrTolRatio, eq, eq ? 1 : 0.5, 3),
+      ];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: eq ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: null, direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: '陰線・陽線・陰線で両端の終値がほぼ一致する形（スティックサンドイッチ）。伝統解釈では下値の支持。終値一致はATR14比で判定する。' }));
+    }
+    return ev;
+  }
+}));
+
+// ---- ladder (defs-driven; Stage 5-B-2 final batch; count fixed at 5 bars) ----
+registerRule(defRule('ladder', {
+  id: 'ladder', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 4; i < bars.length; i++) {
+      const idx = [i - 4, i - 3, i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      for (const form of ['bottom', 'top']) {
+        const s = form === 'bottom' ? -1 : 1;
+        if (!(F.dir[i - 4] === s && F.dir[i - 3] === s && F.dir[i - 2] === s)) continue;
+        const prog = s < 0
+          ? (bars[i - 3].close < bars[i - 4].close && bars[i - 2].close < bars[i - 3].close)
+          : (bars[i - 3].close > bars[i - 4].close && bars[i - 2].close > bars[i - 3].close);
+        if (!prog) continue;
+        const shadow = form === 'bottom' ? F.upper[i - 1] : F.lower[i - 1];
+        const shadowRatio = F.range[i - 1] > 0 ? shadow / F.range[i - 1] : 0;
+        if (shadowRatio < P.shadowVsRangeMin) continue;
+        if (F.dir[i] !== -s) continue;
+        const bodyEnd = form === 'bottom' ? Math.max(bars[i - 1].open, bars[i - 1].close) : Math.min(bars[i - 1].open, bars[i - 1].close);
+        const beyondEnd = form === 'bottom' ? bars[i].close > bodyEnd : bars[i].close < bodyEnd;
+        const beyondClose = form === 'bottom' ? bars[i].close > bars[i - 1].close : bars[i].close < bars[i - 1].close;
+        if (!beyondClose) continue;
+        const cs = [
+          critN('3本連続で同方向・終値進行', 1, 1, true, 1, 2),
+          critN('第4足の反転側ヒゲ/値幅', shadowRatio, P.shadowVsRangeMin, true, Math.min(1, shadowRatio), 2),
+          critN('第5足が逆方向で第4足実体端を超える', beyondEnd ? 1 : 0.5, 1, beyondEnd, beyondEnd ? 1 : 0.5, 3),
+        ];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: beyondEnd ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: form, direction: form === 'bottom' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 4, endIndex: i, detectedIndex: i, criteria: cs, explanation: form === 'bottom'
+          ? '陰線の連続の後、上ヒゲの足を経て陽線が実体上端を超えた（ラダー底、本数は5本に固定）。'
+          : '陽線の連続の後、下ヒゲの足を経て陰線が実体下端を超えた（ラダー天、本数は5本に固定）。' }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// ---- streak (defs-driven; observation counter; Stage 5-B-2 final batch) ----
+registerRule(defRule('streak', {
+  id: 'streak', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let runLen = 0, runDir = 0;
+    for (let i = 0; i < bars.length; i++) {
+      const d = F.dir[i];
+      if (d !== 0 && d === runDir && i > 0 && (d > 0 ? bars[i].close > bars[i - 1].close : bars[i].close < bars[i - 1].close)) runLen += 1;
+      else if (d !== 0) { runLen = 1; runDir = d; }
+      else { runLen = 0; runDir = 0; }
+      if (!bars[i].complete || runLen < P.minStreak) continue;
+      const cs = [critN('同方向・終値単調の連続本数', runLen, P.minStreak, true, 1, 1)];
+      ev.push(makeEvent(this, { state: 'observation', score: null, coverage: 1, variant: runDir > 0 ? 'bullish' : 'bearish', direction: runDir > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - runLen + 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${runLen}本連続の${runDir > 0 ? '陽線' : '陰線'}（終値単調）。観察記録であり、方向の予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// ---- breakaway-windowless (defs-driven; original windowless type; Stage 5-B-2 final batch) ----
+registerRule(defRule('breakaway-windowless', {
+  id: 'breakaway-windowless', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 4; i < bars.length; i++) {
+      const idx = [i - 4, i - 3, i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete)) continue;
+      const d = F.dir[i - 4];
+      if (d === 0 || F.bodyRatio[i - 4] < P.bodyRatioMin) continue;
+      const prog = d > 0
+        ? (bars[i - 3].close < bars[i - 4].close && bars[i - 2].close < bars[i - 3].close && bars[i - 1].close < bars[i - 2].close)
+        : (bars[i - 3].close > bars[i - 4].close && bars[i - 2].close > bars[i - 3].close && bars[i - 1].close > bars[i - 2].close);
+      if (!prog) continue;
+      if (F.dir[i] !== -d) continue;
+      const body1 = F.body[i - 4];
+      if (!(body1 > 0)) continue;
+      const pen = d > 0 ? (bars[i - 4].close - bars[i].close) / body1 : (bars[i].close - bars[i - 4].close) / body1;
+      const inside = pen > 0 && pen < 1;
+      const near = pen >= -0.25 && pen <= 0;
+      if (!(inside || near)) continue;
+      const cs = [
+        critN('第1足が大実体', F.bodyRatio[i - 4], P.bodyRatioMin, true, Math.min(1, F.bodyRatio[i - 4]), 2),
+        critN('中間3本が逆方向へ終値進行', 1, 1, true, 1, 2),
+        critN('第5足の第1足実体への侵入度', pen, 0, inside, inside ? Math.min(1, pen + 0.5) : 0.5, 3),
+      ];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: inside ? 'confirmed' : 'approximate', score: sc.score, coverage: sc.coverage, variant: d > 0 ? 'up' : 'down', direction: d > 0 ? 'bearish-traditional' : 'bullish-traditional', startIndex: i - 4, endIndex: i, detectedIndex: i, criteria: cs, explanation: '強い実体の後に逆方向へ3本進み、最終足が第1足の実体内へ切り戻した（離脱足の窓なし型・独自）。窓を必須とする原型の成立ではない。' }));
+    }
+    return ev;
+  }
+}));
+
 registerRule(crossRule('sma-cross-bullish', 'SMA5/20 強気クロス', true));
 registerRule(crossRule('sma-cross-bearish', 'SMA5/20 弱気クロス', false));
 
@@ -1349,7 +2545,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数854件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数2081件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -1623,11 +2819,11 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.3', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.4', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
-      return { eventId: e.eventId, ruleId: e.ruleId, ruleName: ruleName(e.ruleId), ruleVersion: e.ruleVersion, category: e.category, family: e.family, timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction, day: b ? b.day : null, time: b ? timeLabel(b.minute) : null, startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex, criteria: e.criteria, missingCriteria: e.missingCriteria, overlays: e.overlays, explanation: e.explanation, history: e.history, parameters: e.parameters };
+      return { eventId: e.eventId, ruleId: e.ruleId, ruleName: ruleName(e.ruleId), ruleVersion: e.ruleVersion, variant: e.variant, coverage: e.coverage, category: e.category, family: e.family, timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction, day: b ? b.day : null, time: b ? timeLabel(b.minute) : null, startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex, criteria: e.criteria, missingCriteria: e.missingCriteria, overlays: e.overlays, explanation: e.explanation, history: e.history, parameters: e.parameters };
     })
   };
   download('technical-events.json', JSON.stringify(out, null, 2), 'application/json');
@@ -1663,10 +2859,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '955d7aae12a08d7c7e4e0947685c914af91b1e621ea88df60542f5a760abf9d0', expectedCount: 855 },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '7ab4d6838486d4ee86e14ea0b6fedb7cc9c9d2bc842888db29b5268dbe1d1a38', expectedCount: 854 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '2d950ffbc35a022828a2dec2e4a72af170f35fe4083ab05825f201ce5cbd75b9', expectedCount: 857 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '8cbe9f6c09cf9bb0979aa294adf5565b97dec6d6d4cca51ff63439a22dbdad60', expectedCount: 857 }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '284be020a256b91e501bf9ca51ac53857cc5b67dedb3dc790b98d0542af1adc8', expectedCount: 2082 },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: 'd75cbbc2bedcd8327fbddd3a5e7a5aad6ab7d0079b014dee6eb11ef609106d67', expectedCount: 2081 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: 'e4a113135557dc9a16ca998004098967c1909d13b7ce38cb1fa8f445fad57f81', expectedCount: 2036 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: 'dafa57fd4e7039bcee936596d499cfc5214f33964c3706723a7a3c7875c126b4', expectedCount: 2036 }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
