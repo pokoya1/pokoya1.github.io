@@ -122,6 +122,26 @@ table.dt tbody tr{cursor:pointer}
   table.dt td:first-child{grid-column:1 / -1;font-size:1rem;font-weight:900;border-bottom:1px dashed var(--line);padding-bottom:.4rem}
   table.dt td:first-child::before{content:"下落率"}
 }
+/* 計画比較表（ステップ2）：指標を行・候補（現在の計画と案）を列に並べる。スマホでは行カード形式に組み替える */
+.cmpwrap{overflow-x:auto}
+table.cmp{width:100%;border-collapse:collapse;font-size:.88rem}
+table.cmp th,table.cmp td{padding:.5rem .55rem;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.cmp th{font-size:.78rem;font-weight:700;background:var(--surface2)}
+table.cmp th:first-child,table.cmp td:first-child{text-align:left}
+table.cmp td:first-child{color:var(--muted);font-weight:700;font-size:.8rem}
+table.cmp .base-note{display:block;font-weight:400;font-size:.7rem;color:var(--warn);white-space:normal}
+@media(max-width:640px){
+  .cmpwrap{overflow-x:visible}
+  table.cmp thead{display:none}
+  table.cmp,table.cmp tbody{display:block}
+  table.cmp tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;padding:10px 6px;border-bottom:1px solid var(--line)}
+  table.cmp td{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:none;padding:.28rem 0;white-space:normal;text-align:right;font-size:.86rem}
+  table.cmp td::before{content:attr(data-label);font-size:.72rem;font-weight:700;color:var(--muted);text-align:left}
+  table.cmp td:first-child{grid-column:1 / -1;font-size:.95rem;font-weight:900;color:var(--ink);border-bottom:1px dashed var(--line);padding-bottom:.4rem}
+  table.cmp td:first-child::before{content:""}
+}
+.slotrow{border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:var(--surface)}
+.slotrow .slotmeta{font-size:.82rem;color:var(--muted);flex:1;min-width:200px;padding-bottom:.45rem;line-height:1.6}
 /* chart */
 .chartbox{width:100%}
 .chartbox svg{width:100%;height:auto;display:block}
@@ -272,8 +292,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "1.9.2";
-var SW_CACHE_NAME = "nanpin-planner-v17";
+var APP_VERSION = "2.0";
+var SW_CACHE_NAME = "nanpin-planner-v18";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -315,7 +335,7 @@ function sampleState(){
         closePrev: null, closeChangePct: null, closeQuality: "", closeAnomalyCount: 0, closeSplits: [],
         holding: { qty: 0, avgPrice: 0, side: "buy" },
         ref: { name: "TOPIX", baseDate: "", baseValue: null, currentValue: null },
-        stages: sampleStages() }
+        stages: sampleStages(), slots: [] }
     ],
     settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5,
                 collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000,
@@ -406,6 +426,18 @@ function sanitizeState(s){
                  budget: clamp(Math.round(num(st.budget, 0)), 0, 1e12), enabled: st.enabled !== false,
                  executed: !!st.executed, execPrice: optNum(st.execPrice), execQty: (st.execQty === null || st.execQty === "" || st.execQty === undefined) ? null : clamp(Math.round(num(st.execQty, 0)), 0, 1e9),
                  execAmount: optNum(st.execAmount), reflected: !!st.reflected };
+      }) : [],
+      /* 計画スロット（案）（形式v3のまま追加する任意項目・ステップ2）：保持するのは未実行レシピだけ
+         （名前・銘柄コード・計画基準価格・未実行段階の下落率と段階予算）。実行済み段階・実保有・口座情報・
+         終値は含めない。スロットのない旧データ・旧JSONでは空配列で補完され、そのまま読み込める */
+      slots: Array.isArray(it.slots) ? it.slots.slice(0, 5).map(function(sl){
+        sl = sl || {};
+        return { id: String(sl.id || uid("slot")), name: String(sl.name || "").slice(0, 40),
+                 code: normalizeCode(sl.code), planBasePrice: clamp(num(sl.planBasePrice, 0), 0, 1e9),
+                 stages: Array.isArray(sl.stages) ? sl.stages.slice(0, 100).map(function(s2){
+                   s2 = s2 || {};
+                   return { dropPct: clamp(num(s2.dropPct, 0), 0, 100), budget: clamp(Math.round(num(s2.budget, 0)), 0, 1e12) };
+                 }) : [] };
       }) : [] };
   }) : [];
   var st = s.settings || {};
@@ -1281,6 +1313,116 @@ var ReverseCalc = (function(){
   }
   return { sanitizeParams: sanitizeParams, validateParams: validateParams, parseParams: parseParams, evaluateCandidate: evaluateCandidate, upperBound: upperBound, solve: solve, GRID_DIV: GRID_DIV, REFINE_DIV: REFINE_DIV, FINAL_STEP: FINAL_STEP, FINAL_MAX_EVALS: FINAL_MAX_EVALS };
 })();
+
+/* ============================================================
+   計画スロット（案）の保存・比較 PlanSlots（ステップ2・v2.0）
+   銘柄ごとに最大5件の「案」を保存する。スロットが保持するのは未実行の将来レシピだけ：
+   { id, 名前, 銘柄コード, 計画基準価格, 未実行段階のリスト（下落率・段階予算） }。
+   実行済み段階・実保有・口座情報・終値は含めない（それらは常に現在のマスタを参照する）。
+   比較の評価は表示のたびに現在のマスタ（口座・実保有・実行済み段階・他銘柄の計画・最新の終値）を
+   前提として再計算し、保存時点の計算結果は保持しない。評価は既存エンジン MarginSim の
+   simulate / pathEvaluate / pointAt をそのまま使い、計算式をここでは複製しない。
+   候補ステートでも実行済み段階は共通の現実として残すため、候補どうしの差は未実行レシピだけから生じる。
+   ============================================================ */
+var PlanSlots = (function(){
+  var MAX_SLOTS = 5;
+  function slotsOf(ins){ return (ins && Array.isArray(ins.slots)) ? ins.slots : []; }
+  /* 既定の名前「案N」：未使用の最小の番号を使う */
+  function defaultName(ins){
+    var used = {};
+    slotsOf(ins).forEach(function(s){ used[s.name] = true; });
+    var n = 1;
+    while (used["案" + n]) n++;
+    return "案" + n;
+  }
+  function makeSlot(name, code, planBasePrice, stageList){
+    return { id: uid("slot"),
+             name: String(name === null || name === undefined ? "" : name).slice(0, 40),
+             code: normalizeCode(code),
+             planBasePrice: clamp(num(planBasePrice, 0), 0, 1e9),
+             stages: (Array.isArray(stageList) ? stageList : []).map(function(s){
+               s = s || {};
+               return { dropPct: clamp(num(s.dropPct, 0), 0, 100), budget: clamp(Math.round(num(s.budget, 0)), 0, 1e12) };
+             }) };
+  }
+  /* 現在の計画（計画基準価格＋未実行段階）からスロットを作る。実行済み段階は含めない */
+  function slotFromCurrentPlan(ins){
+    return makeSlot(defaultName(ins), ins.code, ins.planBasePrice,
+      ins.stages.filter(function(s){ return !s.executed; }));
+  }
+  /* 任意の段階レシピ（予算逆算のプレビュー等）からスロットを作る。計画基準価格は対象銘柄の現在の値を使う */
+  function slotFromRecipe(ins, name, stageList){
+    return makeSlot(name, ins.code, ins.planBasePrice, stageList);
+  }
+  /* スロットを追加する。上限（5件）に達していれば追加せず false を返す */
+  function addSlot(ins, slot){
+    if (!Array.isArray(ins.slots)) ins.slots = [];
+    if (ins.slots.length >= MAX_SLOTS) return false;
+    ins.slots.push(slot);
+    return true;
+  }
+  function removeSlot(ins, slotId){
+    if (!Array.isArray(ins.slots)) return false;
+    var before = ins.slots.length;
+    ins.slots = ins.slots.filter(function(s){ return s.id !== slotId; });
+    return ins.slots.length !== before;
+  }
+  /* スロットを現在の計画へ反映する：未実行段階をレシピで置き換え、計画基準価格もスロットの値にする。
+     実行済み段階と実保有は変更しない。スロット自体は残る */
+  function applySlot(ins, slot){
+    var kept = ins.stages.filter(function(s){ return s.executed; });
+    var news = slot.stages.map(function(s){
+      return { id: uid("st"), dropPct: s.dropPct, budget: s.budget, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false };
+    });
+    ins.stages = kept.concat(news);
+    if (slot.planBasePrice !== ins.planBasePrice){ ins.planBasePrice = slot.planBasePrice; ins.baseIsSample = false; }
+    return { keptCount: kept.length, newCount: news.length };
+  }
+  /* 評価済みシミュレーションから比較指標を取り出す。予算・実購入額・実行不能数は対象銘柄の
+     未実行かつ有効な段階についての集計で、経路・到達・評価損は口座全体の指標。
+     経路上の最低維持率は MarginSim.pathEvaluate、下落率−50%時点は MarginSim.pointAt、
+     到達下落率は simulate の精緻化値、最終評価損は想定最大下落率時点の行の評価損益をそのまま使う */
+  function metricsFor(st, simR, targetIns){
+    var path = MarginSim.pathEvaluate(st, st.settings.maxDrop);
+    var pt50 = MarginSim.pointAt(st, simR.stageRes, 50, 50);
+    var lastRow = simR.rows.length ? simR.rows[simR.rows.length - 1] : null;
+    var budgetTotal = 0, costTotal = 0, infeasibleCount = 0;
+    targetIns.stages.forEach(function(sg){
+      if (!sg.enabled || sg.executed) return;
+      budgetTotal += sg.budget;
+      var r = simR.stageRes[sg.id];
+      if (r){ costTotal += r.cost; if (r.status === "infeasible") infeasibleCount++; }
+    });
+    return { budgetTotal: budgetTotal, costTotal: costTotal,
+             minRate: path.minRate, minRateDrop: path.minRateDrop,
+             firstMgmt: simR.firstMgmtPrecise, firstCall: simR.firstCallPrecise,
+             rate50: pt50.rate, infeasibleCount: infeasibleCount,
+             finalPnl: lastRow ? lastRow.totalPnl : null };
+  }
+  /* 「現在の計画」の評価：現在のステートそのものを既存エンジンで評価する */
+  function evaluateCurrent(state, ins){
+    return metricsFor(state, MarginSim.simulate(state), ins);
+  }
+  /* スロットの評価：現在のステートを複製し、対象銘柄の未実行段階だけをレシピに差し替え
+     （実行済み段階は共通の現実として残す）、計画基準価格もスロット自身の値にして評価する */
+  function evaluateSlot(state, ins, slot){
+    var cs = JSON.parse(JSON.stringify(state));
+    var ci = null;
+    cs.instruments.forEach(function(x){ if (x.id === ins.id) ci = x; });
+    if (!ci) return null;
+    var kept = ci.stages.filter(function(s){ return s.executed; });
+    var news = slot.stages.map(function(s, i){
+      return { id: "slotcand_" + i, dropPct: s.dropPct, budget: s.budget, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false };
+    });
+    ci.stages = kept.concat(news);
+    ci.planBasePrice = slot.planBasePrice;
+    return metricsFor(cs, MarginSim.simulate(cs), ci);
+  }
+  return { MAX_SLOTS: MAX_SLOTS, slotsOf: slotsOf, defaultName: defaultName, makeSlot: makeSlot,
+           slotFromCurrentPlan: slotFromCurrentPlan, slotFromRecipe: slotFromRecipe,
+           addSlot: addSlot, removeSlot: removeSlot, applySlot: applySlot,
+           metricsFor: metricsFor, evaluateCurrent: evaluateCurrent, evaluateSlot: evaluateSlot };
+})();
 </script>
 <script>
 "use strict";
@@ -2024,6 +2166,9 @@ function renderPlan(){
   /* ---------- リスクから逆算（ステップ1・v1.9） ---------- */
   html += reverseSectionHtml(ins);
 
+  /* ---------- 計画の比較・保存（ステップ2・v2.0） ---------- */
+  html += slotsSectionHtml(ins);
+
   var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
   html += '<div class="card"><h2>ナンピン購入計画（' + esc(normalizeCode(ins.code)) + " " + esc(ins.name) + '）</h2>'
     + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は計画基準価格×(1−下落率)を円未満切り捨て。実際に購入した段階は「実行済み」にすると実績として記録され、将来シミュレーションでは再購入しません（実績は上の「現在の保有」へ反映して管理します）。未実行の段階は実行済みの実績を残したまま自由に変更できます。</p>'
@@ -2081,6 +2226,7 @@ function renderPlan(){
   bindStages(el, ins);
   bindBulk(el, ins);
   bindReverse(el, ins);
+  bindSlots(el, ins);
 }
 /* ---------- リスクから逆算セクション（プレビュー専用。入力値は保存データに含めない） ---------- */
 function reverseSectionHtml(ins){
@@ -2116,7 +2262,7 @@ function reverseSectionHtml(ins){
         + "<dt>経路上の最低維持率</dt><dd class='num'>" + (res.minRate === null ? "対象外" : fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）") + "</dd>"
         + "<dt>目標下落率（−" + res.params.target + "%）時点の維持率</dt><dd class='num'>" + (res.rateAtTarget === null ? "対象外" : fmtPct(res.rateAtTarget)) + "</dd></dl>"
         + '<p class="hint">探索メタ情報：探索範囲 0〜' + fmtYen(res.meta.upper) + "（総予算）／グリッド " + res.meta.gridDiv + "分割＋精査 " + res.meta.refineDiv + "分割（精査粒度 約" + fmtYen(res.meta.refineStep) + "）＋最終走査 " + fmtYen(res.meta.finalStep || 1000) + "刻み" + (res.meta.finalEvals !== undefined ? "（最終走査 " + res.meta.finalEvals + "回）" : "") + (res.meta.evalCount !== undefined ? "／総評価回数 " + res.meta.evalCount + "回" : "") + "／所要 " + res.meta.elapsedMs + "ミリ秒。全域の最大値を保証するものではありません。" + (res.meta.rawTotalBudget !== undefined && res.meta.rawTotalBudget !== res.totalBudget ? "<br>探索で得た総予算（段階配分の丸め前）は " + fmtYen(res.meta.rawTotalBudget) + " です。見出しの総予算は、段階予算（100円単位）の合計＝実際に反映される金額に合わせて表示しています。" : "") + "<br>探索上限の根拠：" + esc(res.upper.basis) + "</p>"
-        + '<div class="rowflex"><button class="btn primary" id="revApplyBtn" type="button">この計画を反映する</button></div>';
+        + '<div class="rowflex"><button class="btn primary" id="revApplyBtn" type="button">この計画を反映する</button><button class="btn" id="revSaveSlotBtn" type="button">この結果を案として保存</button></div>';
     } else if (res.status === "existing_fail"){
       html += '<div class="notice danger" style="margin-top:0"><strong>逆算できません：既存建玉のみで既に条件未達です。</strong><br>候補計画なし・他銘柄の計画なし（実保有と既存建玉だけ）の経路評価で、すでに条件を満たしていません。'
         + (res.failRate ? "<br>・経路上の最低維持率 " + fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）が最低維持率ライン " + fmtPct(res.params.minRate) + " を下回っています。" : "")
@@ -2210,6 +2356,136 @@ function bindReverse(el, ins){
         toast("逆算結果を反映しました（未実行 " + news.length + " 段階を置き換え" + (kept.length ? "、実行済み " + kept.length + " 段階は保護" : "") + "）。");
       });
   };
+  /* 逆算プレビューを計画へ反映せず、そのまま案（スロット）として保存する（ステップ2） */
+  var saveSlotBtn = el.querySelector("#revSaveSlotBtn");
+  if (saveSlotBtn) saveSlotBtn.onclick = function(){
+    var rp = ui.reversePreview;
+    if (!rp || rp.insId !== ins.id || rp.result.status !== "ok") return;
+    var slot = PlanSlots.slotFromRecipe(ins, "逆算案（目標 −" + rp.params.target + "%・最低維持率 " + rp.params.minRate + "%）",
+      rp.result.stages.map(function(sg){ return { dropPct: sg.dropPct, budget: sg.budget }; }));
+    if (!PlanSlots.addSlot(ins, slot)){
+      toast("保存できる案は1銘柄につき最大" + PlanSlots.MAX_SLOTS + "件です。不要な案を削除してから保存してください。");
+      return;
+    }
+    recalc(); renderPlan();
+    toast("逆算結果を案「" + slot.name + "」として保存しました（計画には反映していません）。下の「計画の比較・保存」で比べられます。");
+  };
+}
+/* ---------- 計画の比較・保存セクション（ステップ2・v2.0） ----------
+   「現在の計画」と保存済みスロットを横並びで比較する。評価はこの描画のたびに PlanSlots が
+   現在のマスタで再計算したもの（保存時点の計算結果は保持しない） */
+function slotsSectionHtml(ins){
+  var slots = PlanSlots.slotsOf(ins);
+  var hasExecuted = ins.stages.some(function(s){ return s.executed; });
+  var html = '<div class="card"><h2>計画の比較・保存</h2>'
+    + '<p class="sub">この銘柄の計画を「案」として最大' + PlanSlots.MAX_SLOTS + '件まで保存し、現在の計画と並べて比較できます。案に保存するのは<strong>未実行段階のレシピ（下落率・段階予算）と計画基準価格・銘柄コードだけ</strong>で、実行済み段階・実保有・口座情報・終値は含めません。比較は表示のたびに、現在の口座情報・実保有・実行済み段階・他銘柄の計画・最新の終値を前提に再計算します（保存時点の結果は保持しません）。実行済み段階は全候補に共通の現実として含めて評価するため、候補どうしの差は未実行レシピだけから生じます。</p>'
+    + '<div class="rowflex"><button class="btn" id="saveSlotBtn" type="button">現在の計画を案として保存</button></div>'
+    + (hasExecuted ? '<p class="hint">この銘柄には実行済み段階があります。<strong>実行済み段階は案に含まれません</strong>（未実行段階だけを保存します）。</p>' : "")
+    + (slots.length >= PlanSlots.MAX_SLOTS ? '<p class="hint">保存できる案は最大' + PlanSlots.MAX_SLOTS + '件です。新しい案を保存するには、不要な案を削除してください。</p>' : "");
+  if (!slots.length){
+    html += '<p class="hint">保存済みの案はまだありません。「現在の計画を案として保存」か、上の「リスクから逆算」のプレビューから保存できます。</p></div>';
+    return html;
+  }
+  var maxDrop = state.settings.maxDrop;
+  var cands = [{ name: "現在の計画", slot: null, m: PlanSlots.evaluateCurrent(state, ins) }]
+    .concat(slots.map(function(sl){ return { name: sl.name || "案", slot: sl, m: PlanSlots.evaluateSlot(state, ins, sl) }; }));
+  function rateCell(v){ return (v === null || v === undefined) ? "対象外" : fmtPct(v); }
+  function reachCell(v){ return (v === null || v === undefined) ? "到達なし（−" + maxDrop + "%まで）" : "−" + v.toFixed(1) + "%"; }
+  var rowsDef = [
+    ["予算合計", function(m){ return fmtYen(m.budgetTotal); }],
+    ["実購入予定額", function(m){ return fmtYen(m.costTotal); }],
+    ["経路上の最低維持率", function(m){ return m.minRate === null ? "対象外" : fmtPct(m.minRate) + "（−" + m.minRateDrop + "%時点）"; }],
+    ["管理基準（" + state.settings.management + "%）到達下落率", function(m){ return reachCell(m.firstMgmt); }],
+    ["追証基準（" + state.settings.marginCall + "%）到達下落率", function(m){ return reachCell(m.firstCall); }],
+    ["下落率−50%時点の維持率", function(m){ return rateCell(m.rate50); }],
+    ["実行不能段階の数", function(m){ return m.infeasibleCount + "件"; }],
+    ["最終評価損（−" + maxDrop + "%時点）", function(m){ return m.finalPnl === null ? "—" : fmtSignedYen(m.finalPnl); }]
+  ];
+  html += '<div class="cmpwrap mt"><table class="cmp"><thead><tr><th>比較指標（' + esc(normalizeCode(ins.code) || "コード未設定") + "）</th>";
+  cands.forEach(function(c){
+    html += "<th>" + esc(c.name);
+    if (c.slot && c.slot.planBasePrice !== ins.planBasePrice) html += '<span class="base-note">基準価格が現在と異なります（保存時 ' + fmtYen(c.slot.planBasePrice) + "）</span>";
+    html += "</th>";
+  });
+  html += "</tr></thead><tbody>";
+  rowsDef.forEach(function(rd){
+    html += "<tr><td>" + esc(rd[0]) + "</td>";
+    cands.forEach(function(c){ html += '<td class="num" data-label="' + esc(c.name) + '">' + (c.m ? rd[1](c.m) : "—") + "</td>"; });
+    html += "</tr>";
+  });
+  html += "</tbody></table></div>";
+  /* スロットの操作（名前変更・反映・削除） */
+  slots.forEach(function(sl){
+    var budgetSum = sl.stages.reduce(function(a, s){ return a + s.budget; }, 0);
+    html += '<div class="slotrow"><div class="field" style="flex:1;min-width:180px"><label class="flabel" for="slotname_' + sl.id + '">案の名前</label><input type="text" id="slotname_' + sl.id + '" data-slot-name="' + sl.id + '" value="' + esc(sl.name) + '" maxlength="40"></div>'
+      + '<div class="slotmeta">計画基準価格 <strong class="num">' + fmtYen(sl.planBasePrice) + "</strong>／" + sl.stages.length + "段階／予算合計 <strong class=\"num\">" + fmtYen(budgetSum) + "</strong>"
+      + (sl.planBasePrice !== ins.planBasePrice ? '<br>基準価格が現在と異なります（保存時 ' + fmtYen(sl.planBasePrice) + "）。比較はこの案自身の計画基準価格で評価しています。" : "")
+      + '</div>'
+      + '<div class="rowflex"><button class="btn small primary" data-slot-apply="' + sl.id + '" type="button">この案を反映する</button><button class="btn small danger-outline" data-slot-del="' + sl.id + '" type="button">削除</button></div></div>';
+  });
+  html += "</div>";
+  return html;
+}
+function bindSlots(el, ins){
+  function findSlot(id){ return PlanSlots.slotsOf(ins).filter(function(s){ return s.id === id; })[0] || null; }
+  var save = el.querySelector("#saveSlotBtn");
+  if (save){
+    guardButtonClick(save);
+    save.onclick = function(){
+      commitActiveInput();
+      var slot = PlanSlots.slotFromCurrentPlan(ins);
+      if (!PlanSlots.addSlot(ins, slot)){
+        toast("保存できる案は1銘柄につき最大" + PlanSlots.MAX_SLOTS + "件です。不要な案を削除してから保存してください。");
+        return;
+      }
+      recalc(); renderPlan();
+      toast("現在の計画を案「" + slot.name + "」として保存しました（未実行 " + slot.stages.length + " 段階・計画基準価格 " + fmtYen(slot.planBasePrice) + "）。");
+    };
+  }
+  el.querySelectorAll("[data-slot-name]").forEach(function(inp){
+    inp.addEventListener("change", function(){
+      var sl = findSlot(inp.getAttribute("data-slot-name"));
+      if (!sl) return;
+      var nm = inp.value.trim().slice(0, 40);
+      if (nm) sl.name = nm;
+      recalc(); renderPlan();
+      toast("案の名前を変更しました。");
+    });
+  });
+  el.querySelectorAll("[data-slot-apply]").forEach(function(btn){
+    guardButtonClick(btn);
+    btn.onclick = function(){
+      commitActiveInput();
+      var sl = findSlot(btn.getAttribute("data-slot-apply"));
+      if (!sl) return;
+      var baseDiff = sl.planBasePrice !== ins.planBasePrice;
+      confirmModal("この案を反映しますか",
+        "(i) 現在の計画の未実行段階は、この案「" + esc(sl.name) + "」のレシピ（" + sl.stages.length + "段階）で置き換わります。<br>"
+        + (baseDiff ? "(ii) 計画基準価格が現在と異なるため、基準価格もこの案の値（" + fmtYen(sl.planBasePrice) + "）になります（現在は " + fmtYen(ins.planBasePrice) + "）。<br>"
+                    : "(ii) 計画基準価格は現在と同じ（" + fmtYen(ins.planBasePrice) + "）ため、変わりません。<br>")
+        + "(iii) 実行済み段階と実保有は変更されません。<br>(iv) 反映前に、設定・データ画面からJSONエクスポートでバックアップを取ることをおすすめします。<br>案自体は反映後も残ります。",
+        "この案を反映する", function(){
+          var r = PlanSlots.applySlot(ins, sl);
+          recalc(); renderPlan();
+          toast("案「" + sl.name + "」を反映しました（未実行 " + r.newCount + " 段階に置き換え" + (r.keptCount ? "、実行済み " + r.keptCount + " 段階は保持" : "") + "）。");
+        });
+    };
+  });
+  el.querySelectorAll("[data-slot-del]").forEach(function(btn){
+    guardButtonClick(btn);
+    btn.onclick = function(){
+      commitActiveInput();
+      var sl = findSlot(btn.getAttribute("data-slot-del"));
+      if (!sl) return;
+      confirmModal("この案を削除しますか",
+        "案「" + esc(sl.name) + "」（" + sl.stages.length + "段階・予算合計 " + fmtYen(sl.stages.reduce(function(a, s){ return a + s.budget; }, 0)) + "）を削除します。現在の計画には影響しません。",
+        "削除する", function(){
+          PlanSlots.removeSlot(ins, sl.id);
+          recalc(); renderPlan();
+          toast("案「" + sl.name + "」を削除しました。");
+        });
+    };
+  });
 }
 function bindBulk(el, ins){
   var pv = el.querySelector("#bulkPreviewBtn");
@@ -2279,7 +2555,7 @@ function bindPlanCommon(el){
                closePrev: null, closeChangePct: null, closeQuality: "", closeAnomalyCount: 0, closeSplits: [],
                holding: { qty: 0, avgPrice: 0, side: "buy" },
                ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null },
-               stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] };
+               stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }], slots: [] };
     state.instruments.push(ni); ui.selectedInsId = ni.id; state.meta.isSample = false;
     recalc(); renderPlan(); toast("銘柄を追加しました。コード・計画基準価格を入力してください。");
   }; }
@@ -2398,6 +2674,7 @@ function bindInstrumentForm(el, ins){
       copy.id = uid("ins"); copy.code = normalizeCode(document.getElementById("dupCode").value);
       copy.name = document.getElementById("dupName").value.trim().slice(0, 80); copy.baseIsSample = false;
       copy.stages.forEach(function(s){ s.id = uid("st"); });
+      if (Array.isArray(copy.slots)) copy.slots.forEach(function(sl){ sl.id = uid("slot"); });
       state.instruments.push(copy); ui.selectedInsId = copy.id;
       closeModal(); recalc(); renderPlan(); toast("計画を複製しました。");
     };
@@ -3160,8 +3437,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.9.2" && SW_CACHE_NAME === "nanpin-planner-v17",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.9.2／SW v17");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.0" && SW_CACHE_NAME === "nanpin-planner-v18",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.0／SW v18");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -3494,6 +3771,79 @@ function runSelfTests(){
     && ReverseCalc.evaluateCandidate(s59, "rv1", p59, res59.totalBudget).ok
     && res67_300.status === "ok" && res67_300.totalQty === 32 && res67_100.status === "ok" && res67_100.totalQty === 76,
     "手計算ケース（数量上限139）では最終走査後も数量139のままで、500円刻みの全数探索の最大予算との差は最終粒度1,000円＋刻み500円＋段階丸め100円以内。ライン300／100の手計算ケースでも数量32／76は不変");
+  /* 73 計画スロットの保存→JSON往復で保持され、スロットのない旧データも読み込める（ステップ2） */
+  var s73 = sanitizeState(sampleState());
+  var slot73 = PlanSlots.slotFromCurrentPlan(s73.instruments[0]);
+  var added73 = PlanSlots.addSlot(s73.instruments[0], slot73);
+  var unpacked73 = unpackState(JSON.parse(JSON.stringify(packState(s73))));
+  var us73 = unpacked73.ok ? unpacked73.state.instruments[0] : null;
+  var old73 = JSON.parse(JSON.stringify(sampleState()));
+  delete old73.instruments[0].slots;
+  var oldClean73 = sanitizeState(old73);
+  t("計画スロットがJSON往復で保持され、スロットのない旧データも読み込める", added73 && unpacked73.ok && !!us73
+    && us73.slots.length === 1 && us73.slots[0].name === slot73.name && us73.slots[0].code === "1308"
+    && us73.slots[0].planBasePrice === 3000 && us73.slots[0].stages.length === slot73.stages.length && slot73.stages.length === 13
+    && us73.slots[0].stages[0].dropPct === slot73.stages[0].dropPct && us73.slots[0].stages[0].budget === slot73.stages[0].budget
+    && !("executed" in us73.slots[0].stages[0]) && !("holding" in us73.slots[0])
+    && Array.isArray(oldClean73.instruments[0].slots) && oldClean73.instruments[0].slots.length === 0,
+    "現在の計画を案として保存し、封筒に包んでJSON化→検証付きで開くと、名前・銘柄コード・計画基準価格・段階レシピ（下落率・段階予算）がそのまま保持される。スロットには実行済み情報や保有を含めない。slots 項目のない旧データは空のスロットで補完され、移行ブロックせず読み込める");
+  /* 74 スロットの適用：実行済み段階と実保有は不変、未実行段階はレシピどおり、計画基準価格はスロットの値になる */
+  var s74 = sanitizeState(sampleState());
+  var ins74 = s74.instruments[0];
+  ins74.holding = { qty: 100, avgPrice: 2800, side: "buy" };
+  ins74.stages[0].executed = true; ins74.stages[0].execPrice = 2850; ins74.stages[0].execQty = 35; ins74.stages[0].execAmount = 99750;
+  var execId74 = ins74.stages[0].id;
+  var slot74 = PlanSlots.makeSlot("検証用", ins74.code, 2500, [{ dropPct: 20, budget: 300000 }, { dropPct: 40, budget: 600000 }]);
+  PlanSlots.addSlot(ins74, slot74);
+  var applied74 = PlanSlots.applySlot(ins74, slot74);
+  var execAfter74 = ins74.stages.filter(function(s){ return s.executed; });
+  var unexecAfter74 = ins74.stages.filter(function(s){ return !s.executed; });
+  t("スロットの適用で実行済み段階と実保有が変わらず、未実行段階と計画基準価格が案どおりになる", applied74.keptCount === 1 && applied74.newCount === 2
+    && execAfter74.length === 1 && execAfter74[0].id === execId74 && execAfter74[0].execAmount === 99750
+    && ins74.holding.qty === 100 && ins74.holding.avgPrice === 2800
+    && unexecAfter74.length === 2 && unexecAfter74[0].dropPct === 20 && unexecAfter74[0].budget === 300000 && unexecAfter74[1].dropPct === 40 && unexecAfter74[1].budget === 600000
+    && ins74.planBasePrice === 2500 && PlanSlots.slotsOf(ins74).length === 1,
+    "実行済み1段階（実績99,750円）と実保有（100口・平均建値2,800円）は適用後も不変。未実行段階は案のレシピ（−20%・300,000円／−40%・600,000円）に置き換わり、計画基準価格は現在の3,000円から案の2,500円に変わる。適用してもスロット自体は残る");
+  /* 75 比較は現在のマスタで再計算される：口座の現金を変えると比較指標が変わる */
+  var s75 = sanitizeState(sampleState());
+  var ins75 = s75.instruments[0];
+  var slot75 = PlanSlots.slotFromCurrentPlan(ins75);
+  PlanSlots.addSlot(ins75, slot75);
+  var m75a = PlanSlots.evaluateSlot(s75, ins75, slot75);
+  s75.account.cash = s75.account.cash + 5000000;
+  var m75b = PlanSlots.evaluateSlot(s75, ins75, slot75);
+  t("口座の現金を変更すると比較指標が変わる（比較は現在のマスタで再計算）", !!m75a && !!m75b
+    && m75a.minRate !== null && m75b.minRate !== null && m75b.minRate > m75a.minRate
+    && m75a.budgetTotal === m75b.budgetTotal && m75a.budgetTotal === 4500000,
+    "同じスロットでも、口座の現金を5,000,000円増やすと経路上の最低維持率が " + (m75a && m75a.minRate !== null ? m75a.minRate.toFixed(1) : "—") + "% → " + (m75b && m75b.minRate !== null ? m75b.minRate.toFixed(1) : "—") + "% に変わる（保存時点の結果ではなく、現在のマスタで評価している）。レシピ由来の予算合計は不変");
+  /* 76 計画基準価格の異なるスロットは、そのスロット自身の基準価格で評価される */
+  var s76 = sanitizeState(sampleState());
+  var ins76 = s76.instruments[0];
+  var slot76 = PlanSlots.makeSlot("基準価格違い", ins76.code, 2000, ins76.stages.filter(function(s){ return !s.executed; }));
+  PlanSlots.addSlot(ins76, slot76);
+  var m76slot = PlanSlots.evaluateSlot(s76, ins76, slot76);
+  var s76ref = sanitizeState(sampleState());
+  s76ref.instruments[0].planBasePrice = 2000;
+  var m76ref = PlanSlots.evaluateCurrent(s76ref, s76ref.instruments[0]);
+  var m76cur = PlanSlots.evaluateCurrent(s76, ins76);
+  t("計画基準価格の異なるスロットはその基準価格で評価される", !!m76slot && !!m76ref && !!m76cur
+    && m76slot.costTotal === m76ref.costTotal && m76slot.costTotal !== m76cur.costTotal,
+    "計画基準価格2,000円の案の実購入予定額 " + (m76slot ? m76slot.costTotal.toLocaleString("ja-JP") : "—") + "円は、現在の計画の基準価格を2,000円に変えて評価した結果と一致し、基準価格3,000円の現在の計画（" + (m76cur ? m76cur.costTotal.toLocaleString("ja-JP") : "—") + "円）とは異なる。評価はスロット自身の計画基準価格で行われる");
+  /* 77 スロットは1銘柄につき最大5件まで（6件目は保存できない） */
+  var s77 = sanitizeState(sampleState());
+  var ins77 = s77.instruments[0];
+  var ok77 = 0;
+  for (var i77 = 0; i77 < 5; i77++){ if (PlanSlots.addSlot(ins77, PlanSlots.makeSlot("案" + (i77 + 1), ins77.code, ins77.planBasePrice, []))) ok77++; }
+  var sixth77 = PlanSlots.addSlot(ins77, PlanSlots.makeSlot("案6", ins77.code, ins77.planBasePrice, []));
+  t("計画スロットは最大5件までで6件目は保存できない", ok77 === 5 && sixth77 === false && PlanSlots.slotsOf(ins77).length === 5 && PlanSlots.MAX_SLOTS === 5,
+    "5件までは保存でき、6件目の追加は false を返して保存されず、件数は5件のまま（上限は PlanSlots.MAX_SLOTS = 5）");
+  /* 78 既存サンプルの回帰値が不変（ステップ2の追加後も計算エンジン・サンプルは無変更） */
+  var s78 = sanitizeState(sampleState());
+  var r78 = MarginSim.simulate(s78);
+  t("既存サンプルの回帰値が不変（実購入予定額・到達下落率）", r78.planCost === 4493550
+    && Math.abs(r78.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r78.firstCallPrecise - 77.6) < 0.051
+    && Array.isArray(s78.instruments[0].slots) && s78.instruments[0].slots.length === 0,
+    "サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変。サンプルのスロットは空で、既存の計算結果に影響しない");
   return T;
 }
 
