@@ -1,6 +1,6 @@
 /* 信用ナンピン計画・リスク管理 Service Worker（オフライン用キャッシュ）
    GitHub Pages 等に単独配置した場合に有効。Muse の埋め込み表示では登録できないことがあります。 */
-var CACHE = "nanpin-planner-v16";
+var CACHE = "nanpin-planner-v17";
 var CORE = ["./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
@@ -19,6 +19,24 @@ self.addEventListener("fetch", function (e) {
       caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
       return res;
     }).catch(function () { return caches.match(e.request); }));
+    return;
+  }
+  /* ページ本体（ナビゲーション／index文書）はネットワーク優先（v1.9.2）：
+     オンライン時は通常の再読み込みで最新版が表示されるようにし、ネットワークが
+     使えない場合に限りキャッシュから返す（オフライン起動は従来どおり維持する）。
+     取得できた応答はキャッシュも更新しておき、次回のオフライン起動に備える */
+  var isNavigation = e.request.mode === "navigate";
+  var isIndexDocument = /(^|\/)index\.html([?#]|$)/.test(e.request.url) || /\/$/.test(new URL(e.request.url).pathname);
+  if (isNavigation || isIndexDocument) {
+    e.respondWith(fetch(e.request).then(function (res) {
+      var copy = res.clone();
+      caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      return res;
+    }).catch(function () {
+      return caches.match(e.request).then(function (hit) {
+        return hit || caches.match("./index.html", { ignoreSearch: true });
+      });
+    }));
     return;
   }
   e.respondWith(caches.match(e.request).then(function (hit) {
