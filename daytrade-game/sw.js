@@ -1,6 +1,6 @@
-/* デイトレゲーム株価生成エンジン v0.1 — Service Worker
+/* デイトレゲーム株価生成エンジン v0.2 — Service Worker
    オフライン起動用。キャッシュ名はこのアプリ専用。 */
-var CACHE_NAME = 'daytrade-engine-v0.1';
+var CACHE_NAME = 'daytrade-engine-v0.2';
 var CORE = [
   './index.html',
   './manifest.webmanifest',
