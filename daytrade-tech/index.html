@@ -128,7 +128,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.1 ／ 工程2〜4</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.2 ／ 工程2〜4</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -169,7 +169,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルールでの検出結果です。拡張モデル seed 42 を全期間・全ルールONで実行すると、正本（Node）の実測 <b>総数310件</b> と一致しなければなりません。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全ルールON・ATR基準「現在足」で実行すると、正本（Node）の実測 <b>総数310件</b> と一致しなければなりません（「極値時点」では309件）。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -186,6 +186,12 @@
             </select>
           </label>
           <label class="chk"><input type="checkbox" id="zzShow" checked /> 転換点の折れ線を表示</label>
+          <label>ZigZag ATR基準
+            <select id="zzAtrMode" aria-label="ZigZag ATR基準">
+              <option value="current" selected>現在足（既定）</option>
+              <option value="pivot">極値時点（固定）</option>
+            </select>
+          </label>
           <button id="btnFullRange">全期間に戻す</button>
         </div>
         <div class="row">
@@ -203,7 +209,7 @@
           <span><i style="background:var(--accent)"></i>ZigZag確定点</span>
           <span>候補（未確定）点は破線・別色 ／ 薄い帯は過去足（ウォームアップ）、濃い部分が当日足（day=0）</span>
         </div>
-        <p class="sub">スライダーを動かすと、その時点までの足（prefix）だけで表示と検出を再実行します。未来足を隠した状態を再現するため、確定済みイベントが後から書き換わることはありません。チャートはスライダー時点を右端とする最大200本を表示します。</p>
+        <p class="sub">スライダーを動かすと、その時点までの足（prefix）だけで表示と検出を再実行します。未来足を隠した状態を再現するため、確定済みイベントが後から書き換わることはありません。チャートはスライダー時点を右端とする最大200本を表示します。「ZigZag ATR基準」は反転閾値に使うATR14の取り方です。「現在足」は判定する足のATR、「極値時点（固定）」は候補の極値が設定された足のATRを固定し、極値が更新されたときだけ更新します。切り替えると検出を再実行し、チャートのZigZag描画とダブル系（ダブルトップ／ダブルボトム）の判定に反映します。</p>
       </section>
 
       <section aria-labelledby="h-rules" class="needs-engine">
@@ -227,7 +233,7 @@
 
       <section aria-labelledby="h-detail" class="needs-engine">
         <h2 id="h-detail">イベント詳細</h2>
-        <div id="detailPanel"><p class="sub">一覧の行を選ぶと、条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴を表示します。ダブル系を選ぶとチャートにネックラインと3転換点も描きます。</p></div>
+        <div id="detailPanel"><p class="sub">一覧の行を選ぶと、正本検出器が出力した条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴をそのまま表示します（この画面で条件を再分解・再計算はしません）。ダブル系を選ぶと、正本の overlays を使ってチャートにネックラインと3転換点も描きます。</p></div>
       </section>
 
       <section aria-labelledby="h-export" class="needs-engine">
@@ -244,12 +250,20 @@
         <h3>アプリ内チェック（その場で実行）</h3>
         <div class="row"><button id="btnRunChecks" class="primary">チェックを実行</button></div>
         <div id="checkResults"><p class="sub">現在のデータで、①同一入力の2回実行が完全一致すること、②検出の前後で入力データが不変であること、を確認します。</p></div>
-        <h3>Node正本の検証実績（静的記録）</h3>
+        <h3>正本一致ハッシュチェック（その場で実行）</h3>
+        <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。</p>
+        <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
+        <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
+        <h3>Node正本の検証実績（静的記録・v0.2）</h3>
         <ul class="tight">
-          <li>単体・未来情報・スケール不変性テスト：<b>19/19 合格</b>（手計算可能な指標、典型成立・不成立・近似例、閾値境界、ゼロ値幅、欠測、未確定足、日またぎ、prefix一致、価格スケール不変性）。</li>
-          <li>未来情報テスト：prefixのみの実行結果と全データ実行の同時点までのイベント履歴が一致。確定イベントは未来足の追加で変更されません。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数310件・ルール別件数が、この画面の表示と一致すること。</li>
+          <li>単体テスト：<b>21/21 合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）</b>。</li>
+          <li>因果性テスト：4系列×12時点で prefix 実行と全データ実行を意味的に比較し、確定済みイベントの深い一致 8,039 件を確認。未来足の置換に対する不変性も合格。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数310件（現在足）／309件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも322件。</li>
         </ul>
+        <h3>統計監査（v0.1 バッチの再監査）</h3>
+        <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
+        <h3>ZigZag A/B（100日バッチ）</h3>
+        <p>転換点数（尺度×2）: 純GBM 現在足 3,415 / 極値時点 3,400、拡張 3,576 / 3,370。確認遅延は両方式とも平均約5.9本。成立ダブル件数: 純GBM 376 → 362、拡張 285 → 268。適合度平均は約90で不変。極値時点方式はやや保守的。</p>
         <h3>バッチ測定の要約（Node正本・拡張モデル1000日、history=500、当日足のみ集計）</h3>
         <div class="table-scroll">
           <table>
@@ -266,10 +280,19 @@
       </section>
 
       <section aria-labelledby="h-report" class="report">
-        <h2 id="h-report">実装・検証レポート（2026-11-18）</h2>
+        <h2 id="h-report">実装・検証レポート（2026-11-18／v0.2更新）</h2>
+        <h3>v0.1 からの差分（v0.2）</h3>
+        <ul class="tight">
+          <li><b>検出器を正本 v0.2 に一元化</b>：埋め込み検出器を正本 detector.mjs v0.2 と同一にしました（DETECTOR_VERSION = '0.2'）。イベントに category・family・timeframe（'5m'）のメタデータを追加し、入力アダプターはセッション開始フラグ（isSessionStart）を付与、特徴量にも同フラグを公開します（判定条件自体は変更していません）。</li>
+          <li><b>ZigZag ATR基準の両方式対応</b>：反転閾値のATRを「現在足」（既定・v0.1と同一挙動）と「極値時点（固定）」（候補の極値が設定された足のATRを固定し、極値更新時のみ更新。候補設定時にATRが無い場合は、その候補が立っている間にATRが利用可能になった最初の足で採用）から選べるようにしました。設定セレクタから切り替えでき、チャート描画とダブル系判定に反映します。</li>
+          <li><b>表示の一元化</b>：イベント詳細は正本が出力する criteria・missingCriteria・explanation・history・overlays をそのまま描画し、この画面で条件を再分解・再計算しません。v0.1 で画面独自だった強気包み足の5条件分解（重み4/4/2等）は解消し、正本の criteria 配列（3条件）をそのまま表示します。一覧・サマリー・描画（ネックライン、転換点）も正本の overlays を使用します。</li>
+          <li><b>ハッシュ検証の追加</b>：検証節に正本一致ハッシュチェックを追加しました。組み込みサンプルを全566本・全ルール有効・全量で実行した結果を正規化し SHA-256 で Node 正本と照合します（上の検証節でその場で実行できます）。</li>
+          <li><b>統計監査結果の反映</b>：v0.1 バッチの再監査結果（状態分離と集計単位の対応付けによる再計算）を検証節に反映しました。ダブルボトム等の v0.1 報告値は集計方法由来であり、成立イベントのみではゼロと整合します。</li>
+          <li>Service Worker のキャッシュ名を technical-lab-v0.2 に変更しました。価格生成器（組み込みサンプル生成を含む）には一切手を入れていません。</li>
+        </ul>
         <h3>実装内容</h3>
         <ul class="tight">
-          <li>工程2：入力アダプター（時刻順・有限値・正価格・OHLC関係・出来高を検証し、variance/jumps等の内部情報は型の段階で落とす）、共通数学部品（実体・ヒゲ・TR・ATR14＝Wilder平滑、SMA、EMA、RSI14、標準偏差、回帰傾き、最高・最安）、終値ベースの因果的ZigZag（尺度×1/×2/×3、反転閾値は判定時点のATR×倍率、確定点は不変、最後の点は候補のみ）。</li>
+          <li>工程2：入力アダプター（時刻順・有限値・正価格・OHLC関係・出来高を検証し、variance/jumps等の内部情報は型の段階で落とす。v0.2でセッション開始フラグ isSessionStart を追加）、共通数学部品（実体・ヒゲ・TR・ATR14＝Wilder平滑、SMA、EMA、RSI14、標準偏差、回帰傾き、最高・最安）、終値ベースの因果的ZigZag（尺度×1/×2/×3、反転閾値はATR×倍率。ATR基準は現在足／極値時点の両方式、確定点は不変、最後の点は候補のみ）。</li>
           <li>工程3：ルール登録方式の共通判定機構。ルールは id・version・name・category・family・lookback・parameters・evaluate を持つ独立モジュールで、追加時にcoreの変更は不要。必須条件と加点条件を分け、加重平均で適合度（0〜100）を算出。状態は confirmed / forming / approximate / expired 等を区別し、パターンの終了時刻と検出可能時刻を分けています。</li>
           <li>工程4：仮ルール10種（十字線、長い下ヒゲ、強気包み足、赤三兵、ダブルトップ、ダブルボトム、SMA5/20強気・弱気クロス、RSI14売られすぎ・買われすぎ進入）と、この実験室UI（読み込み、チャート、時点スライダー、ON/OFF、詳細、全件一覧、JSON/CSV出力）。</li>
         </ul>
@@ -277,21 +300,21 @@
         <ul class="tight">
           <li><b>懸念対策のマスタースイッチ</b>：検出器を内部モジュールとして分離し、接続/切断のON/OFFを付けました。OFFでは検出を実行せず、大量検出に埋もれず生チャートを観察できます。ルール別・カテゴリ別のON/OFFも「表示フィルタではなく実行の切替」として実装しています。</li>
           <li>バッチ測定は生成条件を実験室と揃え、history=500 のウォームアップ付きで当日足のみ集計（Node正本で実施）。</li>
-          <li>ダブル系の「直前の上昇/下落」は「第1極値が直前20本の最高（最安）終値であること」と数式化し、加点条件として明示。ZigZagの閾値ATRは反転判定を行う現在の足の値で固定。ダブル系の既定尺度は×2。RSIは再発火ヒステリシス（売られすぎは35、買われすぎは65に戻るまで再発火しない）を明文化。</li>
+          <li>ダブル系の「直前の上昇/下落」は「第1極値が直前20本の最高（最安）終値であること」と数式化し、加点条件として明示。ZigZagの閾値ATRは v0.1 では反転判定を行う現在の足の値で固定していましたが、v0.2 では極値時点方式と切替可能にし、既定は現在足のままにしました。ダブル系の既定尺度は×2。RSIは再発火ヒステリシス（売られすぎは35、買われすぎは65に戻るまで再発火しない）を明文化。</li>
           <li>転換点の3尺度同時表示はせず、選択中の尺度だけを表示（既定×2）。</li>
         </ul>
         <h3>検証結果（実測）</h3>
         <ul class="tight">
-          <li>組み込み検出器はNode正本と同一コードで、検証アンカー（拡張 seed 42：総数310件、包み足101・十字線86・下ヒゲ75・クロス強気18／弱気17・RSI買われすぎ5／売られすぎ4・赤三兵2・ダブルトップ1・ダブルボトム1）に一致することを組み込み前にNodeで確認済み。この画面のサマリーでも同じ値を表示します。</li>
-          <li>Node正本：単体・未来情報・スケール不変性テスト19/19合格。バッチは純GBM／拡張モデル各1000日を測定（要約表は上の節）。</li>
-          <li>アプリ内チェック（再現性・入力不変）は上の節でその場で実行できます。</li>
+          <li>組み込み検出器はNode正本 v0.2 と同一コードで、検証アンカー（拡張 seed 42・現在足：総数310件、包み足101・十字線86・下ヒゲ75・クロス強気18／弱気17・RSI買われすぎ5／売られすぎ4・赤三兵2・ダブルトップ1・ダブルボトム1）に一致します。v0.2 ではさらに、正規化イベント列の SHA-256 が4条件（拡張 seed 42／純GBM seed 7 × 現在足／極値時点）すべてで Node 正本と一致することを確認済みです。この画面のサマリーと検証節のハッシュチェックでも同じ照合ができます。</li>
+          <li>Node正本：単体テスト21/21合格（旧19件 + ZigZag両方式の対比テスト + メタデータ不変テスト）。因果性は4系列×12時点の意味的比較で確定済みイベントの深い一致 8,039 件を確認し、未来足の置換に対する不変性も合格。バッチは純GBM／拡張モデル各1000日を測定（要約表は上の節）。</li>
+          <li>アプリ内チェック（再現性・入力不変）とハッシュチェックは上の節でその場で実行できます。</li>
         </ul>
         <h3>問題点・未検証</h3>
         <ul class="tight">
           <li>ランダムウォーク相手では十字線・下ヒゲ・包み足が1日に合計約30件出ます（バッチ実測）。一覧は状態フィルタ既定（成立＋形成中）でも多く、ルールOFFやマスター切断で切り離せるようにしましたが、工程6の重複排除・頻度整理は未実施です。</li>
           <li>ダブル系はZigZag尺度に強く依存します。尺度を変えると候補が大きく変わるため、較正は工程6の課題です。</li>
-          <li>検出後1/3/6足の条件付き収益率は、この画面では表示していません（バッチ側の観測項目として工程6で日単位集約・ブートストラップと併せて扱う想定）。</li>
-          <li>Service Workerの登録状態と実機（スマホ）での表示は、ビルド環境からは直接確認できない項目があります。</li>
+          <li>検出後1/3/6足の条件付き収益率は、この画面では表示していません（バッチ側の観測項目として工程6で扱う想定）。v0.1 バッチの収益率報告には集計方法の問題があったことが再監査で判明したため、検証節の統計監査の記述に差し替えました。</li>
+          <li>未検証項目：ブラウザのコンソール出力、Service Workerの登録状態の直接確認、実機（スマホ）での表示は、環境制約により未確認の場合があります。Service Workerの登録状態と実機表示はビルド環境からは直接確認できない項目です。</li>
         </ul>
         <h3>アドバイス（次工程への提案）</h3>
         <ul class="tight">
@@ -302,7 +325,7 @@
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.1 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.2 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -366,6 +389,7 @@ function adaptBars(rawBars, meta = {}) {
       open: +b.open, high: +b.high, low: +b.low, close: +b.close,
       volume: volumeDeclaredOff ? null : (b.volume == null ? null : +b.volume),
       complete: b.complete !== false,
+      isSessionStart: false,
     };
     return bar;
   });
@@ -385,6 +409,10 @@ function adaptBars(rawBars, meta = {}) {
     }
   }
   if (errors.length) throw new Error('invalid bars: ' + errors.slice(0, 5).join('; '));
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i], p = bars[i - 1];
+    b.isSessionStart = i === 0 || b.day !== p.day || (b.minute != null && p.minute != null && b.minute < p.minute);
+  }
   return { bars, volumeMissing };
 }
 
@@ -398,6 +426,7 @@ function computeFeatures(bars) {
     ema12: new Array(n).fill(null), ema26: new Array(n).fill(null),
     rsi14: new Array(n).fill(null), sd20: new Array(n).fill(null),
     slope20: new Array(n).fill(null), hi20: new Array(n).fill(null), lo20: new Array(n).fill(null),
+    isSessionStart: bars.map(b => !!b.isSessionStart),
   };
   const closes = bars.map(b => b.close);
   const sma = (arr, i, p) => { if (i < p - 1) return null; let s = 0; for (let k = i - p + 1; k <= i; k++) s += arr[k]; return s / p; };
@@ -441,36 +470,46 @@ function computeFeatures(bars) {
   return F;
 }
 
-function zigzag(bars, F, k) {
+function zigzag(bars, F, k, atrMode = 'current') {
   const closes = bars.map(b => b.close);
   const pivots = [];
   let mode = 'undetermined';
-  let candHigh = { index: 0, price: closes[0] }, candLow = { index: 0, price: closes[0] };
+  let candHigh = { index: 0, price: closes[0], atr: null }, candLow = { index: 0, price: closes[0], atr: null };
   let candidate = null;
+  const thr = (cand, atrNow) => {
+    if (atrMode === 'pivot') {
+      if (cand.atr == null && atrNow != null) cand.atr = atrNow;
+      return cand.atr != null && cand.atr > 0 ? k * cand.atr : null;
+    }
+    return atrNow != null && atrNow > 0 ? k * atrNow : null;
+  };
+  const pub = cand => ({ index: cand.index, price: cand.price });
   for (let i = 0; i < bars.length; i++) {
     const c = closes[i], atr = F.atr14[i];
     if (mode === 'undetermined') {
-      if (c > candHigh.price) candHigh = { index: i, price: c };
-      if (c < candLow.price) candLow = { index: i, price: c };
-      if (atr != null && atr > 0) {
-        if (c >= candLow.price + k * atr) { pivots.push({ ...candLow, type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c }; }
-        else if (c <= candHigh.price - k * atr) { pivots.push({ ...candHigh, type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c }; }
-      }
+      if (c > candHigh.price) candHigh = { index: i, price: c, atr };
+      if (c < candLow.price) candLow = { index: i, price: c, atr };
+      const tL = thr(candLow, atr), tH = thr(candHigh, atr);
+      if (tL != null && c >= candLow.price + tL) { pivots.push({ ...pub(candLow), type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c, atr }; }
+      else if (tH != null && c <= candHigh.price - tH) { pivots.push({ ...pub(candHigh), type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c, atr }; }
     } else if (mode === 'seekHigh') {
-      if (c > candHigh.price) candHigh = { index: i, price: c };
-      candidate = { ...candHigh, type: 'high' };
-      if (atr != null && atr > 0 && c <= candHigh.price - k * atr) { pivots.push({ ...candHigh, type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c }; candidate = null; }
+      if (c > candHigh.price) candHigh = { index: i, price: c, atr };
+      candidate = { ...pub(candHigh), type: 'high' };
+      const t = thr(candHigh, atr);
+      if (t != null && c <= candHigh.price - t) { pivots.push({ ...pub(candHigh), type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c, atr }; candidate = null; }
     } else {
-      if (c < candLow.price) candLow = { index: i, price: c };
-      candidate = { ...candLow, type: 'low' };
-      if (atr != null && atr > 0 && c >= candLow.price + k * atr) { pivots.push({ ...candLow, type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c }; candidate = null; }
+      if (c < candLow.price) candLow = { index: i, price: c, atr };
+      candidate = { ...pub(candLow), type: 'low' };
+      const t = thr(candLow, atr);
+      if (t != null && c >= candLow.price + t) { pivots.push({ ...pub(candLow), type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c, atr }; candidate = null; }
     }
   }
-  if (mode === 'seekHigh') candidate = { ...candHigh, type: 'high' };
-  if (mode === 'seekLow') candidate = { ...candLow, type: 'low' };
+  if (mode === 'seekHigh') candidate = { ...pub(candHigh), type: 'high' };
+  if (mode === 'seekLow') candidate = { ...pub(candLow), type: 'low' };
   return { pivots, candidate };
 }
 
+const DETECTOR_VERSION = '0.2';
 const RULES = [];
 function registerRule(rule) { RULES.push(rule); return rule; }
 function crit(name, measured, threshold, pass, match, weight, mandatory) {
@@ -483,7 +522,7 @@ function scoreOf(criteria) {
 function makeEvent(rule, o) {
   const missing = o.criteria.filter(c => c.mandatory && !c.pass).map(c => c.name);
   return {
-    eventId: `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version,
+    eventId: `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version, category: rule.category, family: rule.family, timeframe: '5m',
     state: o.state, score: o.score, direction: o.direction ?? null,
     startIndex: o.startIndex, endIndex: o.endIndex, detectedIndex: o.detectedIndex,
     criteria: o.criteria, missingCriteria: missing, overlays: o.overlays ?? [],
@@ -687,8 +726,9 @@ registerRule(doubleRule('double-bottom', 'ダブルボトム', false));
 
 function runDetector(bars, options = {}) {
   const F = computeFeatures(bars);
-  const zigzags = { 1: zigzag(bars, F, 1), 2: zigzag(bars, F, 2), 3: zigzag(bars, F, 3) };
-  const ctx = { bars, F, zigzags };
+  const atrMode = options.zigzagAtrMode === 'pivot' ? 'pivot' : 'current';
+  const zigzags = { 1: zigzag(bars, F, 1, atrMode), 2: zigzag(bars, F, 2, atrMode), 3: zigzag(bars, F, 3, atrMode) };
+  const ctx = { bars, F, zigzags, zigzagAtrMode: atrMode };
   const enabled = options.enabled ? new Set(options.enabled) : null;
   const events = [];
   for (const rule of RULES) {
@@ -696,7 +736,17 @@ function runDetector(bars, options = {}) {
     for (const e of rule.evaluate(ctx)) events.push(e);
   }
   events.sort((a, b) => a.detectedIndex - b.detectedIndex || a.ruleId.localeCompare(b.ruleId));
-  return { events, features: F, zigzags };
+  return { events, features: F, zigzags, zigzagAtrMode: atrMode };
+}
+
+function normalizeEvents(events) {
+  return JSON.stringify(events.map(e => ({
+    eventId: e.eventId, ruleId: e.ruleId, ruleVersion: e.ruleVersion, category: e.category, family: e.family,
+    timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction,
+    startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex,
+    criteria: e.criteria, missingCriteria: e.missingCriteria, overlays: e.overlays,
+    explanation: e.explanation, history: e.history,
+  })));
 }
 function ruleCatalog() {
   return RULES.map(r => ({ id: r.id, version: r.version, name: r.name, category: r.category, family: r.family, lookback: r.lookback, parameters: r.parameters }));
@@ -718,6 +768,7 @@ var state = {
   chartFocus: 0,          // right-edge bar index of chart window
   result: null,           // runDetector output for current prefix
   enabled: {},            // ruleId -> bool (execution switch)
+  zigzagAtrMode: 'current', // 'current' | 'pivot'
   selectedId: null,
   internalColsNote: ''
 };
@@ -835,7 +886,7 @@ function runDetection() {
     return;
   }
   var prefix = state.bars.slice(0, state.sliderPos);
-  state.result = runDetector(prefix, { enabled: enabledList() });
+  state.result = runDetector(prefix, { enabled: enabledList(), zigzagAtrMode: state.zigzagAtrMode });
   renderSummary(); renderList(); drawChart();
   var sel = findEvent(state.selectedId);
   renderDetail(sel);
@@ -875,7 +926,7 @@ function renderSummary() {
   box.innerHTML = html;
   updateRuleCounts(by);
   var check = '';
-  if (state.sourceKind === 'builtin-ext' && state.sliderPos === state.bars.length && enabledList().length === 10) {
+  if (state.sourceKind === 'builtin-ext' && state.sliderPos === state.bars.length && enabledList().length === 10 && state.zigzagAtrMode === 'current') {
     var okTotal = ev.length === ANCHOR.total;
     var okRules = Object.keys(ANCHOR.byRule).every(function (k) { return (by[k] || 0) === ANCHOR.byRule[k]; });
     check = (okTotal && okRules)
@@ -884,7 +935,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON」のときに表示されます。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数309件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -969,7 +1020,7 @@ function renderList() {
 function renderDetail(e) {
   var p = $('detailPanel');
   if (!state.master) { p.innerHTML = '<p class="sub">検出エンジン切断中は詳細を表示しません。</p>'; return; }
-  if (!e) { p.innerHTML = '<p class="sub">一覧の行を選ぶと、条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴を表示します。ダブル系を選ぶとチャートにネックラインと3転換点も描きます。</p>'; return; }
+  if (!e) { p.innerHTML = '<p class="sub">一覧の行を選ぶと、正本検出器が出力した条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴をそのまま表示します（この画面で条件を再分解・再計算はしません）。ダブル系を選ぶと、正本の overlays を使ってチャートにネックラインと3転換点も描きます。</p>'; return; }
   var b = state.bars[e.detectedIndex];
   var rows = e.criteria.map(function (c) {
     return '<tr><td>' + esc(c.name) + '</td><td class="num">' + fmtN(c.measured, 3) + '</td><td class="num">' + esc(String(c.threshold)) + '</td>' +
@@ -984,7 +1035,7 @@ function renderDetail(e) {
   }).join(' → ');
   p.innerHTML =
     '<h3 style="margin-top:0;">' + esc(ruleName(e.ruleId)) + ' <span class="badge b-' + esc(e.state) + '">' + esc(STATE_LABEL[e.state] || e.state) + '</span></h3>' +
-    '<p class="mono">検出時点：' + (b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : '') + '（' + (e.detectedIndex + 1) + '本目）／ 対象：' + (e.startIndex + 1) + '〜' + (e.endIndex + 1) + '本目 ／ 適合度：' + (e.score == null ? '評価不能' : e.score) + ' ／ 方向（伝統的解釈）：' + esc(e.direction || 'なし') + ' ／ ルール版：' + esc(e.ruleVersion) + '</p>' +
+    '<p class="mono">検出時点：' + (b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : '') + '（' + (e.detectedIndex + 1) + '本目）／ 対象：' + (e.startIndex + 1) + '〜' + (e.endIndex + 1) + '本目 ／ 適合度：' + (e.score == null ? '評価不能' : e.score) + ' ／ 方向（伝統的解釈）：' + esc(e.direction || 'なし') + ' ／ ルール版：' + esc(e.ruleVersion) + ' ／ カテゴリ：' + esc(e.category || '') + ' ／ ファミリー：' + esc(e.family || '') + ' ／ 時間足：' + esc(e.timeframe || '') + '</p>' +
     '<p>' + esc(e.explanation) + '</p>' +
     '<h3>未成立の必須条件</h3><p>' + miss + '</p>' +
     '<h3>条件の内訳</h3><div class="table-scroll"><table><thead><tr><th>条件</th><th class="num">実測値</th><th class="num">閾値</th><th>合否</th><th class="num">一致度</th><th class="num">重み</th><th>種別</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
@@ -1158,23 +1209,23 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.1', source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.2', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
-      return { eventId: e.eventId, ruleId: e.ruleId, ruleName: ruleName(e.ruleId), ruleVersion: e.ruleVersion, state: e.state, score: e.score, direction: e.direction, day: b ? b.day : null, time: b ? timeLabel(b.minute) : null, startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex, criteria: e.criteria, missingCriteria: e.missingCriteria, explanation: e.explanation, history: e.history, parameters: e.parameters };
+      return { eventId: e.eventId, ruleId: e.ruleId, ruleName: ruleName(e.ruleId), ruleVersion: e.ruleVersion, category: e.category, family: e.family, timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction, day: b ? b.day : null, time: b ? timeLabel(b.minute) : null, startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex, criteria: e.criteria, missingCriteria: e.missingCriteria, overlays: e.overlays, explanation: e.explanation, history: e.history, parameters: e.parameters };
     })
   };
   download('technical-events.json', JSON.stringify(out, null, 2), 'application/json');
 }
 function exportCSV() {
   if (!state.result) return;
-  var head = 'eventId,ruleId,ruleName,state,score,direction,day,time,startIndex,endIndex,detectedIndex,missingCriteria,explanation';
+  var head = 'eventId,ruleId,ruleName,category,family,timeframe,state,score,direction,day,time,startIndex,endIndex,detectedIndex,missingCriteria,explanation';
   var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
   var lines = [head];
   visibleEvents().forEach(function (e) {
     var b = state.bars[e.detectedIndex];
-    lines.push([e.eventId, e.ruleId, ruleName(e.ruleId), e.state, e.score == null ? '' : e.score, e.direction || '', b ? b.day : '', b ? timeLabel(b.minute) : '', e.startIndex, e.endIndex, e.detectedIndex, e.missingCriteria.join(' / '), e.explanation].map(q).join(','));
+    lines.push([e.eventId, e.ruleId, ruleName(e.ruleId), e.category || '', e.family || '', e.timeframe || '', e.state, e.score == null ? '' : e.score, e.direction || '', b ? b.day : '', b ? timeLabel(b.minute) : '', e.startIndex, e.endIndex, e.detectedIndex, e.missingCriteria.join(' / '), e.explanation].map(q).join(','));
   });
   download('technical-events.csv', lines.join('\n') + '\n', 'text/csv');
 }
@@ -1185,8 +1236,8 @@ function runChecks() {
   if (!state.bars) { box.innerHTML = '<p class="error">データがありません。</p>'; return; }
   var prefix = state.bars.slice(0, state.sliderPos);
   var before = JSON.stringify(prefix);
-  var r1 = runDetector(prefix, { enabled: enabledList() });
-  var r2 = runDetector(prefix, { enabled: enabledList() });
+  var r1 = runDetector(prefix, { enabled: enabledList(), zigzagAtrMode: state.zigzagAtrMode });
+  var r2 = runDetector(prefix, { enabled: enabledList(), zigzagAtrMode: state.zigzagAtrMode });
   var after = JSON.stringify(prefix);
   var repro = JSON.stringify(r1.events) === JSON.stringify(r2.events);
   var immut = before === after;
@@ -1194,6 +1245,63 @@ function runChecks() {
     '<p>① 再現性（同一入力・同一設定で2回実行しイベントが完全一致）：<b class="' + (repro ? 'pass' : 'fail') + '">' + (repro ? '合格' : '不合格') + '</b>（イベント ' + r1.events.length + ' 件）</p>' +
     '<p>② 入力不変（検出の前後で入力データが変化しない）：<b class="' + (immut ? 'pass' : 'fail') + '">' + (immut ? '合格' : '不合格') + '</b>（対象 ' + prefix.length + ' 本）</p>' +
     '<p class="sub">このチェックはマスタースイッチの状態によらず、検証のために検出器を直接実行します（画面の検出結果は変更しません）。</p>';
+}
+
+/* ---------- 正本一致ハッシュチェック ---------- */
+var CANONICAL_HASHES = [
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '6d76942ee4846a72874ca74e59843672f3a552d341a1a389ec9481b83b4fd9f7', expectedCount: 310 },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '918515c686916a200f1e1fe0488960c3cfba9a8e25ca2b225d44476303a25eb5', expectedCount: 309 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: 'f2b272e1b67f2e11803d32345a05a59d5c5a7fa3f4cad7eec7929abdcaa83f77', expectedCount: 322 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '74d5c89edddff3ed90e868949ab07df90e552af97f5b52d64572fa060570c5da', expectedCount: 322 }
+];
+function sha256Hex(text) {
+  if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  });
+}
+function builtinAdaptedBars(kind) {
+  var s = kind === 'ext' ? generate(42, {}) : generate(7, { base: 0.3, regimes: false, season: false, jumps: false });
+  return adaptBars(s.bars, { seed: s.seed, config: s.config }).bars;
+}
+function hashCheckRow(label, modeLabel, count, actual, expected) {
+  var verdict;
+  if (expected == null) verdict = '<span class="sub">照合先なし</span>';
+  else verdict = actual === expected ? '<b class="pass">一致</b>' : '<b class="fail">不一致</b>';
+  return '<tr><td>' + esc(label) + '</td><td>' + esc(modeLabel) + '</td><td class="num">' + count + '件</td>' +
+    '<td class="mono" style="word-break:break-all;">' + esc(actual) + '</td>' +
+    '<td class="mono" style="word-break:break-all;">' + (expected == null ? '—' : esc(expected)) + '</td><td>' + verdict + '</td></tr>';
+}
+function runHashCheck() {
+  var box = $('hashResults');
+  var allIds = ruleCatalog().map(function (r) { return r.id; });
+  box.innerHTML = '<p class="sub">計算中です…</p>';
+  var cache = {};
+  function barsFor(kind) { if (!cache[kind]) cache[kind] = builtinAdaptedBars(kind); return cache[kind]; }
+  var jobs = CANONICAL_HASHES.map(function (c) {
+    var res = runDetector(barsFor(c.kind), { enabled: allIds, zigzagAtrMode: c.mode });
+    return sha256Hex(normalizeEvents(res.events)).then(function (h) {
+      return { html: hashCheckRow(c.label + '（全' + barsFor(c.kind).length + '本・全ルール有効）', c.modeLabel, res.events.length, h, c.expected), match: h === c.expected };
+    });
+  });
+  if (state.sourceKind === 'file' && state.bars) {
+    ['current', 'pivot'].forEach(function (mode) {
+      var res = runDetector(state.bars, { enabled: allIds, zigzagAtrMode: mode });
+      jobs.push(sha256Hex(normalizeEvents(res.events)).then(function (h) {
+        return { html: hashCheckRow('読み込みデータ：' + state.sourceLabel + '（全' + state.bars.length + '本・全ルール有効）', mode === 'pivot' ? '極値時点' : '現在足', res.events.length, h, null), match: null };
+      }));
+    });
+  }
+  return Promise.all(jobs).then(function (rows) {
+    var allMatch = rows.every(function (r) { return r.match !== false; });
+    box.innerHTML =
+      '<div class="table-scroll"><table><thead><tr><th>対象</th><th>ATR基準</th><th class="num">件数</th><th>計算ハッシュ（SHA-256）</th><th>Node正本ハッシュ</th><th>判定</th></tr></thead><tbody>' +
+      rows.map(function (r) { return r.html; }).join('') + '</tbody></table></div>' +
+      '<p>組み込みサンプルの照合結果：<b class="' + (allMatch ? 'pass' : 'fail') + '">' + (allMatch ? 'すべて一致' : '不一致があります（合わせ込みはせず、実際の値を表示しています）') + '</b></p>' +
+      '<p class="sub">このチェックは画面のルールON/OFF・状態フィルタ・スライダー・ATR基準セレクタの状態には依存しません。検出器バージョン：' + esc(DETECTOR_VERSION) + '。</p>';
+  }).catch(function (e) {
+    box.innerHTML = '<p class="error">ハッシュチェックを実行できませんでした：' + esc(e.message) + '</p>';
+  });
 }
 
 /* ---------- イベント配線 ---------- */
@@ -1214,16 +1322,19 @@ $('btnFullRange').addEventListener('click', function () {
 });
 $('zzScale').addEventListener('change', drawChart);
 $('zzShow').addEventListener('change', drawChart);
+$('zzAtrMode').addEventListener('change', function () { state.zigzagAtrMode = this.value === 'pivot' ? 'pivot' : 'current'; runDetection(); });
 Array.prototype.forEach.call(document.querySelectorAll('.state-filter'), function (cb) {
   cb.addEventListener('change', function () { renderList(); drawChart(); });
 });
 $('btnExportJson').addEventListener('click', exportJSON);
 $('btnExportCsv').addEventListener('click', exportCSV);
 $('btnRunChecks').addEventListener('click', runChecks);
+$('btnHashCheck').addEventListener('click', runHashCheck);
 window.addEventListener('resize', drawChart);
 
 buildRulePanel();
 loadBuiltin('ext');
+runHashCheck();
 
 if ('serviceWorker' in navigator) {
   try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
