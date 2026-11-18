@@ -272,8 +272,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "1.8";
-var SW_CACHE_NAME = "nanpin-planner-v14";
+var APP_VERSION = "1.9";
+var SW_CACHE_NAME = "nanpin-planner-v15";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -319,7 +319,10 @@ function sampleState(){
     ],
     settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5,
                 collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000,
-                relayUrl: DEFAULT_RELAY_URL }
+                relayUrl: DEFAULT_RELAY_URL,
+                /* シナリオ拡張の地ならし（形式v3のまま追加する任意項目）：将来の銘柄別シナリオ用。
+                   現時点では種別は一律（uniform）のみで、銘柄別終点マップは空。計算・表示には一切使わない */
+                scenarioType: "uniform", scenarioEndpoints: {} }
   };
 }
 
@@ -416,7 +419,20 @@ function sanitizeState(s){
     includeProfit: false, fees: clamp(num(st.fees, 0), 0, 1e12),
     minMargin: clamp(num(st.minMargin, 300000), 0, 1e12),
     /* 価格中継URL：旧データで未設定なら初期値で補完する（移行ブロックはしない）。空欄は無効として保持し、https 以外は除去する */
-    relayUrl: (st.relayUrl === undefined || st.relayUrl === null) ? DEFAULT_RELAY_URL : sanitizeRelayUrl(st.relayUrl)
+    relayUrl: (st.relayUrl === undefined || st.relayUrl === null) ? DEFAULT_RELAY_URL : sanitizeRelayUrl(st.relayUrl),
+    /* シナリオ拡張の地ならし（形式v3のまま追加する任意項目）：旧データ・旧JSONでは項目がないため
+       種別＝一律（uniform）・銘柄別終点マップ＝空で補完する。値は保持するだけで計算・表示には使わない。
+       終点マップは「銘柄コード → 終点下落率(%)」の素朴なマップとして検証し、不正な項目は除去する */
+    scenarioType: st.scenarioType === "perInstrument" ? "perInstrument" : "uniform",
+    scenarioEndpoints: (function(){
+      var m = {}, src = (st.scenarioEndpoints && typeof st.scenarioEndpoints === "object" && !Array.isArray(st.scenarioEndpoints)) ? st.scenarioEndpoints : {};
+      Object.keys(src).slice(0, 50).forEach(function(k){
+        var code = normalizeCode(k);
+        var v = num(src[k], NaN);
+        if (code && isFinite(v)) m[code] = clamp(v, 0, 100);
+      });
+      return m;
+    })()
   };
   out.version = DATA_VERSION;
   return out;
@@ -565,6 +581,62 @@ var MarginSim = (function(){
     return result;
   }
 
+  /* ある下落率・購入カットオフでの維持率／実質保証金／建代金合計（simulate の精緻化計算と共通の単一実装）。
+     cutoff より深い段階はまだ購入していないものとして扱う（トリガー直前の評価に使う） */
+  function pointAt(state, stageRes, drop, cutoff){
+    var st = state.settings, factor = collateralFactor(st);
+    var existingPrincipal = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
+    var executed = [];
+    state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+      var r = stageRes[sg.id];
+      if (sg.enabled && r && r.feasible && sg.dropPct <= cutoff + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
+    });});
+    var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
+    var newPnl = executed.reduce(function(s, e){
+      var curPrice = stagePrice(e.ins.planBasePrice, drop);
+      return s + e.r.qty * (curPrice - e.r.price);
+    }, 0);
+    var exP = existingPnlAt(state.positions, drop);
+    var hdP = holdingsTotalsAt(state, drop);
+    var collateral = collateralAt(state.account.collateral, drop, factor);
+    var totalPnl = exP.pnl + hdP.pnl + newPnl;
+    var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees + unsettledAmount(state);
+    var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
+    return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal };
+  }
+  /* 経路評価：下落率0%から targetDrop までの全評価点（0.1%刻み＋購入段階の直前・直後。到達計算と同じ評価点）を
+     1回の走査で評価し、経路上の最低維持率とその下落率・目標下落率時点の維持率・経路上の最小の実質保証金を返す。
+     予算逆算（ReverseCalc）の成立判定はこの評価だけを使い、計算式を複製しない */
+  function pathEvaluate(state, targetDrop){
+    var stageRes = evaluateStages(state);
+    var target = clamp(num(targetDrop, 0), 0, 100);
+    var triggerDrops = [];
+    state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
+      var r = stageRes[sg.id];
+      if (sg.enabled && !sg.executed && r && r.status !== "skip") triggerDrops.push(sg.dropPct);
+    }); });
+    var candMap = {}, cands = [];
+    function addC(d){ var k = d.toFixed(4); if (!candMap[k]){ candMap[k] = 1; cands.push(d); } }
+    for (var d = 0; d <= target + 1e-9; d += 0.1) addC(Math.round(d * 10) / 10);
+    addC(target);
+    triggerDrops.forEach(function(td){ if (td <= target + 1e-9) addC(td); });
+    cands.sort(function(a, b){ return a - b; });
+    var minRate = null, minRateDrop = null, minBalance = null, rateAtTarget = null;
+    function visit(pt, dropVal){
+      if (pt.rate !== null && (minRate === null || pt.rate < minRate)){ minRate = pt.rate; minRateDrop = dropVal; }
+      if (minBalance === null || pt.balance < minBalance) minBalance = pt.balance;
+    }
+    for (var i = 0; i < cands.length; i++){
+      var cd = cands[i];
+      var isTrig = triggerDrops.some(function(t){ return Math.abs(t - cd) < 1e-9; });
+      if (isTrig) visit(pointAt(state, stageRes, cd, cd - 0.0001), cd);
+      var after = pointAt(state, stageRes, cd, cd);
+      visit(after, cd);
+      if (Math.abs(cd - target) < 1e-9) rateAtTarget = after.rate;
+    }
+    return { stageRes: stageRes, minRate: minRate, minRateDrop: minRateDrop, rateAtTarget: rateAtTarget, minBalance: minBalance, targetDrop: target };
+  }
+
   function simulate(state){
     var st = state.settings, factor = collateralFactor(st);
     var stageRes = evaluateStages(state);
@@ -640,25 +712,7 @@ var MarginSim = (function(){
        表・グラフは従来の刻み幅のままだが、基準への「最初の到達下落率」は細かい評価点で求める。
        段階購入のトリガーでは維持率が不連続に変化するため、トリガー下落率そのもの（購入後）に加えて
        トリガー直前（その段階をまだ購入していない状態）も評価点に含め、到達の見落としを防ぐ。 */
-    function computeAt(drop, cutoff){
-      var executed = [];
-      state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
-        var r = stageRes[sg.id];
-        if (sg.enabled && r && r.feasible && sg.dropPct <= cutoff + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
-      });});
-      var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
-      var newPnl = executed.reduce(function(s, e){
-        var curPrice = stagePrice(e.ins.planBasePrice, drop);
-        return s + e.r.qty * (curPrice - e.r.price);
-      }, 0);
-      var exP = existingPnlAt(state.positions, drop);
-      var hdP = holdingsTotalsAt(state, drop);
-      var collateral = collateralAt(state.account.collateral, drop, factor);
-      var totalPnl = exP.pnl + hdP.pnl + newPnl;
-      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees + unsettledAmount(state);
-      var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
-      return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal };
-    }
+    function computeAt(drop, cutoff){ return pointAt(state, stageRes, drop, cutoff); }
     /* 購入イベントとして扱うのは実際に購入する段階だけ。見送り（数量0）の段階は
        トリガー評価点に含めない（建代金0の加算は無害だが、段階直後の評価点で購入扱いにしないため） */
     var triggerDrops = [];
@@ -697,6 +751,7 @@ var MarginSim = (function(){
   }
   return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor, unsettledAmount: unsettledAmount,
            existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate,
+           pointAt: pointAt, pathEvaluate: pathEvaluate,
            holdingPrincipal: holdingPrincipal, holdingPnlNow: holdingPnlNow, holdingPnlAt: holdingPnlAt,
            holdingsTotalsAt: holdingsTotalsAt, holdingsTotalsNow: holdingsTotalsNow };
 })();
@@ -1020,6 +1075,155 @@ function effectiveSplits(ins, quote){
   if (ins && Array.isArray(ins.closeSplits) && ins.closeSplits.length && ins.closeSource === "relay") return ins.closeSplits;
   return [];
 }
+
+/* ============================================================
+   予算逆算エンジン ReverseCalc（ステップ1・v1.9）
+   選択中の1銘柄について、リスク条件を満たす購入計画の総予算の上限を逆算する。
+   計算エンジンは MarginSim のみ：候補計画の評価は MarginSim.pathEvaluate / evaluateStages を
+   そのまま使い、維持率や保証金の計算式をここでは複製しない。
+   他銘柄の実保有・既存建玉・既存計画は固定の前提として合算シミュレーションに含め、
+   対象銘柄の未実行段階だけを候補計画（generateBulkStages と同じ段階予算の導出）に差し替えて評価する。
+   成立条件：(a) 数量が1売買単位以上の候補段階はすべて購入時点で新規建て条件（設定値）を満たす
+             （数量ゼロの段階は「見送り」として許容し判定対象にしない。v1.6の現行仕様と同一）
+             (b) 下落率0%〜目標耐性下落率の経路上の全評価点で維持率が最低維持率ライン以上
+             (c) 同じ経路上の全評価点で実質保証金が最低保証金（設定値）以上
+   探索は総予算の1変数で単調性を仮定しない：グリッド走査（約100分割）で成立する最大の格子点を取り、
+   その区間内を約20分割して精査する。全域の最大値の保証はしない。
+   ============================================================ */
+var ReverseCalc = (function(){
+  var GRID_DIV = 100, REFINE_DIV = 20;
+  function sanitizeParams(p){
+    p = p || {};
+    var start = clamp(num(p.start, 5), 0, 100);
+    var end = clamp(num(p.end, 65), 0, 100);
+    return {
+      target: clamp(num(p.target, 75), 0, 100),
+      minRate: clamp(num(p.minRate, 35), 0, 100),
+      start: start, end: end,
+      step: clamp(num(p.step, 5), 0.5, 100),
+      mode: ["equal","deeper","shallower"].indexOf(p.mode) >= 0 ? p.mode : "equal"
+    };
+  }
+  function cloneState(state){ return JSON.parse(JSON.stringify(state)); }
+  function findIns(st, insId){ return st.instruments.filter(function(i){ return i.id === insId; })[0] || null; }
+  /* 候補計画を差し替えた評価用ステートを作る。実行済み段階は保護し、未実行段階だけを差し替える */
+  function candidateState(state, insId, rows){
+    var cs = cloneState(state);
+    var ins = findIns(cs, insId);
+    if (!ins) return null;
+    var kept = ins.stages.filter(function(s){ return s.executed; });
+    var news = rows.map(function(r, i){
+      return { id: "rev_" + i, dropPct: r.dropPct, budget: r.budget, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false };
+    });
+    ins.stages = kept.concat(news);
+    return { state: cs, ids: news.map(function(s){ return s.id; }) };
+  }
+  /* 候補なしの前提評価用ステート：対象銘柄の未実行段階を除去し、他銘柄の計画は includeOthers で切り替える */
+  function baselineState(state, insId, includeOthers){
+    var cs = cloneState(state);
+    cs.instruments.forEach(function(ins){
+      if (ins.id === insId || !includeOthers) ins.stages = ins.stages.filter(function(s){ return s.executed; });
+    });
+    return cs;
+  }
+  function pathOk(path, params, minMargin){
+    var okRate = path.minRate === null || path.minRate >= params.minRate - 1e-9;
+    var okBalance = path.minBalance === null || path.minBalance >= minMargin - 1e-9;
+    return { okRate: okRate, okBalance: okBalance, ok: okRate && okBalance };
+  }
+  /* 総予算1つ分の候補を現行エンジンで評価する（成立条件 a/b/c の判定つき） */
+  function evaluateCandidate(state, insId, rawParams, totalBudget){
+    var params = sanitizeParams(rawParams);
+    var budget = Math.max(0, Math.round(num(totalBudget, 0)));
+    var rows = generateBulkStages({ total: budget, start: params.start, end: params.end, step: params.step, mode: params.mode });
+    var built = candidateState(state, insId, rows);
+    if (!built) return { ok: false, totalBudget: budget, stages: [], totalCost: 0, totalQty: 0, condA: false, condB: false, condC: false, path: null };
+    var path = MarginSim.pathEvaluate(built.state, params.target);
+    var minMargin = built.state.settings.minMargin;
+    var stages = [], totalCost = 0, totalQty = 0, condA = true;
+    built.ids.forEach(function(id, i){
+      var r = path.stageRes[id] || { price: 0, qty: 0, cost: 0, status: "" };
+      stages.push({ dropPct: rows[i].dropPct, budget: rows[i].budget, price: r.price, qty: r.qty, cost: r.cost, status: r.status });
+      totalCost += r.cost; totalQty += r.qty;
+      /* (a) 数量が1売買単位以上の段階だけを判定対象にする（数量ゼロ＝見送りは許容） */
+      if (r.qty > 0 && r.status !== "buy") condA = false;
+    });
+    var chk = pathOk(path, params, minMargin);
+    return { ok: condA && chk.ok, totalBudget: budget, stages: stages, totalCost: totalCost, totalQty: totalQty,
+             condA: condA, condB: chk.okRate, condC: chk.okBalance,
+             minRate: path.minRate, minRateDrop: path.minRateDrop, rateAtTarget: path.rateAtTarget, minBalance: path.minBalance };
+  }
+  /* 探索上限の自動設定：新規建て条件の逆数（例 1/0.31≒3.23）を土台に、現在の実質保証金
+     （受渡未到来の算入分を含む現在の値。MarginSim.simulate の現在値）から到達可能な建代金合計の上限を
+     見積もり、既存の建代金合計（現在の建玉総額）を差し引いたものを候補購入額の上限とする。負値なら0。
+     これは制度上の上限ではなく探索用の天井である */
+  function upperBound(state){
+    var cur = MarginSim.simulate(state).current;
+    var newMargin = state.settings.newMargin;
+    var maxPrincipal = newMargin > 0 ? Math.floor(cur.balance / (newMargin / 100)) : 0;
+    var upper = Math.max(0, maxPrincipal - cur.principal);
+    return { upper: upper, balance: cur.balance, currentPrincipal: cur.principal, maxPrincipal: Math.max(0, maxPrincipal), newMargin: newMargin,
+             basis: "現在の実質保証金 " + fmtYen(cur.balance) + " ÷ 新規建て条件 " + newMargin + "%（逆数 約" + (newMargin > 0 ? (100 / newMargin).toFixed(2) : "—") + "倍）＝ 到達可能な建代金合計の上限 約" + fmtYen(Math.max(0, maxPrincipal)) + "。ここから既存の建代金合計 " + fmtYen(cur.principal) + " を差し引いた " + fmtYen(upper) + " を探索上限とします（制度上の上限ではなく探索用の天井です）" };
+  }
+  function solve(state, insId, rawParams){
+    var t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    function elapsed(){ var t1 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now(); return Math.round((t1 - t0) * 10) / 10; }
+    var params = sanitizeParams(rawParams);
+    var minMargin = state.settings.minMargin;
+    /* 例外 (1) 既存建玉のみで既に条件未達：候補なし・他銘柄計画なしの経路評価 */
+    var base1 = MarginSim.pathEvaluate(baselineState(state, insId, false), params.target);
+    var chk1 = pathOk(base1, params, minMargin);
+    if (!chk1.ok){
+      return { status: "existing_fail", params: params, minRate: base1.minRate, minRateDrop: base1.minRateDrop, minBalance: base1.minBalance,
+               failRate: !chk1.okRate, failBalance: !chk1.okBalance, elapsedMs: elapsed() };
+    }
+    /* 例外 (2) 他銘柄の固定計画による未達：(1)は満たすが他銘柄の現行計画を含めると満たさない */
+    var base2 = MarginSim.pathEvaluate(baselineState(state, insId, true), params.target);
+    var chk2 = pathOk(base2, params, minMargin);
+    if (!chk2.ok){
+      return { status: "other_fail", params: params, minRate: base2.minRate, minRateDrop: base2.minRateDrop, minBalance: base2.minBalance,
+               failRate: !chk2.okRate, failBalance: !chk2.okBalance, elapsedMs: elapsed() };
+    }
+    var ub = upperBound(state);
+    if (!(ub.upper > 0)){
+      return { status: "zero", reason: "upper", params: params, upper: ub, elapsedMs: elapsed() };
+    }
+    /* グリッド走査：上限までを約100分割し、成立する最大の格子点を取る（単調性は仮定しない） */
+    var best = null;
+    for (var i = 0; i <= GRID_DIV; i++){
+      var b = Math.round(ub.upper * i / GRID_DIV);
+      var ev = evaluateCandidate(state, insId, params, b);
+      if (ev.ok && ev.totalQty > 0 && (best === null || b > best.totalBudget)) best = ev;
+    }
+    if (best === null){
+      return { status: "zero", reason: "no_feasible", params: params, upper: ub, elapsedMs: elapsed() };
+    }
+    /* 精査：最大の格子点の区間内を約20分割してさらに細かく調べる */
+    var gridStep = ub.upper / GRID_DIV;
+    var intervalEnd = Math.min(ub.upper, best.totalBudget + gridStep);
+    var refineStep = (intervalEnd - best.totalBudget) / REFINE_DIV;
+    if (refineStep > 0){
+      for (var k = 1; k <= REFINE_DIV; k++){
+        var b2 = Math.round(best.totalBudget + refineStep * k);
+        if (b2 <= best.totalBudget) continue;
+        var ev2 = evaluateCandidate(state, insId, params, b2);
+        if (ev2.ok && ev2.totalQty > 0) best = ev2;
+      }
+    }
+    /* 最終候補を現行エンジンで再評価して成立を確認してから結果とする */
+    var finalEv = evaluateCandidate(state, insId, params, best.totalBudget);
+    if (!finalEv.ok || finalEv.totalQty <= 0){
+      return { status: "zero", reason: "no_feasible", params: params, upper: ub, elapsedMs: elapsed() };
+    }
+    var atCeiling = finalEv.totalBudget >= ub.upper - 1;
+    return { status: "ok", params: params, totalBudget: finalEv.totalBudget, stages: finalEv.stages,
+             totalCost: finalEv.totalCost, totalQty: finalEv.totalQty,
+             minRate: finalEv.minRate, minRateDrop: finalEv.minRateDrop, rateAtTarget: finalEv.rateAtTarget, minBalance: finalEv.minBalance,
+             atCeiling: atCeiling, upper: ub,
+             meta: { upper: ub.upper, gridDiv: GRID_DIV, refineDiv: REFINE_DIV, gridStep: Math.round(gridStep), refineStep: Math.round(refineStep * 10) / 10, elapsedMs: elapsed() } };
+  }
+  return { sanitizeParams: sanitizeParams, evaluateCandidate: evaluateCandidate, upperBound: upperBound, solve: solve, GRID_DIV: GRID_DIV, REFINE_DIV: REFINE_DIV };
+})();
 </script>
 <script>
 "use strict";
@@ -1760,6 +1964,9 @@ function renderPlan(){
   }
   html += "</div>";
 
+  /* ---------- リスクから逆算（ステップ1・v1.9） ---------- */
+  html += reverseSectionHtml(ins);
+
   var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
   html += '<div class="card"><h2>ナンピン購入計画（' + esc(normalizeCode(ins.code)) + " " + esc(ins.name) + '）</h2>'
     + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は計画基準価格×(1−下落率)を円未満切り捨て。実際に購入した段階は「実行済み」にすると実績として記録され、将来シミュレーションでは再購入しません（実績は上の「現在の保有」へ反映して管理します）。未実行の段階は実行済みの実績を残したまま自由に変更できます。</p>'
@@ -1816,6 +2023,114 @@ function renderPlan(){
   bindInstrumentForm(el, ins);
   bindStages(el, ins);
   bindBulk(el, ins);
+  bindReverse(el, ins);
+}
+/* ---------- リスクから逆算セクション（プレビュー専用。入力値は保存データに含めない） ---------- */
+function reverseSectionHtml(ins){
+  if (!ui.reverse) ui.reverse = { target: 75, minRate: 35, start: 5, end: 65, step: 5, mode: "equal" };
+  var rv = ui.reverse;
+  var rp = (ui.reversePreview && ui.reversePreview.insId === ins.id) ? ui.reversePreview : null;
+  var html = '<div class="card"><h2>リスクから逆算</h2>'
+    + '<p class="sub">この銘柄について、リスク条件を満たす購入計画の総予算の上限を逆算します。他の銘柄の保有・既存建玉・既存計画は固定の前提として含め、この銘柄の未実行段階だけを候補に差し替えて評価します。条件は「数量のある段階がすべて購入時点で新規建て条件（' + state.settings.newMargin + '%）を満たす」「下落率0%〜目標耐性下落率の経路上の全評価点で維持率が最低維持率ライン以上」「同じ経路上で実質保証金が最低保証金額（' + fmtYen(state.settings.minMargin) + '）以上」の3点です。結果はプレビュー表示のみで、「この計画を反映する」を押すまでは計画を変更しません。逆算の入力値は保存データに含めない、その場の試算用です。</p>'
+    + '<div class="formgrid">'
+    + fld("目標耐性下落率（%）", '<input type="number" id="r_target" min="0" max="100" step="any" value="' + rv.target + '">')
+    + fld("最低維持率ライン（%）", '<input type="number" id="r_minrate" min="0" max="100" step="any" value="' + rv.minRate + '">')
+    + fld("購入開始下落率（%）", '<input type="number" id="r_start" min="0" max="100" step="any" value="' + rv.start + '">')
+    + fld("購入終了下落率（%）", '<input type="number" id="r_end" min="0" max="100" step="any" value="' + rv.end + '">')
+    + fld("購入間隔（%）", '<input type="number" id="r_step" min="0.5" max="100" step="any" value="' + rv.step + '">')
+    + fld("配分方式", '<select id="r_mode"><option value="equal"' + (rv.mode === "equal" ? " selected" : "") + '>均等配分</option><option value="deeper"' + (rv.mode === "deeper" ? " selected" : "") + '>下落が深いほど購入額を増やす</option><option value="shallower"' + (rv.mode === "shallower" ? " selected" : "") + ">下落が浅い段階で多く購入する</option></select>")
+    + "</div>"
+    + '<p class="hint">入力欄の初期値（目標75%・最低維持率35%など）はあくまで入力例であり、推奨値ではありません。ご自身のリスク許容度に合わせて変更してください。</p>'
+    + (rv.end > rv.target ? '<div class="notice warn" style="margin-top:10px">目標下落率より深い段階は逆算の判定対象外です（購入終了下落率 ' + rv.end + '% が目標耐性下落率 ' + rv.target + '% より大きいため、' + rv.target + '% より深い段階は成立条件の判定に含まれません）。</div>' : "")
+    + '<div class="rowflex mt"><button class="btn" id="revRunBtn" type="button">逆算する</button></div>';
+  if (rp){
+    var res = rp.result;
+    html += '<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><h3>逆算結果（プレビュー）</h3>';
+    if (res.status === "ok"){
+      html += '<div class="notice info" style="margin-top:0">探索範囲内で確認した購入予算（概算）：<strong class="num" style="font-size:1.1rem">' + fmtYen(res.totalBudget) + '</strong><br>この金額はアプリの計算モデルによる目安です。実際の可否は証券会社の表示で確認してください。</div>'
+        + (res.atCeiling ? '<div class="notice warn">探索上限内での結果です（結果が探索上限に張り付いています）。' + esc(res.upper.basis) + "</div>" : "")
+        + '<div class="tblwrap mt"><table class="dt"><thead><tr><th>下落率</th><th>段階予算</th><th>想定価格</th><th>購入数量</th><th>購入金額</th></tr></thead><tbody>';
+      res.stages.forEach(function(sg){
+        html += '<tr><td class="num">−' + sg.dropPct + '%</td><td class="num" data-label="段階予算">' + fmtYenShort(sg.budget) + '円</td><td class="num" data-label="想定価格">' + (ins.planBasePrice > 0 ? fmtYenShort(sg.price) + "円" : "—") + '</td><td class="num" data-label="購入数量">' + sg.qty.toLocaleString("ja-JP") + (sg.status === "skip" ? "（見送り）" : "") + '</td><td class="num" data-label="購入金額">' + fmtYenShort(sg.cost) + "円</td></tr>";
+      });
+      html += "</tbody></table></div>"
+        + '<dl class="kv mt"><dt>実購入予定額合計</dt><dd class="num">' + fmtYen(res.totalCost) + "</dd>"
+        + "<dt>経路上の最低維持率</dt><dd class='num'>" + (res.minRate === null ? "対象外" : fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）") + "</dd>"
+        + "<dt>目標下落率（−" + res.params.target + "%）時点の維持率</dt><dd class='num'>" + (res.rateAtTarget === null ? "対象外" : fmtPct(res.rateAtTarget)) + "</dd></dl>"
+        + '<p class="hint">探索メタ情報：探索範囲 0〜' + fmtYen(res.meta.upper) + "（総予算）／グリッド " + res.meta.gridDiv + "分割＋精査 " + res.meta.refineDiv + "分割（精査粒度 約" + fmtYen(res.meta.refineStep) + "）／所要 " + res.meta.elapsedMs + "ミリ秒。全域の最大値を保証するものではありません。<br>探索上限の根拠：" + esc(res.upper.basis) + "</p>"
+        + '<div class="rowflex"><button class="btn primary" id="revApplyBtn" type="button">この計画を反映する</button></div>';
+    } else if (res.status === "existing_fail"){
+      html += '<div class="notice danger" style="margin-top:0"><strong>逆算できません：既存建玉のみで既に条件未達です。</strong><br>候補計画なし・他銘柄の計画なし（実保有と既存建玉だけ）の経路評価で、すでに条件を満たしていません。'
+        + (res.failRate ? "<br>・経路上の最低維持率 " + fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）が最低維持率ライン " + fmtPct(res.params.minRate) + " を下回っています。" : "")
+        + (res.failBalance ? "<br>・経路上の実質保証金の最小値 " + fmtYen(res.minBalance) + " が最低保証金額 " + fmtYen(state.settings.minMargin) + " を下回っています。" : "")
+        + "<br>口座・保有状況を見直してから、再度お試しください。</div>";
+    } else if (res.status === "other_fail"){
+      html += '<div class="notice danger" style="margin-top:0"><strong>逆算できません：他銘柄の固定計画による未達です。</strong><br>既存建玉だけでは条件を満たしますが、他銘柄の現在の購入計画を含めると経路上で条件を満たしません。'
+        + (res.failRate ? "<br>・経路上の最低維持率 " + fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）が最低維持率ライン " + fmtPct(res.params.minRate) + " を下回っています。" : "")
+        + (res.failBalance ? "<br>・経路上の実質保証金の最小値 " + fmtYen(res.minBalance) + " が最低保証金額 " + fmtYen(state.settings.minMargin) + " を下回っています。" : "")
+        + "<br>他銘柄の計画を調整してから、再度お試しください。</div>";
+    } else {
+      html += '<div class="notice warn" style="margin-top:0"><strong>購入可能額ゼロです。</strong><br>'
+        + (res.reason === "upper"
+          ? "探索上限が0以下でした（現在の実質保証金から到達可能な建代金合計が、既存の建代金合計以下です）。<br>" + esc(res.upper ? res.upper.basis : "")
+          : "探索範囲内で、条件を満たして1売買単位以上を購入できる予算が見つかりませんでした（売買単位の金額に対して予算上限が小さい可能性があります）。")
+        + "</div>";
+    }
+    html += "</div>";
+  }
+  html += "</div>";
+  return html;
+}
+function bindReverse(el, ins){
+  function readInputs(){
+    function gv(id, fb){ var n = el.querySelector(id); return n ? num(n.value, fb) : fb; }
+    var modeEl = el.querySelector("#r_mode");
+    return { target: gv("#r_target", 75), minRate: gv("#r_minrate", 35), start: gv("#r_start", 5), end: gv("#r_end", 65),
+             step: Math.max(0.5, gv("#r_step", 5)), mode: modeEl ? modeEl.value : "equal" };
+  }
+  ["#r_target","#r_minrate","#r_start","#r_end","#r_step","#r_mode"].forEach(function(id){
+    var n = el.querySelector(id);
+    if (n) n.addEventListener("change", function(){ ui.reverse = readInputs(); renderPlan(); });
+  });
+  var run = el.querySelector("#revRunBtn");
+  if (run) run.onclick = function(){
+    ui.reverse = readInputs();
+    if (!(ins.planBasePrice > 0)){ toast("先に計画基準価格を入力してください（想定価格が計算できません）。"); return; }
+    run.disabled = true; run.textContent = "逆算中…";
+    /* 重い計算で描画が固まらないよう、ボタン表示を先に反映してから実行する */
+    setTimeout(function(){
+      var result = ReverseCalc.solve(state, ins.id, ui.reverse);
+      ui.reversePreview = { insId: ins.id, params: ReverseCalc.sanitizeParams(ui.reverse), result: result };
+      renderPlan();
+      toast(result.status === "ok" ? "逆算が完了しました（プレビュー表示中です。計画はまだ変更していません）。" : "逆算結果を表示しました。理由を確認してください。");
+    }, 30);
+  };
+  var apply = el.querySelector("#revApplyBtn");
+  if (apply) apply.onclick = function(){
+    var rp = ui.reversePreview;
+    if (!rp || rp.insId !== ins.id || rp.result.status !== "ok") return;
+    confirmModal("この計画を反映しますか",
+      "(i) 現在の計画の未実行段階はすべて、逆算結果の段階（" + rp.result.stages.length + "段階・総予算 " + fmtYen(rp.result.totalBudget) + "）に置き換わります。<br>(ii) 実行済み段階は保護され、変更されません。実保有も変更されません。<br>(iii) 反映前に、設定・データ画面からJSONエクスポートでバックアップを取ることをおすすめします。<br>反映の直前に、現在のデータで候補予算が今も成立するかを再検証します。",
+      "再検証して反映する", function(){
+        /* 適用前の再検証：プレビュー後に口座・価格・計画が変わっていたら古い結果をそのまま反映しない */
+        var ev = ReverseCalc.evaluateCandidate(state, ins.id, rp.params, rp.result.totalBudget);
+        if (!ev.ok || ev.totalQty <= 0){
+          var fresh = ReverseCalc.solve(state, ins.id, rp.params);
+          ui.reversePreview = { insId: ins.id, params: rp.params, result: fresh };
+          renderPlan();
+          toast("前提が変わっていたため、候補予算が成立しなくなりました。逆算を再実行し、新しいプレビューを表示しました。内容を確認してから再度反映してください。");
+          return;
+        }
+        var kept = ins.stages.filter(function(s){ return s.executed; });
+        var news = rp.result.stages.map(function(sg){
+          return { id: uid("st"), dropPct: sg.dropPct, budget: sg.budget, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false };
+        });
+        ins.stages = kept.concat(news);
+        ui.reversePreview = null;
+        recalc(); renderPlan();
+        toast("逆算結果を反映しました（未実行 " + news.length + " 段階を置き換え" + (kept.length ? "、実行済み " + kept.length + " 段階は保護" : "") + "）。");
+      });
+  };
 }
 function bindBulk(el, ins){
   var pv = el.querySelector("#bulkPreviewBtn");
@@ -2713,8 +3028,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.8" && SW_CACHE_NAME === "nanpin-planner-v14",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.8／SW v14");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.9" && SW_CACHE_NAME === "nanpin-planner-v15",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.9／SW v15");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -2884,6 +3199,95 @@ function runSelfTests(){
     && st57fresh.recorded === true && st57fresh.stale === false && st57fresh.days === 8
     && st57old.recorded === true && st57old.stale === true && st57old.days === 48 && st57bad.recorded === false,
     "記録が無い・壊れている場合は未記録として扱い、8日前の記録は促しなし、48日前（30日超）の記録は古いとして穏やかな促しの対象になる。記録はJSON本体ではなく端末側の保存領域（別キー）にだけ残す");
+  /* 58 1-0地ならし：シナリオ拡張項目の初期値補完・保持・JSON往復と、サンプル回帰値の不変 */
+  var old58 = sampleState(); delete old58.settings.scenarioType; delete old58.settings.scenarioEndpoints;
+  var mig58 = sanitizeState(old58);
+  var custom58 = sampleState(); custom58.settings.scenarioType = "perInstrument"; custom58.settings.scenarioEndpoints = { "285a": 60, "7203": 120, "bad-code!": "x", "": 10 };
+  var clean58 = sanitizeState(custom58);
+  var round58 = unpackState(packState(clean58));
+  var r58 = MarginSim.simulate(sanitizeState(sampleState()));
+  t("シナリオ拡張項目が初期値補完・保持・JSON往復し回帰値が不変", mig58.settings.scenarioType === "uniform"
+    && JSON.stringify(mig58.settings.scenarioEndpoints) === "{}"
+    && clean58.settings.scenarioType === "perInstrument" && clean58.settings.scenarioEndpoints["285A"] === 60 && clean58.settings.scenarioEndpoints["7203"] === 100
+    && Object.keys(clean58.settings.scenarioEndpoints).length === 2
+    && round58.ok && round58.state.settings.scenarioType === "perInstrument" && round58.state.settings.scenarioEndpoints["285A"] === 60
+    && r58.planCost === 4493550 && Math.abs(r58.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r58.firstCallPrecise - 77.6) < 0.051,
+    "旧データ（項目なし）は種別＝一律・終点マップ＝空で補完され、形式はv3のまま。コードは正規化し範囲外は丸め、不正な項目は除去する。値はJSON往復で保持され、サンプルの実購入予定額4,493,550円・到達 −76.6%/−77.6% は不変（この項目は計算に使わない）");
+  /* 逆算テスト用の小ケースstateを作る共通ヘルパー */
+  function revState(collateral, extra){
+    var base = { version: 3, meta: { isSample: false, updatedAt: "" },
+      account: { broker: "", collateral: collateral, collateralBasis: "after", cash: 0, brokerRate: null }, positions: [],
+      instruments: [{ id: "rv1", code: "9999", name: "逆算テスト", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 1, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [] }],
+      settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5, collateralMode: "none", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 10000 } };
+    if (extra) extra(base);
+    return sanitizeState(base);
+  }
+  /* 59 逆算：手計算できる小ケースで全数探索（500円刻みの総当たり）と精査粒度内で一致する
+        手計算：担保1,000,000円→小ケースは100,000円に縮小。−10%で価格900円・単位1・目標50%・最低維持率35%では
+        50%時点の維持率 (100,000−400q)/(900q)≧35% より q≦139（400+315=715、100,000/715=139.8…）が上限 */
+  var s59 = revState(100000);
+  var p59 = { target: 50, minRate: 35, start: 10, end: 10, step: 10, mode: "equal" };
+  var res59 = ReverseCalc.solve(s59, "rv1", p59);
+  var brute59 = 0;
+  if (res59.status === "ok"){
+    for (var b59 = 0; b59 <= res59.upper.upper; b59 += 500){ var ev59 = ReverseCalc.evaluateCandidate(s59, "rv1", p59, b59); if (ev59.ok && ev59.totalQty > 0) brute59 = b59; }
+  }
+  t("予算逆算が全数探索の最大予算と精査粒度内で一致する", res59.status === "ok" && res59.totalQty === 139
+    && Math.abs(brute59 - res59.totalBudget) <= 500 + res59.meta.refineStep + 100
+    && ReverseCalc.evaluateCandidate(s59, "rv1", p59, res59.totalBudget).ok,
+    "担保100,000円・単位1・単一の段階の手計算ケースでは購入数量の上限は139。逆算結果（総予算 " + (res59.totalBudget || 0).toLocaleString("ja-JP") + "円・数量 " + res59.totalQty + "）は500円刻みの全数探索の最大予算 " + brute59.toLocaleString("ja-JP") + "円と精査粒度（約" + (res59.meta ? res59.meta.refineStep : "?") + "円）内で一致し、結果自体も成立する");
+  /* 60 途中の段階が31%を満たさない候補は不成立。61 数量ゼロ段階（見送り）を含む候補は成立し得る */
+  var s6061 = { version: 3, meta: { isSample: false, updatedAt: "" },
+    account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
+    instruments: [{ id: "rv2", code: "9995", name: "逆算見送りテスト", type: "stock", planBasePrice: 70000, closePrice: 70000, closeDate: "", closeSource: "", unit: 100, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [] }],
+    settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5, collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000 } };
+  s6061 = sanitizeState(s6061);
+  var p6061 = { target: 55, minRate: 20, start: 5, end: 55, step: 50, mode: "equal" };
+  var ev61 = ReverseCalc.evaluateCandidate(s6061, "rv2", p6061, 7000000);
+  t("数量ゼロ段階（見送り）を含む候補が成立し得る", ev61.ok && ev61.stages[0].status === "skip" && ev61.stages[0].qty === 0
+    && ev61.stages[1].status === "buy" && ev61.totalQty === 100,
+    "総予算7,000,000円（均等）では −5%段階は価格66,500円×単位100に届かず数量0の見送り、−55%段階は数量100で購入可。見送りは条件(a)の判定対象外のため候補は成立する");
+  var ev60 = ReverseCalc.evaluateCandidate(s6061, "rv2", p6061, 13000000);
+  t("途中の段階が新規建て条件を満たさない候補は不成立になる", ev60.ok === false && ev60.condA === false && ev60.stages[1].status === "infeasible",
+    "総予算13,000,000円では −55%段階の数量が200になり、必要保証金が購入時点の推計保証金を上回るため実行不能（infeasible）となり、条件(a)で候補は不成立になる");
+  /* 62 例外(1)：既存建玉のみで既に条件未達 */
+  var s62 = revState(500000, function(b){
+    b.positions = [{ id: "p62", code: "", name: "既存", side: "buy", principal: 1000000, pnl: -400000 }];
+  });
+  var res62 = ReverseCalc.solve(s62, "rv1", { target: 50, minRate: 35, start: 10, end: 10, step: 10, mode: "equal" });
+  t("逆算の例外(1)既存建玉のみで条件未達を返す", res62.status === "existing_fail" && res62.failBalance === true,
+    "担保500,000円・既存建玉（建代金1,000,000円・評価損−400,000円）では、下落に伴い実質保証金が最低保証金（テスト設定10,000円）を割り込み維持率もマイナスになるため、候補なし・他計画なしの評価で未達になり existing_fail を返す");
+  /* 63 例外(2)：他銘柄の固定計画による未達 */
+  var s63 = revState(1000000, function(b){
+    b.instruments.push({ id: "rvB", code: "8888", name: "他銘柄", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 1, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null },
+      stages: [{ id: "rvBs", dropPct: 10, budget: 3000000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] });
+  });
+  var res63 = ReverseCalc.solve(s63, "rv1", { target: 80, minRate: 35, start: 10, end: 10, step: 10, mode: "equal" });
+  t("逆算の例外(2)他銘柄の固定計画による未達を返す", res63.status === "other_fail" && res63.failRate === true,
+    "既存のみでは経路を満たすが、他銘柄の現行計画（−10%で約300万円購入）を含めると −80%時点で維持率が大きく割り込むため other_fail を返す");
+  /* 64 例外(3)：購入可能額ゼロ（探索上限内では1単元も買えない） */
+  var s64 = revState(100000, function(b){
+    b.instruments[0].planBasePrice = 100000; b.instruments[0].closePrice = 100000; b.instruments[0].unit = 100;
+  });
+  var res64 = ReverseCalc.solve(s64, "rv1", { target: 50, minRate: 35, start: 10, end: 10, step: 10, mode: "equal" });
+  var s64b = revState(310000, function(b){
+    b.positions = [{ id: "p64", code: "", name: "既存", side: "buy", principal: 1000000, pnl: 0 }];
+  });
+  var res64b = ReverseCalc.solve(s64b, "rv1", { target: 0, minRate: 20, start: 10, end: 10, step: 10, mode: "equal" });
+  t("逆算の例外(3)購入可能額ゼロを返す", res64.status === "zero" && res64.reason === "no_feasible" && res64b.status === "zero" && res64b.reason === "upper",
+    "基準価格100,000円・単位100では1単元が約900万円になり探索上限（約32万円）では買えないため zero（no_feasible）。既存建玉1,000,000円・実質保証金310,000円では到達可能な建代金合計の上限が既存分と一致し探索上限が0になるため zero（upper）を返す");
+  /* 65 探索上限に張り付くケースでフラグが立つ */
+  var s65 = revState(1000000);
+  var res65 = ReverseCalc.solve(s65, "rv1", { target: 10, minRate: 1, start: 10, end: 10, step: 10, mode: "equal" });
+  t("探索上限に張り付くケースでフラグが立つ", res65.status === "ok" && res65.atCeiling === true && res65.totalBudget >= res65.upper.upper - 1,
+    "最低維持率1%・目標10%の緩い条件では新規建て条件から決まる探索上限（実質保証金÷31%）まで成立し、結果が上限に張り付くため atCeiling が立つ（上限は制度上の上限ではなく探索用の天井）");
+  /* 66 速度計測：サンプル相当の前提での逆算1回の所要時間 */
+  var t66start = Date.now();
+  var smp66 = sampleState();
+  var res66 = ReverseCalc.solve(sanitizeState(smp66), smp66.instruments[0].id, { target: 75, minRate: 35, start: 5, end: 65, step: 5, mode: "equal" });
+  var elapsed66 = Date.now() - t66start;
+  t("サンプル相当の逆算が実用的な時間で完了する", res66.status === "ok" && elapsed66 < 10000,
+    "サンプル前提（担保15,617,481円・現金70,309円・13段階計画を持つ銘柄が対象）での逆算1回は実測 " + elapsed66 + "ミリ秒（エンジン内計測 " + (res66.meta ? res66.meta.elapsedMs : "?") + "ミリ秒）で完了し、総予算 " + (res66.totalBudget || 0).toLocaleString("ja-JP") + "円・実購入予定額 " + (res66.totalCost || 0).toLocaleString("ja-JP") + "円が得られた");
   return T;
 }
 
