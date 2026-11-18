@@ -292,8 +292,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "2.0.1";
-var SW_CACHE_NAME = "nanpin-planner-v19";
+var APP_VERSION = "2.1";
+var SW_CACHE_NAME = "nanpin-planner-v20";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -340,8 +340,9 @@ function sampleState(){
     settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5,
                 collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000,
                 relayUrl: DEFAULT_RELAY_URL,
-                /* シナリオ拡張の地ならし（形式v3のまま追加する任意項目）：将来の銘柄別シナリオ用。
-                   現時点では種別は一律（uniform）のみで、銘柄別終点マップは空。計算・表示には一切使わない */
+                /* シナリオ設定（形式v3のまま追加する任意項目・ステップ1で地ならし、ステップ3で実装）：
+                   種別は一律（uniform・初期値）／詳細（perInstrument＝銘柄別終点）。終点マップは
+                   「銘柄コード → 終点下落率(%)」で、詳細モードの経路評価に使う */
                 scenarioType: "uniform", scenarioEndpoints: {} }
   };
 }
@@ -452,8 +453,8 @@ function sanitizeState(s){
     minMargin: clamp(num(st.minMargin, 300000), 0, 1e12),
     /* 価格中継URL：旧データで未設定なら初期値で補完する（移行ブロックはしない）。空欄は無効として保持し、https 以外は除去する */
     relayUrl: (st.relayUrl === undefined || st.relayUrl === null) ? DEFAULT_RELAY_URL : sanitizeRelayUrl(st.relayUrl),
-    /* シナリオ拡張の地ならし（形式v3のまま追加する任意項目）：旧データ・旧JSONでは項目がないため
-       種別＝一律（uniform）・銘柄別終点マップ＝空で補完する。値は保持するだけで計算・表示には使わない。
+    /* シナリオ設定（形式v3のまま追加する任意項目）：旧データ・旧JSONでは項目がないため
+       種別＝一律（uniform）・銘柄別終点マップ＝空で補完し、そのまま一律として読み込める。
        終点マップは「銘柄コード → 終点下落率(%)」の素朴なマップとして検証し、不正な項目は除去する */
     scenarioType: st.scenarioType === "perInstrument" ? "perInstrument" : "uniform",
     scenarioEndpoints: (function(){
@@ -486,6 +487,47 @@ var MarginSim = (function(){
       case "custom": return clamp(num(settings.collateralCustom, 100), 0, 300) / 100;
       default: return 1;
     }
+  }
+  /* ---------- 詳細下落シナリオ（ステップ3・v2.1） ----------
+     経路は「基準パス」（想定最大下落率まで進む共通のものさし）の下落率で表し、進行度 p ＝ 基準パス下落率 ÷ 想定最大下落率。
+     一律（uniform）：全銘柄の下落率 ＝ 基準パス下落率（従来どおり）。
+     詳細（perInstrument）：各銘柄の下落率 ＝ その銘柄の終点下落率 × p。
+     終点は銘柄コードごとの設定（scenarioEndpoints）で、未設定の銘柄は想定最大下落率が終点になる。
+     担保と計画銘柄以外の既存建玉は、どちらのモードでも基準パスで変動する（担保＝連動倍率×基準パス、
+     既存建玉＝基準パスへの比例の近似を維持）。計算式はこのモジュール内の単一実装のままで、
+     銘柄ごとの下落率への変換（dropFor）だけを差し替える。 */
+  function scenarioDetailed(state){
+    return !!(state && state.settings && state.settings.scenarioType === "perInstrument");
+  }
+  function endpointFor(state, ins){
+    var st = (state && state.settings) || {};
+    if (st.scenarioType !== "perInstrument") return num(st.maxDrop, 80);
+    var map = (st.scenarioEndpoints && typeof st.scenarioEndpoints === "object" && !Array.isArray(st.scenarioEndpoints)) ? st.scenarioEndpoints : {};
+    var v = num(map[normalizeCode(ins && ins.code)], NaN);
+    return isFinite(v) ? clamp(v, 0, 100) : num(st.maxDrop, 80);
+  }
+  /* 基準パス下落率 baseDrop の時点で、銘柄 ins 自身の下落率を返す（一律では baseDrop そのもの） */
+  function dropFor(state, ins, baseDrop){
+    var st = (state && state.settings) || {};
+    if (st.scenarioType !== "perInstrument") return baseDrop;
+    var md = num(st.maxDrop, 0);
+    if (!(md > 0)) return baseDrop;
+    return endpointFor(state, ins) * (baseDrop / md);
+  }
+  /* 購入段階が発動する進行度（0〜1）。終点が0で下落率が正の段階は発動しないため Infinity */
+  function triggerProgress(state, ins, sg){
+    if (!(sg.dropPct > 0)) return 0;
+    var ep = endpointFor(state, ins);
+    if (!(ep > 0)) return Infinity;
+    return sg.dropPct / ep;
+  }
+  /* 購入段階が発動する時点の基準パス下落率（一律では段階の下落率そのもの） */
+  function triggerBaseDrop(state, ins, sg){
+    var st = (state && state.settings) || {};
+    if (st.scenarioType !== "perInstrument") return sg.dropPct;
+    var tp = triggerProgress(state, ins, sg);
+    if (!isFinite(tp)) return Infinity;
+    return tp * num(st.maxDrop, 0);
   }
   /* 想定価格＝計画基準価格×(1−下落率) を円単位に切り捨てる共通の丸め処理。
      切り捨て前に相対 1e-9 の微小補正を加え、浮動小数点誤差を吸収する
@@ -546,11 +588,13 @@ var MarginSim = (function(){
     var pnl = h.side === "sell" ? h.qty * (h.avgPrice - price) : h.qty * (price - h.avgPrice);
     return { pnl: pnl, approx: now.approx };
   }
-  function holdingsTotalsAt(state, dropPct){
+  /* 基準パス下落率 baseDrop 時点の銘柄別保有の合計。銘柄ごとの下落率は dropFor で変換する
+     （一律では全銘柄が baseDrop、詳細では各銘柄が自分の終点へ比例した下落率になる） */
+  function holdingsTotalsAt(state, baseDrop){
     var principal = 0, pnl = 0, approx = false;
     state.instruments.forEach(function(ins){
       principal += holdingPrincipal(ins);
-      var r = holdingPnlAt(ins, dropPct);
+      var r = holdingPnlAt(ins, dropFor(state, ins, baseDrop));
       pnl += r.pnl; if (r.approx) approx = true;
     });
     return { principal: principal, pnl: pnl, approx: approx };
@@ -565,14 +609,26 @@ var MarginSim = (function(){
     return { principal: principal, pnl: pnl, approx: approx };
   }
 
-  /* 全段階の数量・実購入額・実行可否をトリガー到達時点の保証金で判定（段階は下落率の昇順に処理） */
+  /* 全段階の数量・実購入額・実行可否をトリガー到達時点の保証金で判定。
+     処理順：一律では下落率の昇順（同率は銘柄コード順・従来どおり）。詳細では発動する進行度の昇順で、
+     同じ進行度で複数の段階が発動する場合は銘柄の登録順（同銘柄内は段階の登録順）に処理する */
   function evaluateStages(state){
     var st = state.settings, factor = collateralFactor(st);
+    var detailed = scenarioDetailed(state);
     var flat = [];
-    state.instruments.forEach(function(ins){
-      ins.stages.forEach(function(sg){ flat.push({ ins: ins, sg: sg }); });
+    state.instruments.forEach(function(ins, ii){
+      ins.stages.forEach(function(sg, si){ flat.push({ ins: ins, sg: sg, ii: ii, si: si }); });
     });
-    flat.sort(function(a, b){ return a.sg.dropPct - b.sg.dropPct || String(a.ins.code).localeCompare(String(b.ins.code)); });
+    if (detailed){
+      flat.sort(function(a, b){
+        var pa = triggerProgress(state, a.ins, a.sg), pb = triggerProgress(state, b.ins, b.sg);
+        if (pa !== pb) return pa < pb ? -1 : 1;
+        if (a.ii !== b.ii) return a.ii - b.ii;
+        return a.si - b.si;
+      });
+    } else {
+      flat.sort(function(a, b){ return a.sg.dropPct - b.sg.dropPct || String(a.ins.code).localeCompare(String(b.ins.code)); });
+    }
     var result = {}; var executedPrior = [];
     flat.forEach(function(item){
       var ins = item.ins, sg = item.sg;
@@ -587,14 +643,23 @@ var MarginSim = (function(){
       /* 実行済みの段階は実績として保有建玉側で表すため、将来シミュレーションでは再購入しない */
       if (sg.executed){ rec.status = "executed"; rec.reason = "実行済み"; result[sg.id] = rec; return; }
       if (!sg.enabled){ rec.status = "disabled"; rec.reason = "無効"; result[sg.id] = rec; return; }
+      /* 詳細シナリオでは、銘柄の終点を超える下落率の段階はそのシナリオでは到達しないため発動しない。
+         数量・金額は0として扱い、計画画面では「シナリオ終点を超えるため発動しません」と明示する */
+      if (detailed && sg.dropPct > endpointFor(state, ins) + 1e-9){
+        rec.qty = 0; rec.cost = 0; rec.status = "beyond";
+        rec.reason = "シナリオ終点（−" + endpointFor(state, ins) + "%）を超えるため、このシナリオでは発動しません";
+        result[sg.id] = rec; return;
+      }
       if (qty <= 0){ rec.status = "skip"; rec.reason = price <= 0 ? "計画基準価格が未設定" : "見送り（数量0）：予算内で売買単位を購入できないため、この段階は購入しません（保証金不足ではありません）"; result[sg.id] = rec; return; }
-      /* トリガー到達時点（下落率＝この段階の下落率）の推計保証金 */
-      var t = sg.dropPct;
+      /* トリガー到達時点（その段階が発動する進行度）の推計保証金。
+         到達時点は基準パス下落率で表し（一律では段階の下落率そのもの）、担保・既存建玉は基準パス、
+         銘柄別保有と先行購入分は各銘柄自身の下落率で評価する */
+      var t = detailed ? triggerBaseDrop(state, ins, sg) : sg.dropPct;
       var exP = existingPnlAt(state.positions, t);
       var hdT = holdingsTotalsAt(state, t);
       var newPnl = 0;
       executedPrior.forEach(function(p){
-        var curPrice = stagePrice(p.ins.planBasePrice, t);
+        var curPrice = stagePrice(p.ins.planBasePrice, dropFor(state, p.ins, t));
         newPnl += p.qty * (curPrice - p.price);
       });
       var balance = collateralAt(state.account.collateral, t, factor) + state.account.cash
@@ -613,19 +678,22 @@ var MarginSim = (function(){
     return result;
   }
 
-  /* ある下落率・購入カットオフでの維持率／実質保証金／建代金合計（simulate の精緻化計算と共通の単一実装）。
-     cutoff より深い段階はまだ購入していないものとして扱う（トリガー直前の評価に使う） */
+  /* ある基準パス下落率・購入カットオフでの維持率／実質保証金／建代金合計（simulate の精緻化計算と共通の単一実装）。
+     drop・cutoff は基準パス下落率で表す（一律では銘柄の下落率そのもの、詳細では進行度×想定最大下落率）。
+     cutoff より深い段階はまだ購入していないものとして扱う（トリガー直前の評価に使う）。
+     段階の発動は各銘柄自身の下落率で判定し（発動時点＝triggerBaseDrop）、保有・購入分の評価損益も
+     各銘柄自身の下落率で計算する。担保と計画銘柄以外の既存建玉は基準パスで変動する */
   function pointAt(state, stageRes, drop, cutoff){
     var st = state.settings, factor = collateralFactor(st);
     var existingPrincipal = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
     var executed = [];
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
       var r = stageRes[sg.id];
-      if (sg.enabled && r && r.feasible && sg.dropPct <= cutoff + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
+      if (sg.enabled && r && r.feasible && triggerBaseDrop(state, ins, sg) <= cutoff + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
     });});
     var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
     var newPnl = executed.reduce(function(s, e){
-      var curPrice = stagePrice(e.ins.planBasePrice, drop);
+      var curPrice = stagePrice(e.ins.planBasePrice, dropFor(state, e.ins, drop));
       return s + e.r.qty * (curPrice - e.r.price);
     }, 0);
     var exP = existingPnlAt(state.positions, drop);
@@ -645,7 +713,7 @@ var MarginSim = (function(){
     var triggerDrops = [];
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
       var r = stageRes[sg.id];
-      if (sg.enabled && !sg.executed && r && r.status !== "skip") triggerDrops.push(sg.dropPct);
+      if (sg.enabled && !sg.executed && r && r.status !== "skip" && r.status !== "beyond") triggerDrops.push(triggerBaseDrop(state, ins, sg));
     }); });
     var candMap = {}, cands = [];
     function addC(d){ var k = d.toFixed(4); if (!candMap[k]){ candMap[k] = 1; cands.push(d); } }
@@ -681,12 +749,12 @@ var MarginSim = (function(){
       state.instruments.forEach(function(ins){
         ins.stages.forEach(function(sg){
           var r = stageRes[sg.id];
-          if (sg.enabled && r && r.feasible && sg.dropPct <= drop + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
+          if (sg.enabled && r && r.feasible && triggerBaseDrop(state, ins, sg) <= drop + 1e-9) executed.push({ ins: ins, sg: sg, r: r });
         });
       });
       var newPrincipal = executed.reduce(function(s, e){ return s + e.r.cost; }, 0);
       var newPnl = executed.reduce(function(s, e){
-        var curPrice = stagePrice(e.ins.planBasePrice, drop);
+        var curPrice = stagePrice(e.ins.planBasePrice, dropFor(state, e.ins, drop));
         return s + e.r.qty * (curPrice - e.r.price);
       }, 0);
       var exP = existingPnlAt(state.positions, drop);
@@ -697,18 +765,22 @@ var MarginSim = (function(){
       var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
       var rate = totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null;
       var capacity = st.newMargin > 0 ? Math.max(0, Math.floor(balance / (st.newMargin / 100)) - totalPrincipal) : 0;
-      var infeasibleHere = 0, infeasibleAt = 0, skipHere = 0, skipAt = 0;
+      var infeasibleHere = 0, infeasibleAt = 0, skipHere = 0, skipAt = 0, beyondHere = 0;
       state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
         var r = stageRes[sg.id];
-        if (sg.enabled && !sg.executed && r && r.status === "infeasible" && sg.dropPct <= drop + 1e-9) infeasibleHere++;
-        if (sg.enabled && !sg.executed && r && r.status === "infeasible" && Math.abs(sg.dropPct - drop) < 1e-9) infeasibleAt++;
-        if (sg.enabled && !sg.executed && r && r.status === "skip" && sg.dropPct <= drop + 1e-9) skipHere++;
-        if (sg.enabled && !sg.executed && r && r.status === "skip" && Math.abs(sg.dropPct - drop) < 1e-9) skipAt++;
+        var bd = triggerBaseDrop(state, ins, sg);
+        if (sg.enabled && !sg.executed && r && r.status === "infeasible" && bd <= drop + 1e-9) infeasibleHere++;
+        if (sg.enabled && !sg.executed && r && r.status === "infeasible" && Math.abs(bd - drop) < 1e-9) infeasibleAt++;
+        if (sg.enabled && !sg.executed && r && r.status === "skip" && bd <= drop + 1e-9) skipHere++;
+        if (sg.enabled && !sg.executed && r && r.status === "skip" && Math.abs(bd - drop) < 1e-9) skipAt++;
+        if (sg.enabled && !sg.executed && r && r.status === "beyond") beyondHere++;
       });});
-      return { drop: drop, collateral: collateral, existingPnl: exP.pnl, holdingsPnl: hdP.pnl, newPnl: newPnl, totalPnl: totalPnl,
+      var dropsByIns = {};
+      state.instruments.forEach(function(ins){ dropsByIns[ins.id] = dropFor(state, ins, drop); });
+      return { drop: drop, progress: st.maxDrop > 0 ? drop / st.maxDrop : 0, dropsByIns: dropsByIns, collateral: collateral, existingPnl: exP.pnl, holdingsPnl: hdP.pnl, newPnl: newPnl, totalPnl: totalPnl,
                existingPnlApprox: exP.approx || hdP.approx, holdingsPrincipal: hdP.principal, newPrincipal: newPrincipal, totalPrincipal: totalPrincipal,
                balance: balance, rate: rate, capacity: capacity, executedCount: executed.length, infeasibleCount: infeasibleHere,
-               infeasibleAtDrop: infeasibleAt, skipCount: skipHere, skipAtDrop: skipAt, belowMinMargin: balance < st.minMargin };
+               infeasibleAtDrop: infeasibleAt, skipCount: skipHere, skipAtDrop: skipAt, beyondCount: beyondHere, belowMinMargin: balance < st.minMargin };
     });
     /* 現在値：起点は「銘柄別の実保有＋口座の既存建玉」。計画購入は未実行の段階だけを将来シナリオで追加する */
     var exNow = existingPnlAt(state.positions, 0);
@@ -731,12 +803,17 @@ var MarginSim = (function(){
       return null;
     }
     /* 最初の「実行不能」段階（数量1単位以上で新規建て条件を満たせない段階）。
-       見送り（数量0）の段階はここに数えないため、補助指標は見送り段階では止まらない */
+       見送り（数量0）の段階はここに数えないため、補助指標は見送り段階では止まらない。
+       「最初」は発動時点（基準パス下落率）の早さで判定する（一律では段階の下落率そのもの）。
+       drop は段階自身の下落率、baseDrop は発動時点の基準パス下落率を保持する */
     var firstInfeasible = null;
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
       var r = stageRes[sg.id];
-      if (sg.enabled && !sg.executed && r && r.status === "infeasible" && (firstInfeasible === null || sg.dropPct < firstInfeasible.drop)) {
-        firstInfeasible = { drop: sg.dropPct, code: ins.code, reason: r.reason };
+      if (sg.enabled && !sg.executed && r && r.status === "infeasible") {
+        var bd = triggerBaseDrop(state, ins, sg);
+        if (firstInfeasible === null || bd < firstInfeasible.baseDrop) {
+          firstInfeasible = { drop: sg.dropPct, baseDrop: bd, code: ins.code, reason: r.reason };
+        }
       }
     });});
     var minPnl = rows.length ? Math.min.apply(null, rows.map(function(r){ return r.totalPnl; })) : 0;
@@ -746,11 +823,13 @@ var MarginSim = (function(){
        トリガー直前（その段階をまだ購入していない状態）も評価点に含め、到達の見落としを防ぐ。 */
     function computeAt(drop, cutoff){ return pointAt(state, stageRes, drop, cutoff); }
     /* 購入イベントとして扱うのは実際に購入する段階だけ。見送り（数量0）の段階は
-       トリガー評価点に含めない（建代金0の加算は無害だが、段階直後の評価点で購入扱いにしないため） */
+       トリガー評価点に含めない（建代金0の加算は無害だが、段階直後の評価点で購入扱いにしないため）。
+       終点超え（beyond）の段階は到達しないため同様に含めない。
+       トリガー評価点は発動時点の基準パス下落率で表す（詳細では進行度×想定最大下落率） */
     var triggerDrops = [];
     state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
       var r = stageRes[sg.id];
-      if (sg.enabled && !sg.executed && r && r.status !== "skip") triggerDrops.push(sg.dropPct);
+      if (sg.enabled && !sg.executed && r && r.status !== "skip" && r.status !== "beyond") triggerDrops.push(triggerBaseDrop(state, ins, sg));
     }); });
     function preciseFirst(check){
       var candMap = {}, cands = [];
@@ -773,7 +852,7 @@ var MarginSim = (function(){
     /* 補助指標：新規建て条件を満たせなくなった段階で購入を止めた場合の最終（最大下落率時点）維持率。
        本体のシミュレーション（購入可能な段階はすべて実行する前提）とは区別して表示する */
     var lastRow = rows.length ? rows[rows.length - 1] : null;
-    var stoppedRes = firstInfeasible ? computeAt(st.maxDrop, firstInfeasible.drop - 0.0001)
+    var stoppedRes = firstInfeasible ? computeAt(st.maxDrop, firstInfeasible.baseDrop - 0.0001)
                                       : { rate: lastRow ? lastRow.rate : null, totalPrincipal: lastRow ? lastRow.totalPrincipal : 0 };
     return { rows: rows, stageRes: stageRes, current: current, planBudget: planBudget, planCost: planCost,
              firstMgmt: firstBelow(st.management), firstCall: firstBelow(st.marginCall),
@@ -784,9 +863,68 @@ var MarginSim = (function(){
   return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor, unsettledAmount: unsettledAmount,
            existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate,
            pointAt: pointAt, pathEvaluate: pathEvaluate,
+           scenarioDetailed: scenarioDetailed, endpointFor: endpointFor, dropFor: dropFor,
+           triggerProgress: triggerProgress, triggerBaseDrop: triggerBaseDrop,
            holdingPrincipal: holdingPrincipal, holdingPnlNow: holdingPnlNow, holdingPnlAt: holdingPnlAt,
            holdingsTotalsAt: holdingsTotalsAt, holdingsTotalsNow: holdingsTotalsNow };
 })();
+
+/* ============================================================
+   担保の終点表現（ステップ3・3-2）：担保の価格変動条件は「連動倍率」を正本とする1つの設定のまま、
+   進行度1（想定最大下落率まで進んだ時点）の担保下落率＝終点でも表現・編集できるようにする。
+     終点下落率（%） ＝ 連動倍率 × 想定最大下落率
+     終点側を編集した場合は 倍率 ＝ 終点 ÷ 想定最大下落率 に換算し、連動割合（任意）として保存する。
+   想定最大下落率が0等で換算できない場合は ok:false を返し、値は変更しない（勝手に決めない）。
+   ============================================================ */
+function collateralEndpointPct(settings){
+  return MarginSim.collateralFactor(settings) * num(settings && settings.maxDrop, 0);
+}
+function setCollateralEndpoint(settings, endpointPct){
+  var ep = num(endpointPct, NaN);
+  if (!isFinite(ep) || ep < 0) return { ok: false, message: "担保の終点下落率は0以上の数値で入力してください。値は変更していません。" };
+  if (!(num(settings.maxDrop, 0) > 0)) return { ok: false, message: "想定最大下落率が0のため、終点下落率から連動割合へ換算できません。値は変更していません。" };
+  var custom = Math.round((ep / settings.maxDrop) * 1000) / 10;
+  var capped = custom > 300;
+  settings.collateralMode = "custom";
+  settings.collateralCustom = clamp(custom, 0, 300);
+  return { ok: true, capped: capped, endpoint: collateralEndpointPct(settings) };
+}
+/* ---------- シナリオ表示ヘルパー（ステップ3・3-3） ----------
+   到達点は基準パス下落率（baseDrop）で保持し、表示時にモードへ変換する。
+   一律：従来どおり単一の下落率。詳細：進行度＋その時点の銘柄別下落率の併記 */
+function isDetailedScenario(st){
+  return !!(st && st.settings && st.settings.scenarioType === "perInstrument");
+}
+function progressPctOf(baseDrop){
+  var md = state.settings.maxDrop;
+  return md > 0 ? (baseDrop / md) * 100 : 0;
+}
+function reachText(baseDrop){
+  if (baseDrop === null || baseDrop === undefined) return "";
+  if (!isDetailedScenario(state)) return "−" + Number(baseDrop).toFixed(1) + "%";
+  var md = state.settings.maxDrop, p = md > 0 ? baseDrop / md : 0;
+  var parts = state.instruments.map(function(ins){
+    return (normalizeCode(ins.code) || "コード未設定") + " −" + (MarginSim.endpointFor(state, ins) * p).toFixed(1) + "%";
+  });
+  return "進行度 " + (p * 100).toFixed(1) + "%（" + parts.join("／") + "）";
+}
+function reachShort(baseDrop){
+  if (baseDrop === null || baseDrop === undefined) return "";
+  if (!isDetailedScenario(state)) return "−" + Number(baseDrop).toFixed(1) + "%";
+  return "進行度 " + progressPctOf(baseDrop).toFixed(1) + "%";
+}
+/* 前提サマリー（ダッシュボード）：効いているシナリオ前提の要約。どちらのモードでも表示する */
+function scenarioSummaryHtml(){
+  var s = state.settings;
+  var collat = "担保は市場下落の " + Math.round(sim.factor * 100) + "% 連動（進行度1時点の終点下落率 −" + (Math.round(collateralEndpointPct(s) * 10) / 10) + "%）";
+  if (!isDetailedScenario(state)){
+    return '<div class="card"><h2>シナリオ前提</h2><p class="sub" style="margin-bottom:0">種別：<strong>一律</strong>。すべての銘柄が計画基準価格から同じ下落率で下落します（想定最大下落率 −' + s.maxDrop + '%まで）。' + collat + '。購入段階は下落率の到達順に処理します。前提の変更は「設定・データ」画面で行えます。</p></div>';
+  }
+  var eps = state.instruments.map(function(ins){
+    return esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + "：終点 −" + MarginSim.endpointFor(state, ins).toFixed(1) + "%";
+  }).join("／");
+  return '<div class="card"><h2>シナリオ前提</h2><p class="sub" style="margin-bottom:0">種別：<strong>詳細（銘柄別終点）</strong>。共通の進行度（0→100%）に対して、各銘柄が自分の終点下落率まで比例して下落します。終点：' + eps + '。' + collat + '。複数の購入段階が同じ進行度で発動する場合は、<strong>銘柄の登録順</strong>に処理します。計画銘柄以外の既存建玉は、基準パス（想定最大下落率への比例）で連動する近似のままです。終点は「購入計画」画面の各銘柄で変更できます。</p></div>';
+}
 
 /* ============================================================
    計画銘柄以外の既存建玉に関する警告（表示専用・計算には影響しない）
@@ -1168,9 +1306,12 @@ var ReverseCalc = (function(){
   }
   function cloneState(state){ return JSON.parse(JSON.stringify(state)); }
   function findIns(st, insId){ return st.instruments.filter(function(i){ return i.id === insId; })[0] || null; }
-  /* 候補計画を差し替えた評価用ステートを作る。実行済み段階は保護し、未実行段階だけを差し替える */
+  /* 候補計画を差し替えた評価用ステートを作る。実行済み段階は保護し、未実行段階だけを差し替える。
+     予算逆算は従来の一律シナリオ前提の評価を維持する（ステップ3）：詳細モードが選択されていても、
+     逆算の評価用ステートでは種別を一律に固定し、暗黙に前提を変えない */
   function candidateState(state, insId, rows){
     var cs = cloneState(state);
+    cs.settings.scenarioType = "uniform";
     var ins = findIns(cs, insId);
     if (!ins) return null;
     var kept = ins.stages.filter(function(s){ return s.executed; });
@@ -1180,9 +1321,11 @@ var ReverseCalc = (function(){
     ins.stages = kept.concat(news);
     return { state: cs, ids: news.map(function(s){ return s.id; }) };
   }
-  /* 候補なしの前提評価用ステート：対象銘柄の未実行段階を除去し、他銘柄の計画は includeOthers で切り替える */
+  /* 候補なしの前提評価用ステート：対象銘柄の未実行段階を除去し、他銘柄の計画は includeOthers で切り替える。
+     逆算は一律前提のため、ここでも種別を一律に固定する */
   function baselineState(state, insId, includeOthers){
     var cs = cloneState(state);
+    cs.settings.scenarioType = "uniform";
     cs.instruments.forEach(function(ins){
       if (ins.id === insId || !includeOthers) ins.stages = ins.stages.filter(function(s){ return s.executed; });
     });
@@ -1834,27 +1977,47 @@ function renderDashboard(){
   var mgmtMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.management / 100 : null;
   var callMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.marginCall / 100 : null;
   var status = rateStatus(cur.rate);
+  var detailed = isDetailedScenario(state);
   var heroCls = sim.firstCallPrecise !== null ? "danger" : (sim.firstMgmtPrecise !== null ? "caution" : "");
   var heroMain, heroSub;
   if (sim.firstMgmtPrecise !== null){
-    heroMain = "下落 −" + sim.firstMgmtPrecise.toFixed(1) + "% で自主管理基準（" + st.management + "%）に到達する想定";
-    heroSub = sim.firstCallPrecise !== null ? ("追証基準（" + st.marginCall + "%）には下落 −" + sim.firstCallPrecise.toFixed(1) + "% で到達する想定です（最初の到達点・0.1%精度で算出）。基準到達と実際の追証発生は同一ではありません。")
-                            : ("追証基準（" + st.marginCall + "%）には想定範囲（−" + st.maxDrop + "%）で到達しません。");
+    heroMain = detailed
+      ? reachText(sim.firstMgmtPrecise) + " で自主管理基準（" + st.management + "%）に到達する想定"
+      : "下落 −" + sim.firstMgmtPrecise.toFixed(1) + "% で自主管理基準（" + st.management + "%）に到達する想定";
+    heroSub = sim.firstCallPrecise !== null
+      ? (detailed
+        ? "追証基準（" + st.marginCall + "%）には " + reachText(sim.firstCallPrecise) + " で到達する想定です（最初の到達点・進行度ベースで0.1%精度相当に算出）。基準到達と実際の追証発生は同一ではありません。"
+        : "追証基準（" + st.marginCall + "%）には下落 −" + sim.firstCallPrecise.toFixed(1) + "% で到達する想定です（最初の到達点・0.1%精度で算出）。基準到達と実際の追証発生は同一ではありません。")
+      : (detailed
+        ? "追証基準（" + st.marginCall + "%）には想定範囲（進行度100%）で到達しません。"
+        : "追証基準（" + st.marginCall + "%）には想定範囲（−" + st.maxDrop + "%）で到達しません。");
   } else {
-    heroMain = "想定範囲（−" + st.maxDrop + "%）では自主管理基準（" + st.management + "%）に到達しない想定";
-    heroSub = "下落 −" + st.maxDrop + "% まで全計画を実行しても、管理基準を上回る推計です。";
+    heroMain = detailed
+      ? "想定範囲（進行度100%）では自主管理基準（" + st.management + "%）に到達しない想定"
+      : "想定範囲（−" + st.maxDrop + "%）では自主管理基準（" + st.management + "%）に到達しない想定";
+    heroSub = detailed
+      ? "進行度100%（各銘柄が自分の終点まで下落）まで全計画を実行しても、管理基準を上回る推計です。"
+      : "下落 −" + st.maxDrop + "% まで全計画を実行しても、管理基準を上回る推計です。";
   }
   if (cur.belowMinMargin){
     heroSub += " 現在の実質保証金 " + fmtYen(cur.balance) + " は最低保証金額 " + fmtYen(st.minMargin) + " を下回っています。制度上、新規建てには最低保証金額以上が必要で、下回ると差し入れが必要になる場合があります。";
   } else if (sim.firstMinMarginPrecise !== null){
-    heroSub += " 実質保証金は下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で最低保証金額 " + fmtYen(st.minMargin) + " を下回る想定です。";
+    heroSub += detailed
+      ? " 実質保証金は " + reachText(sim.firstMinMarginPrecise) + " で最低保証金額 " + fmtYen(st.minMargin) + " を下回る想定です。"
+      : " 実質保証金は下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で最低保証金額 " + fmtYen(st.minMargin) + " を下回る想定です。";
   }
   if (sim.firstInfeasible){
-    heroSub += " なお、銘柄 " + esc(sim.firstInfeasible.code) + " の −" + sim.firstInfeasible.drop + "% 段階は「" + esc(sim.firstInfeasible.reason) + "」のため実行不能として計算しています。";
+    heroSub += detailed
+      ? " なお、銘柄 " + esc(sim.firstInfeasible.code) + " の −" + sim.firstInfeasible.drop + "% 段階（" + reachShort(sim.firstInfeasible.baseDrop) + " で発動）は「" + esc(sim.firstInfeasible.reason) + "」のため実行不能として計算しています。"
+      : " なお、銘柄 " + esc(sim.firstInfeasible.code) + " の −" + sim.firstInfeasible.drop + "% 段階は「" + esc(sim.firstInfeasible.reason) + "」のため実行不能として計算しています。";
   }
   var html = "";
-  html += '<div class="hero-rate ' + heroCls + '"><div class="h-label">どの程度の下落まで耐えられるか（簡易シナリオ：全銘柄同率下落・担保は市場下落の ' + Math.round(sim.factor * 100) + '% 連動）</div>'
+  html += '<div class="hero-rate ' + heroCls + '"><div class="h-label">どの程度の下落まで耐えられるか（' + (detailed
+        ? "詳細シナリオ：各銘柄が自銘柄の終点まで共通の進行度で下落・担保は市場下落の " + Math.round(sim.factor * 100) + "% 連動"
+        : "簡易シナリオ：全銘柄同率下落・担保は市場下落の " + Math.round(sim.factor * 100) + "% 連動") + '）</div>'
         + '<div class="h-big">' + heroMain + '</div><div class="h-sub">' + heroSub + "</div></div>";
+
+  html += scenarioSummaryHtml();
 
   html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
     + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
@@ -1862,14 +2025,14 @@ function renderDashboard(){
     + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(callMarginYen), callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
     + kpi("現在の信用建玉総額（実績）", fmtYen(cur.principal), "銘柄別保有＋計画銘柄以外の既存建玉の建代金合計（実績）", "")
     + kpi("現在の建玉評価損益（実績）", cur.pnl === 0 && state.positions.some(function(p){ return p.pnl === null; }) ? "未入力" : fmtSignedYen(cur.pnl), state.positions.some(function(p){ return p.pnl === null; }) ? "未入力の建玉があり、推計は概算です" : "口座画面で入力した現在値", "")
-    + kpi("実質保証金と最低保証金（実績）", fmtYen(cur.balance), "最低保証金額 " + fmtYen(st.minMargin) + (cur.belowMinMargin ? " を下回っています（最低保証金未達：差し入れが必要になる場合があります）" : " 以上を確保しています") + (sim.firstMinMarginPrecise !== null && !cur.belowMinMargin ? "／推計では下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で下回る想定" : ""), cur.belowMinMargin ? "alert" : "")
+    + kpi("実質保証金と最低保証金（実績）", fmtYen(cur.balance), "最低保証金額 " + fmtYen(st.minMargin) + (cur.belowMinMargin ? " を下回っています（最低保証金未達：差し入れが必要になる場合があります）" : " 以上を確保しています") + (sim.firstMinMarginPrecise !== null && !cur.belowMinMargin ? (detailed ? "／推計では " + reachText(sim.firstMinMarginPrecise) + " で下回る想定" : "／推計では下落 −" + sim.firstMinMarginPrecise.toFixed(1) + "% で下回る想定") : ""), cur.belowMinMargin ? "alert" : "")
     + "</div>"
     + '<h2 class="grouphead">将来の見通し<span class="gh-tag">推計（未実行の計画を実行した場合のシミュレーション）</span></h2><div class="kpis">'
     + kpi("未実行の購入予定総額（推計）", fmtYen(sim.planCost), "未実行段階の予算合計 " + fmtYen(sim.planBudget) + "（売買単位で丸めた実購入額）", "")
     + kpi("想定最大評価損", fmtSignedYen(sim.minPnl), "想定範囲内で最も大きい評価損（既存＋計画建玉）", sim.minPnl < 0 ? "caution" : "")
-    + kpi("管理基準に到達する想定下落率（推計・0.1%精度）", sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%" : "到達せず", sim.firstMgmtPrecise !== null ? "最初の到達点（購入段階の直前・直後も評価）。以後は詳細表で確認" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません", sim.firstMgmtPrecise !== null ? "caution" : "")
-    + kpi("追証基準に到達する想定下落率（推計・0.1%精度）", sim.firstCallPrecise !== null ? "−" + sim.firstCallPrecise.toFixed(1) + "%" : "到達せず", sim.firstCallPrecise !== null ? "最初の到達点（購入段階の直前・直後も評価）" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません", sim.firstCallPrecise !== null ? "alert" : "")
-    + kpi("購入可能な段階までで止めた場合の最終維持率（補助指標・推計）", sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped), sim.firstInfeasible ? ("−" + sim.firstInfeasible.drop + "% 段階で新規建て条件を満たさない可能性があり、それ以降は買わない前提。最大下落率時点・建玉総額 " + fmtYen(sim.finalPrincipalStopped)) : "購入不能の段階がないため、全計画実行時（最終維持率 " + (sim.finalRateAll === null ? "対象外" : fmtPct(sim.finalRateAll)) + "）と同じです", "")
+    + kpi(detailed ? "管理基準に到達する想定進行度（推計）" : "管理基準に到達する想定下落率（推計・0.1%精度）", sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) : "到達せず", sim.firstMgmtPrecise !== null ? (detailed ? reachText(sim.firstMgmtPrecise) + " 時点で到達（最初の到達点・購入段階の直前・直後も評価）。以後は詳細表で確認" : "最初の到達点（購入段階の直前・直後も評価）。以後は詳細表で確認") : (detailed ? "進行度100%の範囲内では到達しません" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません"), sim.firstMgmtPrecise !== null ? "caution" : "")
+    + kpi(detailed ? "追証基準に到達する想定進行度（推計）" : "追証基準に到達する想定下落率（推計・0.1%精度）", sim.firstCallPrecise !== null ? reachShort(sim.firstCallPrecise) : "到達せず", sim.firstCallPrecise !== null ? (detailed ? reachText(sim.firstCallPrecise) + " 時点で到達（最初の到達点・購入段階の直前・直後も評価）" : "最初の到達点（購入段階の直前・直後も評価）") : (detailed ? "進行度100%の範囲内では到達しません" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません"), sim.firstCallPrecise !== null ? "alert" : "")
+    + kpi("購入可能な段階までで止めた場合の最終維持率（補助指標・推計）", sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped), sim.firstInfeasible ? ((detailed ? sim.firstInfeasible.code + " の −" + sim.firstInfeasible.drop + "% 段階（" + reachShort(sim.firstInfeasible.baseDrop) + " で発動）" : "−" + sim.firstInfeasible.drop + "% 段階") + "で新規建て条件を満たさない可能性があり、それ以降は買わない前提。" + (detailed ? "進行度100%時点" : "最大下落率時点") + "・建玉総額 " + fmtYen(sim.finalPrincipalStopped)) : "購入不能の段階がないため、全計画実行時（最終維持率 " + (sim.finalRateAll === null ? "対象外" : fmtPct(sim.finalRateAll)) + "）と同じです", "")
     + "</div>";
 
   if (cur.belowMinMargin){
@@ -1917,21 +2080,29 @@ function renderDashboard(){
     html += '<div class="rowflex mt"><button class="btn small" data-goto="plan">購入計画で価格・保有を確認・編集</button></div></div>';
   }
 
-  html += '<div class="card"><h2>下落率 × 保証金維持率シミュレーション</h2>'
-    + '<p class="sub">横軸：計画基準価格からの下落率／縦軸：保証金維持率（推計）。起点は現在の保有建玉で、未実行の購入段階だけを下落に応じて追加します。詳細表の行を選ぶとグラフ上に位置を示します。</p>'
+  html += '<div class="card"><h2>' + (detailed ? "進行度" : "下落率") + ' × 保証金維持率シミュレーション</h2>'
+    + '<p class="sub">' + (detailed
+      ? "横軸：進行度（各銘柄は自銘柄の終点下落率まで比例して下落します。括弧内は基準パスの下落率）／縦軸：保証金維持率（推計）。起点は現在の保有建玉で、未実行の購入段階だけを進行に応じて追加します。詳細表の行を選ぶとグラフ上に位置を示します。"
+      : "横軸：計画基準価格からの下落率／縦軸：保証金維持率（推計）。起点は現在の保有建玉で、未実行の購入段階だけを下落に応じて追加します。詳細表の行を選ぶとグラフ上に位置を示します。") + '</p>'
     + '<div class="rowflex" style="justify-content:flex-end;margin-bottom:6px"><span style="font-size:.8rem;color:var(--muted);font-weight:700">縦軸</span><span class="seg" role="group" aria-label="縦軸スケール">'
     + '<button data-scale="auto" aria-pressed="' + (ui.chartScale !== "linear") + '">対数</button><button data-scale="linear" aria-pressed="' + (ui.chartScale === "linear") + '">線形</button></span></div>'
     + '<div class="chartbox">' + chartSVG() + "</div>"
     + '<div class="legend"><span><span class="sw"></span>シミュレーション維持率</span><span><span class="sw dash mgmt"></span>自主管理基準 ' + st.management + '%</span><span><span class="sw dash call"></span>追証基準 ' + st.marginCall + '%</span><span><span class="dotkey"></span>購入予定段階</span></div>'
     + "</div>";
 
-  var detailMeta = "全" + sim.rows.length + "段階（0%〜−" + st.maxDrop + "%）"
-    + " ・ 管理基準到達（0.1%精度）：" + (sim.firstMgmtPrecise !== null ? "<strong>−" + sim.firstMgmtPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
-    + " ・ 追証基準到達（0.1%精度）：" + (sim.firstCallPrecise !== null ? "<strong>−" + sim.firstCallPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
-    + (sim.firstMinMarginPrecise !== null ? " ・ 最低保証金を下回る下落率：<strong>−" + sim.firstMinMarginPrecise.toFixed(1) + "%</strong>" : "")
-    + (ui.selectedDrop !== null ? " ・ 選択中：<strong>−" + ui.selectedDrop + "%</strong>" : "");
-  html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>下落率別の詳細（シミュレーション）</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。<br>下落率の起点の区別：この表とグラフの下落率は<strong>各銘柄の計画基準価格を起点</strong>とする下落率です。一方、代用有価証券の連動設定（設定画面）は<strong>現在の代用評価額に対する変動の想定</strong>で、起点が異なります。基準への到達下落率は表の刻みより細かい0.1%精度（購入段階の直前・直後も評価）で別途算出し、上の要約とKPIに表示しています。維持率の分子では評価損は差し引き、評価益は算入しません（SBI証券公式ルール準拠）。</p><div class="tblwrap"><table class="dt"><thead><tr>'
-    + "<th>下落率</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>実質保証金</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
+  var detailMeta = detailed
+    ? "全" + sim.rows.length + "段階（進行度0%〜100%）"
+      + " ・ 管理基準到達：" + (sim.firstMgmtPrecise !== null ? "<strong>" + reachText(sim.firstMgmtPrecise) + "</strong>" : "進行度100%の範囲内では到達しません")
+      + " ・ 追証基準到達：" + (sim.firstCallPrecise !== null ? "<strong>" + reachText(sim.firstCallPrecise) + "</strong>" : "進行度100%の範囲内では到達しません")
+      + (sim.firstMinMarginPrecise !== null ? " ・ 最低保証金を下回る時点：<strong>" + reachText(sim.firstMinMarginPrecise) + "</strong>" : "")
+      + (ui.selectedDrop !== null ? " ・ 選択中：<strong>進行度 " + progressPctOf(ui.selectedDrop).toFixed(1) + "%</strong>" : "")
+    : "全" + sim.rows.length + "段階（0%〜−" + st.maxDrop + "%）"
+      + " ・ 管理基準到達（0.1%精度）：" + (sim.firstMgmtPrecise !== null ? "<strong>−" + sim.firstMgmtPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
+      + " ・ 追証基準到達（0.1%精度）：" + (sim.firstCallPrecise !== null ? "<strong>−" + sim.firstCallPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
+      + (sim.firstMinMarginPrecise !== null ? " ・ 最低保証金を下回る下落率：<strong>−" + sim.firstMinMarginPrecise.toFixed(1) + "%</strong>" : "")
+      + (ui.selectedDrop !== null ? " ・ 選択中：<strong>−" + ui.selectedDrop + "%</strong>" : "");
+  html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>' + (detailed ? "進行度別の詳細（シミュレーション）" : "下落率別の詳細（シミュレーション）") + '</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。<br>下落率の起点の区別：この表とグラフの下落率は<strong>各銘柄の計画基準価格を起点</strong>とする下落率です。一方、代用有価証券の連動設定（設定画面）は<strong>現在の代用評価額に対する変動の想定</strong>で、起点が異なります。基準への到達下落率は表の刻みより細かい0.1%精度（購入段階の直前・直後も評価）で別途算出し、上の要約とKPIに表示しています。維持率の分子では評価損は差し引き、評価益は算入しません（SBI証券公式ルール準拠）。' + (detailed ? '<br>詳細シナリオでは、表とグラフの横軸は<strong>進行度</strong>で、各銘柄の下落率は「その銘柄の終点下落率×進行度」です。担保と計画銘柄以外の既存建玉は基準パス（想定最大下落率への比例）で変動します。' : "") + '</p><div class="tblwrap"><table class="dt"><thead><tr>'
+    + "<th>" + (detailed ? "進行度（銘柄別下落率）" : "下落率") + "</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>実質保証金</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
   sim.rows.forEach(function(r){
     var rs = rateStatus(r.rate);
     var rowCls = ui.selectedDrop === r.drop ? "sel" : (r.rate !== null && r.rate < st.marginCall ? "row-danger" : (r.rate !== null && r.rate < st.management ? "row-warn" : ""));
@@ -1940,12 +2111,18 @@ function renderDashboard(){
     else if (r.infeasibleCount > 0) stateLabel += "・購入不能の段階を含む";
     if (r.skipAtDrop > 0) stateLabel += "・この段階は見送り（数量0）";
     else if (r.skipCount > 0) stateLabel += "・見送り（数量0）の段階を含む";
+    if (r.beyondCount > 0) stateLabel += "・シナリオ終点を超えるため発動しない段階を含む";
     if (r.belowMinMargin) stateLabel += "・最低保証金未達（実質保証金が " + fmtYen(st.minMargin) + " 未満）";
-    html += '<tr data-drop="' + r.drop + '" class="' + rowCls + '"><td class="num">−' + r.drop + '%</td><td class="num" data-label="累計購入額">' + fmtYenShort(r.newPrincipal) + '円</td><td class="num" data-label="建玉総額">' + fmtYenShort(r.totalPrincipal) + '円</td><td class="num" data-label="評価損益">' + fmtSignedYen(r.totalPnl) + '</td><td class="num" data-label="代用評価額">' + fmtYenShort(r.collateral) + '円</td><td class="num" data-label="実質保証金">' + fmtYenShort(r.balance) + '円</td><td class="num" data-label="維持率"><strong>' + fmtPct(r.rate) + '</strong></td><td class="num" data-label="新規建余力（概算）">' + fmtYenShort(r.capacity) + '円</td><td data-label="状態"><span class="pill ' + (r.belowMinMargin || r.infeasibleAtDrop > 0 ? "danger" : rs.cls) + '">' + esc(stateLabel) + "</span></td></tr>";
+    var firstCell = detailed
+      ? '<td class="num">' + (r.progress * 100).toFixed(1) + '%<br><span style="font-size:.78rem;color:var(--muted)">' + state.instruments.map(function(ins){ return esc(normalizeCode(ins.code) || "—") + " −" + (r.dropsByIns[ins.id] || 0).toFixed(1) + "%"; }).join("／") + "</span></td>"
+      : '<td class="num">−' + r.drop + '%</td>';
+    html += '<tr data-drop="' + r.drop + '" class="' + rowCls + '">' + firstCell + '<td class="num" data-label="累計購入額">' + fmtYenShort(r.newPrincipal) + '円</td><td class="num" data-label="建玉総額">' + fmtYenShort(r.totalPrincipal) + '円</td><td class="num" data-label="評価損益">' + fmtSignedYen(r.totalPnl) + '</td><td class="num" data-label="代用評価額">' + fmtYenShort(r.collateral) + '円</td><td class="num" data-label="実質保証金">' + fmtYenShort(r.balance) + '円</td><td class="num" data-label="維持率"><strong>' + fmtPct(r.rate) + '</strong></td><td class="num" data-label="新規建余力（概算）">' + fmtYenShort(r.capacity) + '円</td><td data-label="状態"><span class="pill ' + (r.belowMinMargin || r.infeasibleAtDrop > 0 ? "danger" : rs.cls) + '">' + esc(stateLabel) + "</span></td></tr>";
   });
   html += "</tbody></table></div>";
   if (sim.firstInfeasible){
-    html += '<p class="hint">補助指標：−' + sim.firstInfeasible.drop + '% 段階は新規建て条件（新規建保証金率 ' + st.newMargin + '%）を満たさない可能性があります。その段階で購入を止めた場合、最大下落率 −' + st.maxDrop + '% 時点の維持率は <strong class="num">' + (sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped)) + '</strong>（建玉総額 ' + fmtYen(sim.finalPrincipalStopped) + '）です。上の表は購入可能な段階をすべて実行した場合の推計で、この補助指標とは前提が異なります。</p>';
+    html += detailed
+      ? '<p class="hint">補助指標：銘柄 ' + esc(sim.firstInfeasible.code) + ' の −' + sim.firstInfeasible.drop + '% 段階（' + reachShort(sim.firstInfeasible.baseDrop) + ' で発動）は新規建て条件（新規建保証金率 ' + st.newMargin + '%）を満たさない可能性があります。その段階で購入を止めた場合、進行度100%時点の維持率は <strong class="num">' + (sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped)) + '</strong>（建玉総額 ' + fmtYen(sim.finalPrincipalStopped) + '）です。上の表は購入可能な段階をすべて実行した場合の推計で、この補助指標とは前提が異なります。</p>'
+      : '<p class="hint">補助指標：−' + sim.firstInfeasible.drop + '% 段階は新規建て条件（新規建保証金率 ' + st.newMargin + '%）を満たさない可能性があります。その段階で購入を止めた場合、最大下落率 −' + st.maxDrop + '% 時点の維持率は <strong class="num">' + (sim.finalRateStopped === null ? "対象外" : fmtPct(sim.finalRateStopped)) + '</strong>（建玉総額 ' + fmtYen(sim.finalPrincipalStopped) + '）です。上の表は購入可能な段階をすべて実行した場合の推計で、この補助指標とは前提が異なります。</p>';
   }
   if (sim.rows.some(function(r){ return r.belowMinMargin; })){
     html += '<p class="hint">※ 実質保証金が最低保証金額 ' + fmtYen(st.minMargin) + ' を下回る行は、状態欄に「最低保証金未達」と文字で表示しています（色だけでは区別していません）。</p>';
@@ -2002,12 +2179,14 @@ function chartSVG(){
     s += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" stroke="var(--line)" stroke-width="1"/>'
        + '<text x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + v.toLocaleString("ja-JP") + "%</text>";
   });
+  var detailedC = isDetailedScenario(state);
   for (var d = 0; d <= st.maxDrop; d += (st.maxDrop >= 60 ? 10 : 5)){
     var x = X(d);
-    s += '<text x="' + x + '" y="' + (H - 18) + '" text-anchor="middle" font-size="11" fill="var(--muted)">−' + d + '%</text>'
+    var tickLabel = detailedC ? (Math.round((st.maxDrop > 0 ? d / st.maxDrop : 0) * 100) + "%（−" + d + "%）") : ("−" + d + "%");
+    s += '<text x="' + x + '" y="' + (H - 18) + '" text-anchor="middle" font-size="' + (detailedC ? 10 : 11) + '" fill="var(--muted)">' + tickLabel + '</text>'
        + '<line x1="' + x + '" y1="' + T + '" x2="' + x + '" y2="' + (T + ih) + '" stroke="var(--line)" stroke-width="0.5" opacity="0.5"/>';
   }
-  s += '<text x="' + (L + iw / 2) + '" y="' + (H - 2) + '" text-anchor="middle" font-size="11" fill="var(--muted)">下落率</text>';
+  s += '<text x="' + (L + iw / 2) + '" y="' + (H - 2) + '" text-anchor="middle" font-size="11" fill="var(--muted)">' + (detailedC ? "進行度（括弧内は基準パスの下落率）" : "下落率") + '</text>';
   function thresh(v, color, label){
     if (v < yMin || v > yMax) return "";
     var y = Y(v);
@@ -2023,19 +2202,24 @@ function chartSVG(){
   var pts = rows.map(function(r){ return X(r.drop).toFixed(1) + "," + Y(r.rate).toFixed(1); }).join(" ");
   s += '<polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linejoin="round"/>';
   rows.forEach(function(r){
-    s += '<circle cx="' + X(r.drop) + '" cy="' + Y(r.rate) + '" r="' + (ui.selectedDrop === r.drop ? 5.5 : 3) + '" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"><title>−' + r.drop + "%：維持率 " + fmtPct(r.rate) + "</title></circle>";
+    var titleC = detailedC
+      ? "進行度 " + (r.progress * 100).toFixed(1) + "%（" + state.instruments.map(function(ins){ return (normalizeCode(ins.code) || "—") + " −" + (r.dropsByIns[ins.id] || 0).toFixed(1) + "%"; }).join("／") + "）：維持率 " + fmtPct(r.rate)
+      : "−" + r.drop + "%：維持率 " + fmtPct(r.rate);
+    s += '<circle cx="' + X(r.drop) + '" cy="' + Y(r.rate) + '" r="' + (ui.selectedDrop === r.drop ? 5.5 : 3) + '" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"><title>' + esc(titleC) + "</title></circle>";
   });
   /* 購入段階マーカー */
   var rateAt = {};
   sim.rows.forEach(function(r){ rateAt[r.drop] = r.rate; });
   var seen = {};
   state.instruments.forEach(function(ins){ ins.stages.forEach(function(sg){
-    if (!sg.enabled || sg.executed || sg.dropPct > st.maxDrop) return;
-    var row = sim.rows.reduce(function(best, r){ return Math.abs(r.drop - sg.dropPct) < Math.abs(best.drop - sg.dropPct) ? r : best; }, sim.rows[0]);
+    var bd = MarginSim.triggerBaseDrop(state, ins, sg);
+    if (!sg.enabled || sg.executed || !(bd <= st.maxDrop)) return;
+    var row = sim.rows.reduce(function(best, r){ return Math.abs(r.drop - bd) < Math.abs(best.drop - bd) ? r : best; }, sim.rows[0]);
     if (!row || row.rate === null) return;
-    var key = sg.dropPct + ":" + Math.round(row.rate);
+    var key = bd.toFixed(4) + ":" + Math.round(row.rate);
     if (seen[key]) return; seen[key] = 1;
-    s += '<circle cx="' + X(sg.dropPct) + '" cy="' + Y(row.rate) + '" r="5" fill="#d9930d" stroke="var(--surface)" stroke-width="1.5"><title>' + esc(ins.code) + " −" + sg.dropPct + "% 段階</title></circle>";
+    var titleM = detailedC ? (ins.code + " −" + sg.dropPct + "% 段階（進行度 " + (MarginSim.triggerProgress(state, ins, sg) * 100).toFixed(1) + "% で発動）") : (ins.code + " −" + sg.dropPct + "% 段階");
+    s += '<circle cx="' + X(bd) + '" cy="' + Y(row.rate) + '" r="5" fill="#d9930d" stroke="var(--surface)" stroke-width="1.5"><title>' + esc(titleM) + "</title></circle>";
   });});
   s += "</svg>";
   return s;
@@ -2051,7 +2235,7 @@ function currentInstrument(){
 }
 function renderPlan(){
   var el = document.getElementById("view-plan");
-  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%（0.1%精度）" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
+  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) + (isDetailedScenario(state) ? "" : "（0.1%精度）") : (isDetailedScenario(state) ? "なし（進行度100%まで）" : "なし（−" + state.settings.maxDrop + "%まで）")) + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
   html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
   state.instruments.forEach(function(ins){
     var tot = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
@@ -2089,7 +2273,9 @@ function renderPlan(){
     + fld("区分", '<select id="f_type"><option value="ETF"' + (ins.type === "ETF" ? " selected" : "") + '>ETF</option><option value="stock"' + (ins.type === "stock" ? " selected" : "") + ">個別株式</option></select>")
     + fld("売買単位（株/口）", '<input type="number" id="f_unit" min="1" step="1" value="' + ins.unit + '">')
     + fld("計画基準価格（円）", '<input type="number" id="f_base" min="0" step="1" value="' + ins.planBasePrice + '">')
+    + (isDetailedScenario(state) ? fld("シナリオ終点下落率（%）", '<input type="number" id="f_endpoint" min="0" max="100" step="any" value="' + MarginSim.endpointFor(state, ins) + '">') : "")
     + "</div>"
+    + (isDetailedScenario(state) ? '<p class="hint">シナリオ終点下落率：詳細シナリオで、この銘柄が進行度100%の時点で到達する下落率です（この銘柄の下落率 ＝ 終点 × 進行度）。未設定の銘柄は想定最大下落率（−' + state.settings.maxDrop + '%）が終点になります。終点を超える下落率の購入段階は、このシナリオでは発動しません。終点は銘柄コードごとに保存されます。</p>' : "")
     + '<div class="pricepanel"><div class="pp-cell"><div class="pp-label">計画基準価格（下落率の起点）</div><div class="pp-value num">' + fmtYen(ins.planBasePrice) + '</div></div>'
     + '<div class="pp-cell"><div class="pp-label">最新終値' + (ins.closePrice !== null ? "（" + esc(ins.closeDate || "日付不明") + closeSourceSuffix(ins) + (ins.closeSource === "json" && quote && quote.stale ? "・前回データ（取得失敗のため）" : "") + "）" : "") + '</div><div class="pp-value num">' + (ins.closePrice !== null ? fmtYen(ins.closePrice) : "未取得") + (ins.closeSource === "manual" ? ' <span class="pill warn">手入力</span>' : "") + (ins.closeSource === "relay" ? ' <span class="pill info">中継経由</span>' : "") + (ins.closeSource === "relay" && ins.closeQuality === "provisional" ? ' <span class="pill warn">暫定</span>' : "") + (ins.closeSource === "relay" && ins.closeQuality === "suspect" ? ' <span class="pill danger">大きな変動</span>' : "") + '</div></div>'
     + '<div class="pp-cell"><div class="pp-label">計画基準価格からの下落率</div><div class="pp-value">' + (curChg === null ? "—" : chgPill(curChg)) + "</div></div>"
@@ -2179,16 +2365,21 @@ function renderPlan(){
     var passed = stagePassed(ins, sg);
     var statusPill = sg.executed ? '<span class="pill info">実行済み（実績）</span>'
       : (!sg.enabled ? '<span class="pill mute">無効</span>'
+      : (r.status === "beyond" ? '<span class="pill warn">シナリオ終点を超えるため発動しません</span>'
       : (r.status === "skip" && r.price > 0 ? '<span class="pill mute">見送り（数量0）</span>'
       : (r.qty <= 0 ? '<span class="pill danger">実行不能：' + esc(r.reason) + "</span>"
-      : (r.feasible ? '<span class="pill safe">実行予定</span>' : '<span class="pill danger">実行不能（概算判定）</span>'))));
+      : (r.feasible ? '<span class="pill safe">実行予定</span>' : '<span class="pill danger">実行不能（概算判定）</span>')))));
     html += '<div class="stagerow' + (sg.enabled && !sg.executed ? "" : " off") + '" data-stage="' + sg.id + '">'
       + '<div class="sr-top"><label class="switchlabel"><input type="checkbox" data-act="toggle" ' + (sg.enabled ? "checked" : "") + "> 有効</label>"
       + '<label class="switchlabel"><input type="checkbox" data-act="execToggle" ' + (sg.executed ? "checked" : "") + "> 実行済み</label>"
       + "<strong>−" + sg.dropPct + "% 段階</strong>" + statusPill
+      + (isDetailedScenario(state) && !sg.executed && sg.enabled && r.status !== "beyond" ? '<span class="hint" style="margin-top:0">進行度 ' + (MarginSim.triggerProgress(state, ins, sg) * 100).toFixed(1) + "% で発動</span>" : "")
       + '<span style="margin-left:auto"></span><button class="btn small danger-outline" data-act="del">この段階を削除</button></div>';
     if (passed){
       html += '<div class="notice warn" style="margin-top:10px"><strong>現在価格がすでにこの段階を通過しています。</strong> 最新終値 ' + fmtYen(ins.closePrice) + ' は、この段階の想定価格 ' + fmtYen(r.price) + ' を下回っています。過去の購入を自動では仮定しません。実際に購入済みなら「実行済みにする」、まだ買っていない場合は未実行のままにしてください。<div class="rowflex mt"><button class="btn small primary" data-act="markExec">この段階を実行済みにする</button></div></div>';
+    }
+    if (!sg.executed && r.status === "beyond"){
+      html += '<div class="notice warn" style="margin-top:10px"><strong>シナリオ終点を超えるため発動しません。</strong> この段階の下落率 −' + sg.dropPct + '% は、この銘柄のシナリオ終点（−' + MarginSim.endpointFor(state, ins) + '%）を超えているため、詳細シナリオでは到達しません。この段階を評価したい場合は、上の「シナリオ終点下落率」を大きくするか、段階の下落率を見直してください。</div>';
     }
     if (sg.executed){
       html += '<div class="sr-grid">'
@@ -2235,6 +2426,7 @@ function reverseSectionHtml(ins){
   var rp = (ui.reversePreview && ui.reversePreview.insId === ins.id) ? ui.reversePreview : null;
   var html = '<div class="card"><h2>リスクから逆算</h2>'
     + '<p class="sub">この銘柄について、リスク条件を満たす購入計画の総予算の上限を逆算します。他の銘柄の保有・既存建玉・既存計画は固定の前提として含め、この銘柄の未実行段階だけを候補に差し替えて評価します。条件は「数量のある段階がすべて購入時点で新規建て条件（' + state.settings.newMargin + '%）を満たす」「下落率0%〜目標耐性下落率の経路上の全評価点で維持率が最低維持率ライン以上」「同じ経路上で実質保証金が最低保証金額（' + fmtYen(state.settings.minMargin) + '）以上」の3点です。結果はプレビュー表示のみで、「この計画を反映する」を押すまでは計画を変更しません。逆算の入力値は保存データに含めない、その場の試算用です。</p>'
+    + (isDetailedScenario(state) ? '<div class="notice warn" style="margin-top:10px">現在は詳細シナリオ（銘柄別終点）が選択されていますが、<strong>逆算は一律シナリオ前提で評価しています</strong>（銘柄別終点は逆算には適用されません）。</div>' : "")
     + '<div class="formgrid">'
     + fld("目標耐性下落率（%）", '<input type="number" id="r_target" min="0" max="100" step="any" value="' + rv.target + '">')
     + fld("最低維持率ライン（%）", '<input type="number" id="r_minrate" min="0" max="1000" step="any" value="' + rv.minRate + '">')
@@ -2379,6 +2571,7 @@ function slotsSectionHtml(ins){
   var hasExecuted = ins.stages.some(function(s){ return s.executed; });
   var html = '<div class="card"><h2>計画の比較・保存</h2>'
     + '<p class="sub">この銘柄の計画を「案」として最大' + PlanSlots.MAX_SLOTS + '件まで保存し、現在の計画と並べて比較できます。案に保存するのは<strong>未実行段階のレシピ（下落率・段階予算）と計画基準価格・銘柄コードだけ</strong>で、実行済み段階・実保有・口座情報・終値は含めません。比較は表示のたびに、現在の口座情報・実保有・実行済み段階・他銘柄の計画・最新の終値を前提に再計算します（保存時点の結果は保持しません）。実行済み段階は全候補に共通の現実として含めて評価するため、候補どうしの差は未実行レシピだけから生じます。</p>'
+    + (isDetailedScenario(state) ? '<p class="hint">比較は現在のシナリオ設定（<strong>詳細・銘柄別終点</strong>）に従って、詳細経路で再計算しています。到達は進行度で表示します。</p>' : "")
     + '<p class="hint">最低維持率は想定最大下落率（現在 −' + state.settings.maxDrop + '%）までの全経路で評価しています。上の「リスクから逆算」プレビューの最低維持率（目標下落率までの評価）とは評価範囲が異なります。</p>'
     + '<div class="rowflex"><button class="btn" id="saveSlotBtn" type="button">現在の計画を案として保存</button></div>'
     + (hasExecuted ? '<p class="hint">この銘柄には実行済み段階があります。<strong>実行済み段階は案に含まれません</strong>（未実行段階だけを保存します）。</p>' : "")
@@ -2388,19 +2581,20 @@ function slotsSectionHtml(ins){
     return html;
   }
   var maxDrop = state.settings.maxDrop;
+  var detailedS = isDetailedScenario(state);
   var cands = [{ name: "現在の計画", slot: null, m: PlanSlots.evaluateCurrent(state, ins) }]
     .concat(slots.map(function(sl){ return { name: sl.name || "案", slot: sl, m: PlanSlots.evaluateSlot(state, ins, sl) }; }));
   function rateCell(v){ return (v === null || v === undefined) ? "対象外" : fmtPct(v); }
-  function reachCell(v){ return (v === null || v === undefined) ? "到達なし（−" + maxDrop + "%まで）" : "−" + v.toFixed(1) + "%"; }
+  function reachCell(v){ return (v === null || v === undefined) ? (detailedS ? "到達なし（進行度100%まで）" : "到達なし（−" + maxDrop + "%まで）") : (detailedS ? reachText(v) : "−" + v.toFixed(1) + "%"); }
   var rowsDef = [
     ["予算合計", function(m){ return fmtYen(m.budgetTotal); }],
     ["実購入予定額", function(m){ return fmtYen(m.costTotal); }],
-    ["経路上の最低維持率", function(m){ return m.minRate === null ? "対象外" : fmtPct(m.minRate) + "（−" + m.minRateDrop + "%時点）"; }],
-    ["管理基準（" + state.settings.management + "%）到達下落率", function(m){ return reachCell(m.firstMgmt); }],
-    ["追証基準（" + state.settings.marginCall + "%）到達下落率", function(m){ return reachCell(m.firstCall); }],
-    ["下落率−50%時点の維持率", function(m){ return rateCell(m.rate50); }],
+    ["経路上の最低維持率", function(m){ return m.minRate === null ? "対象外" : fmtPct(m.minRate) + (detailedS ? "（進行度 " + (maxDrop > 0 ? (m.minRateDrop / maxDrop * 100).toFixed(1) : "0") + "%時点）" : "（−" + m.minRateDrop + "%時点）"); }],
+    ["管理基準（" + state.settings.management + "%）到達" + (detailedS ? "進行度" : "下落率"), function(m){ return reachCell(m.firstMgmt); }],
+    ["追証基準（" + state.settings.marginCall + "%）到達" + (detailedS ? "進行度" : "下落率"), function(m){ return reachCell(m.firstCall); }],
+    [detailedS ? "基準パス−50%時点の維持率（進行度 " + (maxDrop > 0 ? (50 / maxDrop * 100).toFixed(1) : "0") + "%）" : "下落率−50%時点の維持率", function(m){ return rateCell(m.rate50); }],
     ["実行不能段階の数", function(m){ return m.infeasibleCount + "件"; }],
-    ["最終評価損（−" + maxDrop + "%時点）", function(m){ return m.finalPnl === null ? "—" : fmtSignedYen(m.finalPnl); }]
+    ["最終評価損（" + (detailedS ? "進行度100%時点" : "−" + maxDrop + "%時点") + "）", function(m){ return m.finalPnl === null ? "—" : fmtSignedYen(m.finalPnl); }]
   ];
   html += '<div class="cmpwrap mt"><table class="cmp"><thead><tr><th>比較指標（' + esc(normalizeCode(ins.code) || "コード未設定") + "）</th>";
   cands.forEach(function(c){
@@ -2594,6 +2788,16 @@ function bindInstrumentForm(el, ins){
   on("#f_type", function(n){ ins.type = n.value === "stock" ? "stock" : "ETF"; });
   on("#f_unit", function(n){ ins.unit = Math.max(1, Math.round(num(n.value, 1))); });
   on("#f_base", function(n){ ins.planBasePrice = clamp(num(n.value, 0), 0, 1e9); ins.baseIsSample = false; });
+  /* シナリオ終点下落率（詳細モードのみ表示）：銘柄コードをキーに設定へ保存する */
+  var epInput = el.querySelector("#f_endpoint");
+  if (epInput) epInput.addEventListener("change", function(){
+    var code = normalizeCode(ins.code);
+    if (!code){ toast("先に銘柄コードを入力してください（終点は銘柄コードごとに保存します）。"); renderPlan(); return; }
+    if (!state.settings.scenarioEndpoints || typeof state.settings.scenarioEndpoints !== "object") state.settings.scenarioEndpoints = {};
+    state.settings.scenarioEndpoints[code] = clamp(num(epInput.value, state.settings.maxDrop), 0, 100);
+    recalc(); renderPlan();
+    toast("シナリオ終点下落率を −" + state.settings.scenarioEndpoints[code] + "% に設定しました。");
+  });
   on("#f_hqty", function(n){ ins.holding.qty = clamp(Math.round(num(n.value, 0)), 0, 1e9); });
   on("#f_havg", function(n){ ins.holding.avgPrice = clamp(num(n.value, 0), 0, 1e9); });
   on("#f_hside", function(n){ ins.holding.side = n.value === "sell" ? "sell" : "buy"; });
@@ -2795,7 +2999,7 @@ function refreshStageRow(row, ins, sg){
 }
 function refreshMinibar(){
   var bar = document.querySelector("#view-plan .minibar");
-  if (bar) bar.innerHTML = '<span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? "−" + sim.firstMgmtPrecise.toFixed(1) + "%（0.1%精度）" : "なし（−" + state.settings.maxDrop + "%まで）") + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
+  if (bar) bar.innerHTML = '<span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) + (isDetailedScenario(state) ? "" : "（0.1%精度）") : (isDetailedScenario(state) ? "なし（進行度100%まで）" : "なし（−" + state.settings.maxDrop + "%まで）")) + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
 }
 
 /* ================= 口座・保有状況 ================= */
@@ -2918,7 +3122,11 @@ function renderSettings(){
     + fld("最低保証金額（円）", '<input type="number" id="s_minmargin" min="0" step="10000" value="' + s.minMargin + '">')
     + fld("担保の価格変動条件", '<select id="s_colmode"><option value="same"' + (s.collateralMode === "same" ? " selected" : "") + '>市場と同率で下落</option><option value="half"' + (s.collateralMode === "half" ? " selected" : "") + '>市場の半分だけ下落</option><option value="strong"' + (s.collateralMode === "strong" ? " selected" : "") + '>市場の1.2倍下落</option><option value="none"' + (s.collateralMode === "none" ? " selected" : "") + '>変動しない</option><option value="custom"' + (s.collateralMode === "custom" ? " selected" : "") + ">任意の割合（下で指定）</option></select>")
     + fld("担保の連動割合（%・任意時）", '<input type="number" id="s_colcustom" min="0" max="300" step="5" value="' + s.collateralCustom + '">')
+    + fld("担保の終点下落率（%・進行度1時点）", '<input type="number" id="s_colep" min="0" step="any" value="' + (Math.round(collateralEndpointPct(s) * 10) / 10) + '">')
+    + fld("下落シナリオの種別", '<select id="s_scenariotype"><option value="uniform"' + (s.scenarioType !== "perInstrument" ? " selected" : "") + '>一律（全銘柄が同じ下落率で下落）</option><option value="perInstrument"' + (s.scenarioType === "perInstrument" ? " selected" : "") + ">詳細（銘柄別終点）</option></select>")
     + "</div>"
+    + '<p class="hint"><strong>担保の終点下落率について：</strong>終点下落率 ＝ 連動割合 × 想定最大下落率 で、進行度1（想定最大下落率まで進んだ時点）の担保下落率です。担保の設定は連動割合を正本とする1つのままで、終点はその別の表現です。終点側を編集すると、連動割合（任意の割合）へ換算して保存します。想定最大下落率が0のときは換算できないため、値を変更しません。</p>'
+    + '<p class="hint"><strong>下落シナリオについて：</strong>「詳細（銘柄別終点）」では、共通の進行度（0→100%）に対して各銘柄が自分の終点下落率まで比例して下落し、購入段階は各銘柄自身の下落率で発動します（終点を超える段階は発動しません）。終点は「購入計画」画面の各銘柄で設定し、未設定の銘柄は想定最大下落率が終点になります。担保と計画銘柄以外の既存建玉は、どちらの種別でも基準パス（想定最大下落率への比例）で変動します。予算逆算は常に一律前提で評価します。</p>'
     + '<p class="hint"><strong>担保の下落の起点について：</strong>担保の下落は現在の評価額を起点に計算します。計画の下落率は計画基準価格が起点で、起点が異なります（上の「担保の価格変動条件」は、現在の代用評価額が市場の下落に対してどの割合で連動するかの想定です）。</p>'
     + '<p class="hint"><strong>控除費用について：</strong>控除費用は、委託手数料・買方金利・貸株料など、保証金から差し引かれる費用の見込み額を入れる欄です。配当落調整金は買建では受け取りのため控除しません（売建では支払いになります）。現金（委託保証金現金）の入力に既に反映済みの分は二重に入れないでください。</p>'
     + '<p class="hint"><strong>評価損益の保証金算入方法（SBI証券公式ルール準拠）：</strong>委託保証金率の計算では、評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算します。そのため本ツールでも、維持率の分子では建玉評価損益を min(評価損益, 0) として扱い、<strong>評価益は維持率に算入しません</strong>（従来の「評価益も算入する」方式から変更しました。ダッシュボード等での評価損益そのものの表示は、従来どおりプラスも表示します）。この算入方法は制度に合わせた固定仕様のため、設定では切り替えません。</p>'
@@ -2948,7 +3156,7 @@ function renderSettings(){
 
     + '<div class="card" style="margin-top:14px"><h2>計算モデルの前提と注意</h2>'
     + '<ul style="margin:6px 0 0;padding-left:1.2em;font-size:.88rem">'
-    + "<li>簡易シナリオ：すべての対象銘柄が同じ割合で下落し、担保は設定した連動割合で下落します（銘柄ごとに異なる下落率を設定する詳細シナリオは今後の拡張用にデータ構造のみ用意）。</li>"
+    + "<li>シナリオ：初期設定は「一律」で、すべての対象銘柄が同じ割合で下落し、担保は設定した連動割合で下落します。「詳細（銘柄別終点）」では、共通の進行度（0→100%）に対して各銘柄が自分の終点下落率まで比例して下落し、購入段階は各銘柄自身の下落率で発動します（終点を超える段階は発動せず、計画画面に明示します）。複数の段階が同じ進行度で発動する場合は銘柄の登録順に処理します。担保は連動割合と終点下落率（＝連動割合×想定最大下落率）の2つの表現を持つ1つの設定で、予算逆算は常に一律前提で評価します。</li>"
     + "<li>購入段階は下落率の到達順に実行し、各段階の必要保証金（実購入額×新規建保証金率）を、到達時点の推計保証金と比較して実行可否を判定します。これは概算判定であり、維持率だけで新規建ての可否を判断していません。正確な新規建余力の再現に必要な情報が不足する項目は「概算」と明示しています。</li>"
     + "<li>価格は計画基準価格（下落率の起点・購入しても自動変更しない）／平均建値（実保有の約定平均）／最新終値（終値データ）の3つを分離して管理します。シミュレーションの起点は現在の保有建玉（銘柄別保有＋計画銘柄以外の既存建玉）で、未実行の計画段階だけを今後の下落に応じて追加購入します。実行済みの段階は実績として保有側で表し、シミュレーションで再購入しません（二重計上防止）。</li>"
     + "<li>既存建玉の評価損益の将来推計は「現在の時価（建代金＋現在評価損益）が下落率ぶん変動する」近似です。評価損益が未入力の建玉は計算から除外し（現在損益0として下落変動のみ反映）、維持率は概算である旨を該当表示の近くに明示します。</li>"
@@ -2976,6 +3184,17 @@ function renderSettings(){
   on("#s_minmargin", function(n){ s.minMargin = clamp(num(n.value, 300000), 0, 1e12); });
   on("#s_colmode", function(n){ s.collateralMode = n.value; });
   on("#s_colcustom", function(n){ s.collateralCustom = clamp(num(n.value, 100), 0, 300); });
+  on("#s_scenariotype", function(n){ s.scenarioType = n.value === "perInstrument" ? "perInstrument" : "uniform"; });
+  /* 担保の終点下落率の編集：連動割合へ換算して保存する。換算できない場合は理由を表示し、値を変更しない */
+  var colepInput = el.querySelector("#s_colep");
+  if (colepInput) colepInput.addEventListener("change", function(){
+    var res = setCollateralEndpoint(s, colepInput.value);
+    if (!res.ok){ toast(res.message); renderSettings(); return; }
+    recalc(); renderSettings();
+    toast(res.capped
+      ? "終点下落率が連動割合の上限（300%）を超えるため、連動割合300%（終点 −" + res.endpoint + "%）で保存しました。"
+      : "担保の終点下落率 −" + res.endpoint + "% を連動割合 " + s.collateralCustom + "% へ換算して保存しました。");
+  });
   var relayInput = el.querySelector("#relay_url");
   if (relayInput) relayInput.addEventListener("change", function(){
     var raw = relayInput.value.trim();
@@ -3438,8 +3657,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.0.1" && SW_CACHE_NAME === "nanpin-planner-v19",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.0.1／SW v19");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.1" && SW_CACHE_NAME === "nanpin-planner-v20",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.1／SW v20");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -3622,7 +3841,7 @@ function runSelfTests(){
     && Object.keys(clean58.settings.scenarioEndpoints).length === 2
     && round58.ok && round58.state.settings.scenarioType === "perInstrument" && round58.state.settings.scenarioEndpoints["285A"] === 60
     && r58.planCost === 4493550 && Math.abs(r58.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r58.firstCallPrecise - 77.6) < 0.051,
-    "旧データ（項目なし）は種別＝一律・終点マップ＝空で補完され、形式はv3のまま。コードは正規化し範囲外は丸め、不正な項目は除去する。値はJSON往復で保持され、サンプルの実購入予定額4,493,550円・到達 −76.6%/−77.6% は不変（この項目は計算に使わない）");
+    "旧データ（項目なし）は種別＝一律・終点マップ＝空で補完され、形式はv3のまま。コードは正規化し範囲外は丸め、不正な項目は除去する。値はJSON往復で保持され、サンプルの実購入予定額4,493,550円・到達 −76.6%/−77.6% は不変（ステップ3以降、この項目は詳細モード選択時に経路評価へ使う）");
   /* 逆算テスト用の小ケースstateを作る共通ヘルパー */
   function revState(collateral, extra){
     var base = { version: 3, meta: { isSample: false, updatedAt: "" },
@@ -3845,26 +4064,26 @@ function runSelfTests(){
     && Math.abs(r78.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r78.firstCallPrecise - 77.6) < 0.051
     && Array.isArray(s78.instruments[0].slots) && s78.instruments[0].slots.length === 0,
     "サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変。サンプルのスロットは空で、既存の計算結果に影響しない");
-  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1）。
-     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjE5IjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GEICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
+  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1。版は v2.1／SW v20）。
+     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
      （埋め込み表示など）ではバージョン定数の一致をもって可能な範囲の確認とする */
-  var sw79ok = APP_VERSION === "2.0.1" && SW_CACHE_NAME === "nanpin-planner-v19";
+  var sw79ok = APP_VERSION === "2.1" && SW_CACHE_NAME === "nanpin-planner-v20";
   var sw79src = "";
   try {
     var xhr79 = new XMLHttpRequest();
-    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjE5IjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GEICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
+    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
     xhr79.send(null);
     if ((xhr79.status === 200 || xhr79.status === 0) && xhr79.responseText) sw79src = String(xhr79.responseText);
   } catch (e79) { sw79src = ""; }
   var sw79fileChecked = !!sw79src;
   if (sw79fileChecked){
-    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v19") >= 0
+    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v20") >= 0
       && /new Request\(e\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw79src)
       && sw79src.indexOf("isNavigation") >= 0;
   }
   t("Service Workerのページ取得がキャッシュ再検証を指定する", sw79ok,
-    "アプリ v2.0.1／SWキャッシュ名 nanpin-planner-v19" + (sw79fileChecked
-      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjE5IjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GEICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v19"
+    "アプリ v2.1／SWキャッシュ名 nanpin-planner-v20" + (sw79fileChecked
+      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v20"
       : "。この環境では生成物ファイルを読めないため、バージョン定数の一致で確認（実ファイルの内容確認は公開版で行う）"));
   /* 80 計画比較セクションの注記が現在の想定最大下落率を動的に表示する（v2.0.1・修正2） */
   var s80 = sanitizeState(sampleState());
@@ -3877,6 +4096,108 @@ function runSelfTests(){
   t("計画比較の注記が想定最大下落率を動的に表示する", note80html.indexOf("想定最大下落率（現在 −65%）までの全経路で評価しています") >= 0
     && note80html.indexOf("「リスクから逆算」プレビューの最低維持率（目標下落率までの評価）とは評価範囲が異なります") >= 0,
     "想定最大下落率を −65% に変えると「計画の比較・保存」セクションの注記も「現在 −65%」と表示され、逆算プレビュー（目標下落率までの評価）との評価範囲の違いを明記する。比較指標の計算自体は変更していない");
+  /* 81 検証ゲート（ステップ3）：詳細モードで全銘柄の終点を想定最大下落率と同じ値にすると、
+        既存サンプルの結果が一律モードと一致する */
+  var s81u = sanitizeState(sampleState());
+  var r81u = MarginSim.simulate(s81u);
+  var s81d = sanitizeState(sampleState());
+  s81d.settings.scenarioType = "perInstrument";
+  s81d.settings.scenarioEndpoints = { "1308": 80 };
+  var r81d = MarginSim.simulate(s81d);
+  var path81u = MarginSim.pathEvaluate(s81u, 80), path81d = MarginSim.pathEvaluate(s81d, 80);
+  var last81u = r81u.rows[r81u.rows.length - 1], last81d = r81d.rows[r81d.rows.length - 1];
+  t("詳細モードで全銘柄の終点を最大下落率にすると一律モードと一致する（検証ゲート）", r81d.planCost === 4493550 && r81d.planCost === r81u.planCost
+    && Math.abs(r81d.firstMgmtPrecise - r81u.firstMgmtPrecise) < 0.051 && Math.abs(r81d.firstMgmtPrecise - 76.6) < 0.051
+    && Math.abs(r81d.firstCallPrecise - r81u.firstCallPrecise) < 0.051 && Math.abs(r81d.firstCallPrecise - 77.6) < 0.051
+    && Math.abs(path81d.minRate - path81u.minRate) < 0.01 && path81d.minRateDrop === path81u.minRateDrop
+    && Math.abs(last81d.totalPnl - last81u.totalPnl) < 0.01,
+    "終点 −80%（＝想定最大下落率）の詳細モードでは、実購入予定額4,493,550円・管理基準到達 −76.6%／追証基準到達 −77.6%・経路上の最低維持率 " + (path81d.minRate === null ? "—" : path81d.minRate.toFixed(2)) + "%・最終評価損 " + fmtSignedYen(last81d.totalPnl) + " が一律モードと一致する");
+  /* 82 終点の異なる2銘柄：各段階は自身の下落率で発動し、終点を超える段階は発動しない。
+        A（終点40%）：−30%段階は進行度75%（基準パス−60%）で発動、−50%段階は終点超えで発動しない。
+        B（終点80%）：−50%段階は進行度62.5%（基準パス−50%）で発動する */
+  var s82 = { version: 3, meta: { isSample: false, updatedAt: "" },
+    account: { broker: "", collateral: 10000000, collateralBasis: "after", cash: 0, brokerRate: null }, positions: [],
+    instruments: [
+      { id: "dA", code: "1111", name: "詳細テストA", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 1, baseIsSample: false, holding: { qty: 100, avgPrice: 1000, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [
+        { id: "dA1", dropPct: 30, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false },
+        { id: "dA2", dropPct: 50, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] },
+      { id: "dB", code: "2222", name: "詳細テストB", type: "stock", planBasePrice: 1000, closePrice: 1000, closeDate: "", closeSource: "", unit: 1, baseIsSample: false, holding: { qty: 0, avgPrice: 0, side: "buy" }, ref: { name: "なし", baseDate: "", baseValue: null, currentValue: null }, stages: [
+        { id: "dB1", dropPct: 50, budget: 90000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] }],
+    settings: { marginCall: 20, management: 25, newMargin: 31, maxDrop: 80, step: 5, collateralMode: "none", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 0, scenarioType: "perInstrument", scenarioEndpoints: { "1111": 40, "2222": 80 } } };
+  s82 = sanitizeState(s82);
+  var r82 = MarginSim.simulate(s82);
+  var row82_50 = r82.rows.filter(function(r){ return r.drop === 50; })[0];
+  var row82_60 = r82.rows.filter(function(r){ return r.drop === 60; })[0];
+  var row82_last = r82.rows[r82.rows.length - 1];
+  var insA82 = s82.instruments[0], insB82 = s82.instruments[1];
+  t("終点の異なる2銘柄で各段階が自身の下落率で発動し終点超えは発動しない", r82.stageRes["dA2"].status === "beyond" && r82.stageRes["dA2"].qty === 0 && r82.stageRes["dA2"].cost === 0
+    && r82.stageRes["dA1"].status === "buy" && r82.stageRes["dB1"].status === "buy"
+    && MarginSim.triggerBaseDrop(s82, insA82, insA82.stages[0]) === 60 && MarginSim.triggerBaseDrop(s82, insB82, insB82.stages[0]) === 50
+    && row82_50.executedCount === 1 && row82_60.executedCount === 2 && row82_last.executedCount === 2
+    && Math.abs(row82_last.holdingsPnl - (-40000)) < 0.01 && row82_last.progress === 1,
+    "Aの−50%段階は終点（−40%）超えで beyond（数量0・金額0）。Aの−30%段階は基準パス−60%（進行度75%）で、Bの−50%段階は基準パス−50%（進行度62.5%）で発動するため、基準パス−50%時点の実行数は1、−60%時点では2になる。Aの実保有（100株@1,000円）はA自身のパス（終点−40%）で評価され、最終行の保有評価損は−40,000円");
+  /* 83 担保の終点編集→倍率換算→終点表示の往復が一致する。換算できない場合は値を変更しない */
+  var st83 = sanitizeState(sampleState()).settings;
+  var ep83same = collateralEndpointPct(st83);
+  st83.collateralMode = "custom"; st83.collateralCustom = 150;
+  var ep83custom = collateralEndpointPct(st83);
+  var res83 = setCollateralEndpoint(st83, 120);
+  var ep83back = collateralEndpointPct(st83);
+  var st83zero = { marginCall: 20, management: 25, newMargin: 31, maxDrop: 0, step: 5, collateralMode: "same", collateralCustom: 100, includeProfit: false, fees: 0, minMargin: 300000 };
+  var res83zero = setCollateralEndpoint(st83zero, 50);
+  var res83bad = setCollateralEndpoint(st83, -10);
+  t("担保の終点編集と倍率換算の往復が一致し、換算不能時は値を変更しない", ep83same === 80 && ep83custom === 120
+    && res83.ok === true && st83.collateralMode === "custom" && st83.collateralCustom === 150 && ep83back === 120
+    && res83zero.ok === false && st83zero.collateralMode === "same" && st83zero.collateralCustom === 100
+    && res83bad.ok === false && st83.collateralCustom === 150,
+    "連動100%・想定最大下落率80%では終点は −80%。連動割合150%では終点 −120% になり、終点 −120% を編集すると連動割合150%（任意）へ換算されて往復が一致する。想定最大下落率0や負値の終点では換算せず、理由を返して値は変更しない");
+  /* 84 詳細モードの設定（種別・各銘柄の終点）がJSON往復で保持され、シナリオ項目のない旧データは一律で読み込める */
+  var s84 = sanitizeState(sampleState());
+  s84.settings.scenarioType = "perInstrument";
+  s84.settings.scenarioEndpoints = { "1308": 55 };
+  var round84 = unpackState(packState(s84));
+  var old84 = sampleState(); delete old84.settings.scenarioType; delete old84.settings.scenarioEndpoints;
+  var mig84 = sanitizeState(old84);
+  var ep84default = round84.ok ? MarginSim.endpointFor(round84.state, { code: "9999" }) : null;
+  var ep84set = round84.ok ? MarginSim.endpointFor(round84.state, round84.state.instruments[0]) : null;
+  t("詳細モードの設定がJSON往復で保持され、項目のない旧データは一律で読み込める", round84.ok
+    && round84.state.settings.scenarioType === "perInstrument" && round84.state.settings.scenarioEndpoints["1308"] === 55
+    && ep84set === 55 && ep84default === 80
+    && mig84.settings.scenarioType === "uniform" && Object.keys(mig84.settings.scenarioEndpoints).length === 0,
+    "種別＝詳細・終点マップ {1308: 55} はJSON書き出し／読み込みで保持され、対象銘柄の終点は −55%、未設定の銘柄の終点は想定最大下落率 −80%（初期値）になる。シナリオ項目のない旧データは種別＝一律・終点マップ空で補完される");
+  /* 85 予算逆算は詳細モード選択時も一律前提で評価する（暗黙に前提を変えない） */
+  var s85d = sanitizeState(sampleState());
+  s85d.settings.scenarioType = "perInstrument";
+  s85d.settings.scenarioEndpoints = { "1308": 30 };
+  var s85u = sanitizeState(sampleState());
+  var p85 = { target: 75, minRate: 35, start: 5, end: 65, step: 5, mode: "equal" };
+  var ev85d = ReverseCalc.evaluateCandidate(s85d, s85d.instruments[0].id, p85, 4000000);
+  var ev85u = ReverseCalc.evaluateCandidate(s85u, s85u.instruments[0].id, p85, 4000000);
+  t("予算逆算は詳細モードでも一律シナリオ前提で評価する", ev85d.ok === ev85u.ok && ev85d.minRate === ev85u.minRate
+    && ev85d.totalCost === ev85u.totalCost && ev85d.stages.length === ev85u.stages.length,
+    "対象銘柄の終点を −30% にした詳細モードでも、逆算の候補評価（成立可否・経路上の最低維持率・実購入予定額）は一律モードの状態での評価と完全一致する。詳細経路では −30% を超える段階が発動せず結果が変わるはずだが、逆算は一律前提を維持するため変わらない");
+  /* 86 計画比較（スロット評価）は現在のシナリオ設定に従い、詳細モードでは詳細経路で再計算する */
+  var s86 = sanitizeState(sampleState());
+  s86.settings.scenarioType = "perInstrument";
+  s86.settings.scenarioEndpoints = { "1308": 40 };
+  var ins86 = s86.instruments[0];
+  var slot86 = PlanSlots.slotFromCurrentPlan(ins86);
+  PlanSlots.addSlot(ins86, slot86);
+  var m86 = PlanSlots.evaluateSlot(s86, ins86, slot86);
+  var path86 = MarginSim.pathEvaluate(s86, 80);
+  var s86u = sanitizeState(sampleState());
+  var m86u = PlanSlots.evaluateCurrent(s86u, s86u.instruments[0]);
+  t("計画比較は詳細モードでは詳細経路で再計算される", !!m86 && !!m86u
+    && Math.abs(m86.minRate - path86.minRate) < 0.001 && m86.costTotal < m86u.costTotal && m86u.costTotal === 4493550,
+    "終点 −40% の詳細モードでは、−40% を超える段階が発動しないため案の実購入予定額は一律の 4,493,550円より小さくなり、経路上の最低維持率は詳細経路の pathEvaluate と一致する（比較は現在のシナリオ設定に従う）");
+  /* 87 詳細モードの経路は進行度ベースで比例し、刻みは基準パス0.1%精度を保つ */
+  var r87 = MarginSim.simulate(s82);
+  var first87 = r87.firstMgmtPrecise;
+  t("詳細モードの経路が進行度ベースで比例し到達精度を保つ", MarginSim.dropFor(s82, insA82, 40) === 20 && MarginSim.dropFor(s82, insB82, 40) === 40
+    && MarginSim.endpointFor(s82, insA82) === 40 && MarginSim.endpointFor(s82, insB82) === 80
+    && r87.rows.every(function(r){ return Math.abs(r.progress - r.drop / 80) < 1e-9 && Math.abs(r.dropsByIns["dA"] - r.drop / 2) < 1e-9; })
+    && (first87 === null || Math.abs(first87 * 10 - Math.round(first87 * 10)) < 1e-9),
+    "基準パス−40%（進行度50%）ではAの下落率は終点の半分 −20%、Bは −40% になり、全行で進行度と銘柄別下落率が比例関係を保つ。到達下落率（基準パス）は0.1%刻みの格子上の値で返る");
   return T;
 }
 
