@@ -272,8 +272,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "1.9.1";
-var SW_CACHE_NAME = "nanpin-planner-v16";
+var APP_VERSION = "1.9.2";
+var SW_CACHE_NAME = "nanpin-planner-v17";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -1088,10 +1088,13 @@ function effectiveSplits(ins, quote){
              (b) 下落率0%〜目標耐性下落率の経路上の全評価点で維持率が最低維持率ライン以上
              (c) 同じ経路上の全評価点で実質保証金が最低保証金（設定値）以上
    探索は総予算の1変数で単調性を仮定しない：グリッド走査（約100分割）で成立する最大の格子点を取り、
-   その区間内を約20分割して精査する。全域の最大値の保証はしない。
+   その区間内を約20分割して精査する。精査の刻みは探索上限に比例して粗くなるため、v1.9.2からは
+   精査の後に最終走査を追加する：精査で得た最大の成立予算から1,000円刻みで増やしながら再評価し、
+   最初に不成立になった手前を最終結果とする（追加の評価は最大40回まで）。これにより最終粒度は
+   探索上限の大小によらず約1,000円になる。全域の最大値の保証はしない。
    ============================================================ */
 var ReverseCalc = (function(){
-  var GRID_DIV = 100, REFINE_DIV = 20;
+  var GRID_DIV = 100, REFINE_DIV = 20, FINAL_STEP = 1000, FINAL_MAX_EVALS = 40;
   function sanitizeParams(p){
     p = p || {};
     var start = clamp(num(p.start, 5), 0, 100);
@@ -1221,11 +1224,17 @@ var ReverseCalc = (function(){
     if (!(ub.upper > 0)){
       return { status: "zero", reason: "upper", params: params, upper: ub, elapsedMs: elapsed() };
     }
+    /* 探索中の候補評価の総回数を数える（探索メタ情報の表示と自己テストの上限確認用） */
+    var evalCount = 0;
+    function evalCounted(budget){
+      evalCount++;
+      return evaluateCandidate(state, insId, params, budget);
+    }
     /* グリッド走査：上限までを約100分割し、成立する最大の格子点を取る（単調性は仮定しない） */
     var best = null;
     for (var i = 0; i <= GRID_DIV; i++){
       var b = Math.round(ub.upper * i / GRID_DIV);
-      var ev = evaluateCandidate(state, insId, params, b);
+      var ev = evalCounted(b);
       if (ev.ok && ev.totalQty > 0 && (best === null || b > best.totalBudget)) best = ev;
     }
     if (best === null){
@@ -1239,12 +1248,25 @@ var ReverseCalc = (function(){
       for (var k = 1; k <= REFINE_DIV; k++){
         var b2 = Math.round(best.totalBudget + refineStep * k);
         if (b2 <= best.totalBudget) continue;
-        var ev2 = evaluateCandidate(state, insId, params, b2);
+        var ev2 = evalCounted(b2);
         if (ev2.ok && ev2.totalQty > 0) best = ev2;
       }
     }
+    /* 最終走査（v1.9.2）：精査で得た最大の成立予算から1,000円刻みで増やしながら再評価し、
+       最初に不成立になった手前を最終結果とする。精査の刻みは探索上限に比例して粗くなるが、
+       この最終走査により最終粒度は上限の大小によらず約1,000円になる。
+       追加の評価は最大 FINAL_MAX_EVALS 回まで（探索上限を超える候補は評価しない） */
+    var finalEvals = 0;
+    while (finalEvals < FINAL_MAX_EVALS){
+      var b3 = best.totalBudget + FINAL_STEP;
+      if (b3 > ub.upper) break;
+      var ev3 = evalCounted(b3);
+      finalEvals++;
+      if (ev3.ok && ev3.totalQty > 0) best = ev3;
+      else break;
+    }
     /* 最終候補を現行エンジンで再評価して成立を確認してから結果とする */
-    var finalEv = evaluateCandidate(state, insId, params, best.totalBudget);
+    var finalEv = evalCounted(best.totalBudget);
     if (!finalEv.ok || finalEv.totalQty <= 0){
       return { status: "zero", reason: "no_feasible", params: params, upper: ub, elapsedMs: elapsed() };
     }
@@ -1255,9 +1277,9 @@ var ReverseCalc = (function(){
              totalCost: finalEv.totalCost, totalQty: finalEv.totalQty,
              minRate: finalEv.minRate, minRateDrop: finalEv.minRateDrop, rateAtTarget: finalEv.rateAtTarget, minBalance: finalEv.minBalance,
              atCeiling: atCeiling, upper: ub,
-             meta: { upper: ub.upper, rawTotalBudget: finalEv.totalBudget, gridDiv: GRID_DIV, refineDiv: REFINE_DIV, gridStep: Math.round(gridStep), refineStep: Math.round(refineStep * 10) / 10, elapsedMs: elapsed() } };
+             meta: { upper: ub.upper, rawTotalBudget: finalEv.totalBudget, gridDiv: GRID_DIV, refineDiv: REFINE_DIV, gridStep: Math.round(gridStep), refineStep: Math.round(refineStep * 10) / 10, finalStep: FINAL_STEP, finalEvals: finalEvals, evalCount: evalCount, elapsedMs: elapsed() } };
   }
-  return { sanitizeParams: sanitizeParams, validateParams: validateParams, parseParams: parseParams, evaluateCandidate: evaluateCandidate, upperBound: upperBound, solve: solve, GRID_DIV: GRID_DIV, REFINE_DIV: REFINE_DIV };
+  return { sanitizeParams: sanitizeParams, validateParams: validateParams, parseParams: parseParams, evaluateCandidate: evaluateCandidate, upperBound: upperBound, solve: solve, GRID_DIV: GRID_DIV, REFINE_DIV: REFINE_DIV, FINAL_STEP: FINAL_STEP, FINAL_MAX_EVALS: FINAL_MAX_EVALS };
 })();
 </script>
 <script>
@@ -2093,7 +2115,7 @@ function reverseSectionHtml(ins){
         + '<dl class="kv mt"><dt>実購入予定額合計</dt><dd class="num">' + fmtYen(res.totalCost) + "</dd>"
         + "<dt>経路上の最低維持率</dt><dd class='num'>" + (res.minRate === null ? "対象外" : fmtPct(res.minRate) + "（下落率 −" + res.minRateDrop + "% 時点）") + "</dd>"
         + "<dt>目標下落率（−" + res.params.target + "%）時点の維持率</dt><dd class='num'>" + (res.rateAtTarget === null ? "対象外" : fmtPct(res.rateAtTarget)) + "</dd></dl>"
-        + '<p class="hint">探索メタ情報：探索範囲 0〜' + fmtYen(res.meta.upper) + "（総予算）／グリッド " + res.meta.gridDiv + "分割＋精査 " + res.meta.refineDiv + "分割（精査粒度 約" + fmtYen(res.meta.refineStep) + "）／所要 " + res.meta.elapsedMs + "ミリ秒。全域の最大値を保証するものではありません。" + (res.meta.rawTotalBudget !== undefined && res.meta.rawTotalBudget !== res.totalBudget ? "<br>探索で得た総予算（段階配分の丸め前）は " + fmtYen(res.meta.rawTotalBudget) + " です。見出しの総予算は、段階予算（100円単位）の合計＝実際に反映される金額に合わせて表示しています。" : "") + "<br>探索上限の根拠：" + esc(res.upper.basis) + "</p>"
+        + '<p class="hint">探索メタ情報：探索範囲 0〜' + fmtYen(res.meta.upper) + "（総予算）／グリッド " + res.meta.gridDiv + "分割＋精査 " + res.meta.refineDiv + "分割（精査粒度 約" + fmtYen(res.meta.refineStep) + "）＋最終走査 " + fmtYen(res.meta.finalStep || 1000) + "刻み" + (res.meta.finalEvals !== undefined ? "（最終走査 " + res.meta.finalEvals + "回）" : "") + (res.meta.evalCount !== undefined ? "／総評価回数 " + res.meta.evalCount + "回" : "") + "／所要 " + res.meta.elapsedMs + "ミリ秒。全域の最大値を保証するものではありません。" + (res.meta.rawTotalBudget !== undefined && res.meta.rawTotalBudget !== res.totalBudget ? "<br>探索で得た総予算（段階配分の丸め前）は " + fmtYen(res.meta.rawTotalBudget) + " です。見出しの総予算は、段階予算（100円単位）の合計＝実際に反映される金額に合わせて表示しています。" : "") + "<br>探索上限の根拠：" + esc(res.upper.basis) + "</p>"
         + '<div class="rowflex"><button class="btn primary" id="revApplyBtn" type="button">この計画を反映する</button></div>';
     } else if (res.status === "existing_fail"){
       html += '<div class="notice danger" style="margin-top:0"><strong>逆算できません：既存建玉のみで既に条件未達です。</strong><br>候補計画なし・他銘柄の計画なし（実保有と既存建玉だけ）の経路評価で、すでに条件を満たしていません。'
@@ -2191,7 +2213,9 @@ function bindReverse(el, ins){
 }
 function bindBulk(el, ins){
   var pv = el.querySelector("#bulkPreviewBtn");
+  guardButtonClick(pv);
   if (pv) pv.onclick = function(){
+    commitActiveInput();
     function gv(id, fb){ var n = el.querySelector(id); return n ? num(n.value, fb) : fb; }
     ui.bulk = { total: Math.max(0, Math.round(gv("#b_total", 0))), start: gv("#b_start", 5), end: gv("#b_end", 65), step: Math.max(0.5, gv("#b_step", 5)),
                 mode: (function(){ var s = el.querySelector("#b_mode"); return s ? s.value : "equal"; })() };
@@ -2200,7 +2224,9 @@ function bindBulk(el, ins){
     toast("プレビューを生成しました。内容を確認してから適用してください。");
   };
   var ap = el.querySelector("#bulkApplyBtn");
+  guardButtonClick(ap);
   if (ap) ap.onclick = function(){
+    commitActiveInput();
     if (!ui.bulkPreview || ui.bulkPreview.insId !== ins.id) return;
     var rows = ui.bulkPreview.rows;
     function doApply(){
@@ -2218,10 +2244,37 @@ function bindBulk(el, ins){
   };
 }
 function fld(label, inner){ var m = inner.match(/id="([^"]+)"/); var f = m ? ' for="' + m[1] + '"' : ""; return '<div class="field"><label class="flabel"' + f + ">" + esc(label) + "</label>" + inner + "</div>"; }
+/* ---------- クリック飲み込み対策（v1.9.2・同型パターンの点検と修正） ----------
+   入力欄の change ハンドラが画面全体を再描画する画面では、入力編集中にボタンを押すと
+   mousedown → blur/change（再描画でボタン要素が差し替わる）→ mouseup の順になり click が
+   発生せず、1回目のクリックが飲み込まれる（逆算ボタンで v1.9.1 に修正したのと同型のパターン。
+   「銘柄情報を取得」ボタンでは mousedown の既定動作を止める方式で既に対策済み）。
+   点検の結果、同じ再描画構造を持つ追加・削除系ボタンにも同型パターンがあったため、同じ考え方で統一する：
+   (1) ボタンの mousedown の既定動作（フォーカス移動）を止め、change の再描画を click の前に挟まない。
+   (2) click ハンドラの冒頭で commitActiveInput() を呼び、フォーカス中の入力欄の change を
+   明示的に発火して未確定の編集を先に取り込む（この時点で再描画が起きても、click ハンドラ自体は
+   既に実行中なので処理は続行できる）。これにより「編集が保存される」ことと
+   「1回目のクリックが効く」ことが両立する。 */
+function guardButtonClick(btn){
+  if (!btn) return;
+  btn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+}
+function commitActiveInput(){
+  var a = document.activeElement;
+  if (!a || a === document.body) return;
+  var tag = a.tagName;
+  if (tag !== "INPUT" && tag !== "SELECT" && tag !== "TEXTAREA") return;
+  if (a.type === "checkbox" || a.type === "radio" || a.type === "button") return;
+  var ev;
+  try { ev = new Event("change", { bubbles: true }); }
+  catch (e) { ev = document.createEvent("Event"); ev.initEvent("change", true, false); }
+  a.dispatchEvent(ev);
+}
 function bindPlanCommon(el){
   el.querySelectorAll("[data-ins]").forEach(function(b){ b.onclick = function(){ ui.selectedInsId = b.getAttribute("data-ins"); renderPlan(); }; });
   var add = el.querySelector("#addIns");
-  if (add) add.onclick = function(){
+  if (add){ guardButtonClick(add); add.onclick = function(){
+    commitActiveInput();
     var ni = { id: uid("ins"), code: "", name: "", type: "stock", planBasePrice: 0, closePrice: null, closeDate: "", closeSource: "", unit: 100, baseIsSample: false,
                closePrev: null, closeChangePct: null, closeQuality: "", closeAnomalyCount: 0, closeSplits: [],
                holding: { qty: 0, avgPrice: 0, side: "buy" },
@@ -2229,7 +2282,7 @@ function bindPlanCommon(el){
                stages: [{ id: uid("st"), dropPct: 5, budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false }] };
     state.instruments.push(ni); ui.selectedInsId = ni.id; state.meta.isSample = false;
     recalc(); renderPlan(); toast("銘柄を追加しました。コード・計画基準価格を入力してください。");
-  };
+  }; }
 }
 function commitIns(ins, patch){ Object.keys(patch).forEach(function(k){ ins[k] = patch[k]; }); recalc(); }
 function bindInstrumentForm(el, ins){
@@ -2332,7 +2385,9 @@ function bindInstrumentForm(el, ins){
   on("#f_refbase", function(n){ ins.ref.baseValue = n.value === "" ? null : num(n.value, NaN); if (!isFinite(ins.ref.baseValue)) ins.ref.baseValue = null; });
   on("#f_refcur", function(n){ ins.ref.currentValue = n.value === "" ? null : num(n.value, NaN); if (!isFinite(ins.ref.currentValue)) ins.ref.currentValue = null; });
   var dup = el.querySelector("#dupIns");
+  guardButtonClick(dup);
   if (dup) dup.onclick = function(){
+    commitActiveInput();
     showModal('<h3>計画の複製</h3><p style="margin:0 0 10px">銘柄情報と購入計画を複製します。新しい銘柄コードを入力してください。</p>'
       + '<label class="flabel">新しい銘柄コード</label><input type="text" id="dupCode" value="' + esc(ins.code) + '">'
       + '<label class="flabel" style="margin-top:10px">新しい銘柄名</label><input type="text" id="dupName" value="' + esc(ins.name) + '（複製）">'
@@ -2348,7 +2403,9 @@ function bindInstrumentForm(el, ins){
     };
   };
   var del = el.querySelector("#delIns");
+  guardButtonClick(del);
   if (del) del.onclick = function(){
+    commitActiveInput();
     confirmModal("銘柄を削除しますか", "銘柄「" + esc(ins.code) + " " + esc(ins.name) + "」とその購入計画を削除します。この操作は取り消せません。", "削除する", function(){
       state.instruments = state.instruments.filter(function(i){ return i.id !== ins.id; });
       ui.selectedInsId = state.instruments.length ? state.instruments[0].id : null;
@@ -2356,13 +2413,17 @@ function bindInstrumentForm(el, ins){
     });
   };
   var addStage = el.querySelector("#addStage");
+  guardButtonClick(addStage);
   if (addStage) addStage.onclick = function(){
+    commitActiveInput();
     var maxDrop = ins.stages.length ? Math.max.apply(null, ins.stages.map(function(s){ return s.dropPct; })) : 0;
     ins.stages.push({ id: uid("st"), dropPct: Math.min(100, maxDrop + 5), budget: 100000, enabled: true, executed: false, execPrice: null, execQty: null, execAmount: null, reflected: false });
     recalc(); renderPlan();
   };
   var reset = el.querySelector("#resetPlan");
+  guardButtonClick(reset);
   if (reset) reset.onclick = function(){
+    commitActiveInput();
     confirmModal("購入計画を初期化しますか", ins.code === "1308"
       ? "この銘柄の計画を初期サンプル（−5%〜−65%、累計予算 4,500,000円）に戻します。"
       : "この銘柄の購入計画をすべて削除し、−5%・10万円の1段階だけの初期状態に戻します。", "初期化する", function(){
@@ -2378,8 +2439,12 @@ function bindStages(el, ins){
     if (!sg) return;
     row.querySelectorAll("[data-act]").forEach(function(ctrl){
       var act = ctrl.getAttribute("data-act");
+      /* 行内のボタン（段階の削除・実行済みにする・保有へ反映）はクリック飲み込み対策の対象：
+         同じ行や上のフォームの入力欄を編集中に押しても1回で効くようにする */
+      if (ctrl.tagName === "BUTTON") guardButtonClick(ctrl);
       if (act === "toggle"){ ctrl.addEventListener("change", function(){ sg.enabled = ctrl.checked; recalc(); renderPlan(); }); }
       else if (act === "del"){ ctrl.addEventListener("click", function(){
+        commitActiveInput();
         confirmModal("購入段階を削除しますか", "−" + sg.dropPct + "%／予算 " + fmtYen(sg.budget) + " の段階を削除します。", "削除する", function(){
           ins.stages = ins.stages.filter(function(s){ return s.id !== sid; }); recalc(); renderPlan();
         });
@@ -2399,6 +2464,7 @@ function bindStages(el, ins){
       }
       else if (act === "execToggle" || act === "markExec"){
         ctrl.addEventListener("click", function(){
+          if (act === "markExec") commitActiveInput();
           var toExec = act === "markExec" ? true : ctrl.checked;
           if (toExec && !sg.executed){
             /* 実行済みにする際は、計画値（想定価格・数量・実購入予定額）を実績の初期値として下書きする。実際の値と違えば実績欄で直せる */
@@ -2428,6 +2494,7 @@ function bindStages(el, ins){
       }
       else if (act === "reflect"){
         ctrl.addEventListener("click", function(){
+          commitActiveInput();
           if (sg.execQty === null || sg.execPrice === null || !(sg.execQty > 0)){
             toast("先に実際の購入価格と購入数量を入力してください。"); return;
           }
@@ -2526,7 +2593,9 @@ function renderAccount(){
   on("#a_unsettled", function(n){ var v = n.value === "" ? NaN : num(n.value, NaN); a.unsettledPnl = isFinite(v) ? clamp(v, -1e12, 1e12) : null; state.meta.isSample = false; });
   on("#a_brokerRate", function(n){ a.brokerRate = n.value === "" ? null : num(n.value, NaN); if (!isFinite(a.brokerRate)) a.brokerRate = null; });
   on("#a_updated", function(n){ state.meta.updatedAt = n.value.trim(); });
+  guardButtonClick(el.querySelector("#addPos"));
   el.querySelector("#addPos").onclick = function(){
+    commitActiveInput();
     state.positions.push({ id: uid("pos"), code: "", name: "", side: "buy", principal: 0, pnl: null });
     recalc(); renderAccount();
   };
@@ -2535,7 +2604,9 @@ function renderAccount(){
     if (!p) return;
     row.querySelectorAll("[data-pact]").forEach(function(ctrl){
       var act = ctrl.getAttribute("data-pact");
+      if (ctrl.tagName === "BUTTON") guardButtonClick(ctrl);
       if (act === "del"){ ctrl.addEventListener("click", function(){
+        commitActiveInput();
         confirmModal("建玉を削除しますか", "「" + esc(p.name || p.code || "建玉") + "」（建代金 " + fmtYen(p.principal) + "）を削除します。", "削除する", function(){
           state.positions = state.positions.filter(function(x){ return x.id !== p.id; }); recalc(); renderAccount();
         });
@@ -2666,7 +2737,9 @@ function renderSettings(){
     saveNow().then(function(ok){ toast(ok ? "保存しました。" : "保存できませんでした。"); });
   };
   var clearBtn = el.querySelector("#clearStoredBtn");
+  guardButtonClick(clearBtn);
   if (clearBtn) clearBtn.onclick = function(){
+    commitActiveInput();
     confirmModal("保存データを消去しますか", "読み込めなかった新しい形式の保存データを消去し、現在のデータで自動保存を再開します。現在の画面のデータは消えません。", "消去して再開する", function(){
       idbDel(IDB_KEY).then(function(){
         storageBlocked = false; loadWarning = ""; loadWarningVersion = null;
@@ -2700,7 +2773,9 @@ function renderSettings(){
   if (rpBtn) rpBtn.onclick = function(){ loadPrices(); toast("終値データを再読み込みしました。"); };
   el.querySelector("#exportBtn").onclick = exportJSON;
   el.querySelector("#importBtn").onclick = function(){ document.getElementById("importFile").click(); };
+  guardButtonClick(el.querySelector("#resetBtn"));
   el.querySelector("#resetBtn").onclick = function(){
+    commitActiveInput();
     confirmModal("初期サンプルデータに戻しますか", "現在の口座情報・銘柄・購入計画はすべて初期サンプルに置き換わります。必要な場合は先にJSONで書き出してください。", "初期化する", function(){
       state = sampleState(); ui.selectedInsId = state.instruments[0].id; ui.selectedDrop = null;
       recalc(); renderSettings(); toast("初期サンプルデータに戻しました。");
@@ -3085,8 +3160,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.9.1" && SW_CACHE_NAME === "nanpin-planner-v16",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.9.1／SW v16");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.9.2" && SW_CACHE_NAME === "nanpin-planner-v17",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.9.2／SW v17");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -3376,6 +3451,49 @@ function runSelfTests(){
     && res66.rawTotalBudget >= res66.totalBudget && (res66.rawTotalBudget - res66.totalBudget) < 100
     && r58.planCost === 4493550 && Math.abs(r58.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r58.firstCallPrecise - 77.6) < 0.051,
     "サンプル相当の逆算では見出し総予算 " + (res66.totalBudget || 0).toLocaleString("ja-JP") + "円が段階予算の合計と一致し、探索の生の値 " + (res66.rawTotalBudget || 0).toLocaleString("ja-JP") + "円との差は段階配分の丸め（100円未満）だけである。既存サンプルの回帰値（実購入予定額4,493,550円・到達 −76.6%/−77.6%）も不変");
+  /* 70 最終走査（v1.9.2）：大きな探索上限でも最終粒度が1,000円刻みになり、結果は従来方式（グリッド＋精査のみ）以上になる。
+        従来方式の結果は、グリッド走査＋区間精査だけを evaluateCandidate で再現して求める */
+  var p70 = { target: 75, minRate: 35, start: 5, end: 65, step: 5, mode: "equal" };
+  var s70 = sanitizeState(sampleState());
+  var ub70 = ReverseCalc.upperBound(s70);
+  var oldBest70 = null;
+  for (var gi70 = 0; gi70 <= ReverseCalc.GRID_DIV; gi70++){
+    var gb70 = Math.round(ub70.upper * gi70 / ReverseCalc.GRID_DIV);
+    var gev70 = ReverseCalc.evaluateCandidate(s70, s70.instruments[0].id, p70, gb70);
+    if (gev70.ok && gev70.totalQty > 0 && (oldBest70 === null || gb70 > oldBest70.totalBudget)) oldBest70 = gev70;
+  }
+  if (oldBest70){
+    var gStep70 = ub70.upper / ReverseCalc.GRID_DIV;
+    var iEnd70 = Math.min(ub70.upper, oldBest70.totalBudget + gStep70);
+    var rStep70 = (iEnd70 - oldBest70.totalBudget) / ReverseCalc.REFINE_DIV;
+    if (rStep70 > 0){
+      for (var rk70 = 1; rk70 <= ReverseCalc.REFINE_DIV; rk70++){
+        var rb70 = Math.round(oldBest70.totalBudget + rStep70 * rk70);
+        if (rb70 <= oldBest70.totalBudget) continue;
+        var rev70 = ReverseCalc.evaluateCandidate(s70, s70.instruments[0].id, p70, rb70);
+        if (rev70.ok && rev70.totalQty > 0) oldBest70 = rev70;
+      }
+    }
+  }
+  var next70 = res66.status === "ok" ? ReverseCalc.evaluateCandidate(s70, s70.instruments[0].id, p70, res66.rawTotalBudget + 1000) : null;
+  t("最終走査で大きな上限でも最終粒度が1,000円刻みになる", res66.status === "ok" && !!oldBest70
+    && res66.meta.finalStep === 1000 && ReverseCalc.FINAL_STEP === 1000
+    && res66.rawTotalBudget >= oldBest70.totalBudget
+    && (res66.atCeiling || res66.rawTotalBudget + 1000 > res66.upper.upper || res66.meta.finalEvals >= ReverseCalc.FINAL_MAX_EVALS || (next70 && (!next70.ok || next70.totalQty <= 0))),
+    "サンプル相当（探索上限 約" + ub70.upper.toLocaleString("ja-JP") + "円・精査粒度 約" + (res66.meta ? Math.round(res66.meta.refineStep) : "?").toLocaleString("ja-JP") + "円）でも、最終走査（1,000円刻み・" + (res66.meta ? res66.meta.finalEvals : "?") + "回）により結果 " + (res66.rawTotalBudget || 0).toLocaleString("ja-JP") + "円は従来方式の " + (oldBest70 ? oldBest70.totalBudget : 0).toLocaleString("ja-JP") + "円以上になり、その次の1,000円は不成立（または上限・回数上限に到達）で、境界の幅は約1,000円に収まる");
+  /* 71 最終走査の追加評価回数が上限を超えず、総評価回数も上限内に収まる */
+  t("最終走査の追加評価回数が上限を超えない", res66.status === "ok" && res66.meta.finalEvals <= ReverseCalc.FINAL_MAX_EVALS
+    && ReverseCalc.FINAL_MAX_EVALS === 40
+    && res66.meta.evalCount <= (ReverseCalc.GRID_DIV + 1) + ReverseCalc.REFINE_DIV + ReverseCalc.FINAL_MAX_EVALS + 1
+    && res59.status === "ok" && res59.meta.finalEvals <= ReverseCalc.FINAL_MAX_EVALS,
+    "サンプル相当の逆算では最終走査は " + (res66.meta ? res66.meta.finalEvals : "?") + " 回（上限40回）で、総評価回数 " + (res66.meta ? res66.meta.evalCount : "?") + " 回はグリッド101回＋精査20回＋最終走査40回＋最終確認1回の上限162回以内。小ケースでも最終走査は上限以内");
+  /* 72 最終走査を入れても小ケースの全数探索照合と手計算の数量が一致する（テスト59の強化） */
+  t("最終走査後も小ケースが全数探索・手計算と一致する", res59.status === "ok" && res59.totalQty === 139
+    && res59.meta.finalStep === 1000
+    && Math.abs(brute59 - res59.totalBudget) <= 1000 + 500 + 100
+    && ReverseCalc.evaluateCandidate(s59, "rv1", p59, res59.totalBudget).ok
+    && res67_300.status === "ok" && res67_300.totalQty === 32 && res67_100.status === "ok" && res67_100.totalQty === 76,
+    "手計算ケース（数量上限139）では最終走査後も数量139のままで、500円刻みの全数探索の最大予算との差は最終粒度1,000円＋刻み500円＋段階丸め100円以内。ライン300／100の手計算ケースでも数量32／76は不変");
   return T;
 }
 
