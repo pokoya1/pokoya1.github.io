@@ -272,8 +272,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "1.7";
-var SW_CACHE_NAME = "nanpin-planner-v13";
+var APP_VERSION = "1.8";
+var SW_CACHE_NAME = "nanpin-planner-v14";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -305,7 +305,7 @@ function sampleState(){
   return {
     version: DATA_VERSION,
     meta: { isSample: true, updatedAt: "" },
-    account: { broker: "", collateral: 15617481, collateralBasis: "after", collateralMarket: null, collateralHaircut: null, cash: 70309, brokerRate: null },
+    account: { broker: "", collateral: 15617481, collateralBasis: "after", collateralMarket: null, collateralHaircut: null, cash: 70309, brokerRate: null, unsettledPnl: null },
     positions: [
       { id: uid("pos"), code: "", name: "既存信用建玉（サンプル）", side: "buy", principal: 64800, pnl: null }
     ],
@@ -338,7 +338,11 @@ function sanitizeState(s){
     collateralMarket: (a.collateralMarket === null || a.collateralMarket === "" || a.collateralMarket === undefined || !isFinite(num(a.collateralMarket, NaN))) ? null : clamp(num(a.collateralMarket, 0), 0, 1e12),
     collateralHaircut: (a.collateralHaircut === null || a.collateralHaircut === "" || a.collateralHaircut === undefined || !isFinite(num(a.collateralHaircut, NaN))) ? null : clamp(num(a.collateralHaircut, 0), 0, 100),
     cash: clamp(num(a.cash, 0), -1e12, 1e12),
-    brokerRate: (a.brokerRate === null || a.brokerRate === "" || a.brokerRate === undefined) ? null : clamp(num(a.brokerRate, NaN), 0, 100000)
+    brokerRate: (a.brokerRate === null || a.brokerRate === "" || a.brokerRate === undefined) ? null : clamp(num(a.brokerRate, NaN), 0, 100000),
+    /* 受渡未到来の決済損益（形式v3のまま追加する任意項目）：空欄（初期値・旧データ）＝算入しない（null）。
+       プラス（受取予定の決済益）もマイナス（支払予定の決済損）も入力できる。null を clamp に通すと
+       0 に化けるため、未入力は null のまま直接返す（評価損益 pnl の未入力保持と同じ注意） */
+    unsettledPnl: (a.unsettledPnl === null || a.unsettledPnl === "" || a.unsettledPnl === undefined || !isFinite(num(a.unsettledPnl, NaN))) ? null : clamp(num(a.unsettledPnl, 0), -1e12, 1e12)
   };
   if (!isFinite(out.account.brokerRate)) out.account.brokerRate = null;
   out.positions = Array.isArray(s.positions) ? s.positions.slice(0, 100).map(function(p){
@@ -347,7 +351,10 @@ function sanitizeState(s){
     return { id: String(p.id || uid("pos")), code: normalizeCode(p.code), name: String(p.name || "").slice(0, 60),
              side: p.side === "sell" ? "sell" : "buy",
              principal: clamp(num(p.principal, 0), 0, 1e12),
-             pnl: isFinite(pnl) ? clamp(pnl, -1e12, 1e12) : null };
+             /* 未入力（null）は未入力のまま保持する。isFinite(null) は true になり clamp(null) は 0 を返すため、
+                null をそのまま clamp に通すと「未入力」が「0円入力」に化けて概算警告が消えてしまう（B5の修正）。
+                明示的に入力された 0 は 0 として保持し、未入力とは区別する */
+             pnl: pnl === null ? null : (isFinite(pnl) ? clamp(pnl, -1e12, 1e12) : null) };
   }) : [];
   out.instruments = Array.isArray(s.instruments) ? s.instruments.slice(0, 50).map(function(it){
     it = it || {};
@@ -417,7 +424,9 @@ function sanitizeState(s){
 
 /* ============================================================
    計算モジュール MarginSim（証券会社の実制度とは独立した概算モデル）
-   維持率 ＝（代用評価額(シナリオ後) ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用）÷ 建代金合計 × 100
+   維持率 ＝（代用評価額(シナリオ後) ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用 ＋ 受渡未到来の決済損益（入力がある場合のみ））÷ 建代金合計 × 100
+   受渡未到来の決済損益は口座データの任意項目（未入力＝算入しない）。入力がある場合のみ、その金額を
+   下落率で変動させない固定額として実質保証金（維持率の分子）にそのまま加える（現在値と全シナリオ共通）。
    評価損益の算入はSBI証券公式の委託保証金率の計算に合わせ、評価損（マイナス）の場合のみ差し引き、
    評価益（プラス）の場合はゼロとして計算する（評価益は維持率に算入しない）。評価損益そのものの表示は符号どおり行う。
    建代金合計が 0 のとき維持率は null（画面では「対象外」）。
@@ -445,6 +454,13 @@ var MarginSim = (function(){
   }
   /* SBI証券公式ルール：評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算する */
   function adjPnl(pnl, settings){ return Math.min(pnl, 0); }
+  /* 受渡未到来の決済損益：未入力（null・未定義・不正値）は 0（算入しない）。入力がある場合のみ固定額として加える */
+  function unsettledAmount(state){
+    var v = state && state.account ? state.account.unsettledPnl : null;
+    if (v === null || v === "" || v === undefined) return 0;
+    var n = num(v, NaN);
+    return isFinite(n) ? n : 0;
+  }
   /* 既存建玉の評価損益：現在値（建代金＋現在評価損益）が下落率ぶん変動する近似。pnl 未入力は 0 として概算し approx を立てる */
   function existingPnlAt(positions, dropPct){
     var pnl = 0, approx = false;
@@ -534,7 +550,7 @@ var MarginSim = (function(){
         newPnl += p.qty * (curPrice - p.price);
       });
       var balance = collateralAt(state.account.collateral, t, factor) + state.account.cash
-                    + adjPnl(exP.pnl + hdT.pnl + newPnl, st) - st.fees;
+                    + adjPnl(exP.pnl + hdT.pnl + newPnl, st) - st.fees + unsettledAmount(state);
       var required = Math.ceil(cost * st.newMargin / 100);
       if (balance >= required){ rec.feasible = true; rec.status = "buy"; executedPrior.push({ ins: ins, qty: qty, price: price }); }
       else { rec.status = "infeasible"; rec.reason = "必要保証金（概算 " + fmtYen(required) + "）に対し推計保証金が不足"; }
@@ -573,7 +589,7 @@ var MarginSim = (function(){
       var hdP = holdingsTotalsAt(state, drop);
       var collateral = collateralAt(state.account.collateral, drop, factor);
       var totalPnl = exP.pnl + hdP.pnl + newPnl;
-      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees;
+      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees + unsettledAmount(state);
       var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
       var rate = totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null;
       var capacity = st.newMargin > 0 ? Math.max(0, Math.floor(balance / (st.newMargin / 100)) - totalPrincipal) : 0;
@@ -595,7 +611,7 @@ var MarginSim = (function(){
     var hdNow = holdingsTotalsNow(state);
     var currentPrincipal = existingPrincipal + hdNow.principal;
     var currentPnl = exNow.pnl + hdNow.pnl;
-    var balanceNow = state.account.collateral + state.account.cash + adjPnl(currentPnl, st) - st.fees;
+    var balanceNow = state.account.collateral + state.account.cash + adjPnl(currentPnl, st) - st.fees + unsettledAmount(state);
     var current = { principal: currentPrincipal, pnl: currentPnl, pnlApprox: exNow.approx || hdNow.approx,
                     holdingsPrincipal: hdNow.principal, holdingsPnl: hdNow.pnl,
                     balance: balanceNow, rate: currentPrincipal > 0 ? (balanceNow / currentPrincipal) * 100 : null,
@@ -639,7 +655,7 @@ var MarginSim = (function(){
       var hdP = holdingsTotalsAt(state, drop);
       var collateral = collateralAt(state.account.collateral, drop, factor);
       var totalPnl = exP.pnl + hdP.pnl + newPnl;
-      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees;
+      var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees + unsettledAmount(state);
       var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
       return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal };
     }
@@ -679,7 +695,7 @@ var MarginSim = (function(){
              finalRateAll: lastRow ? lastRow.rate : null, finalRateStopped: stoppedRes.rate, finalPrincipalStopped: stoppedRes.totalPrincipal,
              firstInfeasible: firstInfeasible, minPnl: minPnl, factor: factor };
   }
-  return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor,
+  return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor, unsettledAmount: unsettledAmount,
            existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate,
            holdingPrincipal: holdingPrincipal, holdingPnlNow: holdingPnlNow, holdingPnlAt: holdingPnlAt,
            holdingsTotalsAt: holdingsTotalsAt, holdingsTotalsNow: holdingsTotalsNow };
@@ -1040,6 +1056,51 @@ var persistenceReady = false; /* 初回読み込みが終わるまで自動保�
 var storageBlocked = false;   /* 新しい形式の保存データを検出したときは、上書き防止のため自動保存を止める */
 var storageAvailable = true;  /* 埋め込み表示など IndexedDB が使えない環境では false になり、JSON のみで運用する */
 var lastSavedAt = "";
+/* ---------- 最終エクスポート日時の記録（C07） ----------
+   書き出し操作の日時だけを、端末側の保存領域（IndexedDBの別キー）に記録する。
+   エクスポートされるJSONデータ本体には混ぜない（バックアップの内容は従来どおり）。
+   日時表示は「書き出し操作の記録」であり、ファイルの保存完了やバックアップの成功を断定するものではない。 */
+var IDB_EXPORT_KEY = "last-export-at";
+var lastExportAt = ""; /* ISO文字列。未記録なら "" */
+var EXPORT_STALE_DAYS = 30;
+function exportRecordStatus(iso, nowMs){
+  if (!iso) return { recorded: false, stale: true, days: null };
+  var t = Date.parse(iso);
+  if (!isFinite(t)) return { recorded: false, stale: true, days: null };
+  var days = Math.floor((nowMs - t) / (24 * 3600 * 1000));
+  return { recorded: true, stale: days > EXPORT_STALE_DAYS, days: days };
+}
+function exportRecordText(){
+  var st = exportRecordStatus(lastExportAt, Date.now());
+  if (!st.recorded) return "最終エクスポート：未記録";
+  var d = new Date(lastExportAt);
+  return "最終エクスポート：" + d.toLocaleDateString("ja-JP") + " " + d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function exportPromptText(){
+  var st = exportRecordStatus(lastExportAt, Date.now());
+  if (!st.recorded) return "まだ書き出し操作の記録がありません。大切なデータを守るため、ときどきJSONで書き出して、別の場所にも保管しておくと安心です。";
+  if (st.stale) return "前回の書き出し操作から " + st.days + " 日が経っています。データを守るため、そろそろ新しい書き出しをおすすめします。";
+  return "";
+}
+function refreshExportInfo(){
+  var info = document.getElementById("lastExportInfo");
+  if (info) info.textContent = exportRecordText() + "（この端末に残した書き出し操作の記録です）";
+  var prompt = document.getElementById("lastExportPrompt");
+  if (prompt){ var t = exportPromptText(); prompt.textContent = t; prompt.style.display = t ? "" : "none"; }
+}
+function loadExportRecord(){
+  idbGet(IDB_EXPORT_KEY).then(function(v){
+    if (typeof v === "string" && isFinite(Date.parse(v))) lastExportAt = v;
+    refreshExportInfo();
+  }).catch(function(){ /* 記録が読めなくても本体機能には影響しない */ });
+}
+function recordExportNow(){
+  lastExportAt = new Date().toISOString();
+  refreshExportInfo();
+  if (storageAvailable && !storageBlocked){
+    idbPut(IDB_EXPORT_KEY, lastExportAt).catch(function(){ /* 記録できなくても書き出し自体は妨げない */ });
+  }
+}
 var loadWarning = "";         /* "" | "corrupt" | "version" */
 var loadWarningVersion = null;
 var saveTimer = null, savePending = false;
@@ -1495,6 +1556,7 @@ function renderDashboard(){
     + "<dt>証券会社</dt><dd>" + (state.account.broker ? esc(state.account.broker) : "未登録") + "</dd>"
     + "<dt>代用有価証券評価額（" + (state.account.collateralBasis === "after" ? "掛目適用後" : "時価×掛目で計算した適用後評価額") + "）</dt><dd class='num'>" + fmtYen(state.account.collateral) + "</dd>"
     + "<dt>委託保証金現金</dt><dd class='num'>" + fmtYen(state.account.cash) + "</dd>"
+    + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? "<dt>受渡未到来の決済損益（実質保証金に算入中）</dt><dd class='num'>" + fmtSignedYen(state.account.unsettledPnl) + "</dd>" : "")
     + "<dt>銘柄別保有の建代金合計</dt><dd class='num'>" + fmtYen(cur.holdingsPrincipal) + "</dd>"
     + "<dt>計画銘柄以外の既存建玉 建代金合計</dt><dd class='num'>" + fmtYen(cur.principal - cur.holdingsPrincipal) + "</dd>"
     + "<dt>建代金合計（実績）</dt><dd class='num'>" + fmtYen(cur.principal) + "</dd>"
@@ -2033,9 +2095,11 @@ function renderAccount(){
         + fld("代用有価証券評価額（円・自動計算）", '<input type="number" id="a_collateral" value="' + a.collateral + '" disabled aria-disabled="true">')
       : fld("代用有価証券評価額（円・掛目適用後）", '<input type="number" id="a_collateral" min="0" step="1" value="' + a.collateral + '">'))
     + fld("委託保証金現金（円）", '<input type="number" id="a_cash" step="1" value="' + a.cash + '">')
+    + fld("受渡未到来の決済損益（円・任意）", '<input type="number" id="a_unsettled" step="1" value="' + (a.unsettledPnl === null || a.unsettledPnl === undefined ? "" : a.unsettledPnl) + '" placeholder="未入力">')
     + fld("証券会社表示の保証金維持率（%・任意）", '<input type="number" id="a_brokerRate" min="0" step="0.1" value="' + (a.brokerRate === null ? "" : a.brokerRate) + '" placeholder="未入力">')
     + fld("情報更新日時", '<input type="text" id="a_updated" value="' + esc(state.meta.updatedAt) + '" placeholder="例：2026-11-17 11:30">')
     + "</div>"
+    + '<p class="hint">受渡未到来の決済損益は任意項目です。空欄（初期値）の場合は算入しません。入力がある場合のみ、その金額を下落率で変動させない固定額として、現在の維持率と全シナリオの実質保証金にそのまま加えます（プラスの決済益もマイナスの決済損も入力できます）。証券会社の画面に受渡未到来の決済損益が表示されている場合のみ入力してください。現金や建玉の評価損益に含めて入力しないでください（二重計上になります）。</p>'
     + (hcInfo.mode === "before"
       ? '<p class="hint" style="font-size:.92rem">計算に使う代用評価額：<strong class="num">' + fmtYen(a.collateral) + "</strong>"
         + (hcInfo.applied !== null ? '（時価 ' + fmtYen(a.collateralMarket) + " × 掛目 " + a.collateralHaircut + "% を切り捨てて計算）" : "（時価と掛目がそろうと自動で計算されます）") + "</p>"
@@ -2087,6 +2151,7 @@ function renderAccount(){
     state.meta.isSample = false;
   });
   on("#a_cash", function(n){ a.cash = clamp(num(n.value, 0), -1e12, 1e12); state.meta.isSample = false; });
+  on("#a_unsettled", function(n){ var v = n.value === "" ? NaN : num(n.value, NaN); a.unsettledPnl = isFinite(v) ? clamp(v, -1e12, 1e12) : null; state.meta.isSample = false; });
   on("#a_brokerRate", function(n){ a.brokerRate = n.value === "" ? null : num(n.value, NaN); if (!isFinite(a.brokerRate)) a.brokerRate = null; });
   on("#a_updated", function(n){ state.meta.updatedAt = n.value.trim(); });
   el.querySelector("#addPos").onclick = function(){
@@ -2133,8 +2198,10 @@ function renderSettings(){
     + fld("担保の価格変動条件", '<select id="s_colmode"><option value="same"' + (s.collateralMode === "same" ? " selected" : "") + '>市場と同率で下落</option><option value="half"' + (s.collateralMode === "half" ? " selected" : "") + '>市場の半分だけ下落</option><option value="strong"' + (s.collateralMode === "strong" ? " selected" : "") + '>市場の1.2倍下落</option><option value="none"' + (s.collateralMode === "none" ? " selected" : "") + '>変動しない</option><option value="custom"' + (s.collateralMode === "custom" ? " selected" : "") + ">任意の割合（下で指定）</option></select>")
     + fld("担保の連動割合（%・任意時）", '<input type="number" id="s_colcustom" min="0" max="300" step="5" value="' + s.collateralCustom + '">')
     + "</div>"
+    + '<p class="hint"><strong>担保の下落の起点について：</strong>担保の下落は現在の評価額を起点に計算します。計画の下落率は計画基準価格が起点で、起点が異なります（上の「担保の価格変動条件」は、現在の代用評価額が市場の下落に対してどの割合で連動するかの想定です）。</p>'
+    + '<p class="hint"><strong>控除費用について：</strong>控除費用は、委託手数料・買方金利・貸株料など、保証金から差し引かれる費用の見込み額を入れる欄です。配当落調整金は買建では受け取りのため控除しません（売建では支払いになります）。現金（委託保証金現金）の入力に既に反映済みの分は二重に入れないでください。</p>'
     + '<p class="hint"><strong>評価損益の保証金算入方法（SBI証券公式ルール準拠）：</strong>委託保証金率の計算では、評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算します。そのため本ツールでも、維持率の分子では建玉評価損益を min(評価損益, 0) として扱い、<strong>評価益は維持率に算入しません</strong>（従来の「評価益も算入する」方式から変更しました。ダッシュボード等での評価損益そのものの表示は、従来どおりプラスも表示します）。この算入方法は制度に合わせた固定仕様のため、設定では切り替えません。</p>'
-    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。実質保証金 ＝ 保証金現金 ＋ 代用評価額 ＋ min(建玉評価損益, 0) − 控除費用。新規建てには委託保証金が最低保証金額（初期値300,000円・上で変更可能）以上必要で、実質保証金がこれを下回ると差し入れが必要になるため、現在値とシミュレーション各行で警告します。</p></div>'
+    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。実質保証金 ＝ 保証金現金 ＋ 代用評価額 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '。新規建てには委託保証金が最低保証金額（初期値300,000円・上で変更可能）以上必要で、実質保証金がこれを下回ると差し入れが必要になるため、現在値とシミュレーション各行で警告します。' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? "現在、口座画面で入力した受渡未到来の決済損益（" + fmtSignedYen(state.account.unsettledPnl) + "）が、下落率で変動しない固定額として実質保証金に加わっています。" : "口座画面で受渡未到来の決済損益を入力した場合は、その金額が下落率で変動しない固定額として実質保証金に加わります（未入力の場合は加わりません）。") + '</p></div>'
 
     + '<div class="card"><h2>価格中継（任意コード取得）</h2><p class="sub">終値データ（prices.json）に登録されていない銘柄コードでも、価格中継から終値を取得できるようにします。登録済みコードは従来どおり prices.json を優先し、中継は使いません。中継URLはこの端末のアプリデータ内にだけ保存されます。URLを空欄にすると中継は無効になります。</p>'
     + fld("中継URL", '<input type="text" id="relay_url" value="' + esc(s.relayUrl || "") + '" placeholder="https://…workers.dev" autocomplete="off" inputmode="url">')
@@ -2152,6 +2219,8 @@ function renderSettings(){
     + '<p class="hint">終値データの形式：アプリと同じ場所に置く prices.json（v2形式：{ version, generatedAt, source, stocks: { 銘柄コード: { name, type, unit, close, closeDate, stale, recentSplits } }, indices: { 指数名または機械キー（nikkei/topix/sp500/nasdaq100・表示名は label 併記可）: { latestClose, latestDate, history（{ 日付: 終値 } または [[日付, 終値], ...] の配列）, dataQuality, anomalies, stale, closeIsProxy } } }）。取得日時（generatedAt）と各終値の対象営業日を表示し、古いデータ・暫定データ・大きな変動・前回データの使い回し・株式分割は該当箇所に警告として表示します。定期ジョブが大引け後に最新化する想定です。取得できない環境では終値を手入力できます。</p>'
     + (storageBlocked ? '<div class="notice danger" style="margin:0 0 10px">保存データの形式バージョン（' + loadWarningVersion + '）がこのアプリ（' + DATA_VERSION + '）より新しいため読み込めませんでした。<div class="rowflex mt"><button class="btn danger-outline small" id="clearStoredBtn">保存データを消去して自動保存を再開</button></div></div>' : "")
     + (loadWarning === "corrupt" ? '<div class="notice warn" style="margin:0 0 10px">前回の保存データが破損していたため読み込めず、退避しました。現在のデータは自動保存されています。</div>' : "")
+    + '<p class="hint" id="lastExportInfo">' + esc(exportRecordText()) + '（この端末に残した書き出し操作の記録です）</p>'
+    + '<p class="hint" id="lastExportPrompt"' + (exportPromptText() ? "" : ' style="display:none"') + ">" + esc(exportPromptText()) + "</p>"
     + '<div class="rowflex"><button class="btn" id="saveNowBtn">今すぐ保存</button><button class="btn primary" id="exportBtn">JSONで書き出す（バックアップ）</button><button class="btn" id="importBtn">JSONを読み込む（復元）</button><button class="btn danger-outline" id="resetBtn">初期サンプルデータに戻す</button></div>'
     + '<p class="hint">読み込み時は形式とバージョンを検証し、不正な値（文字列・負数・範囲外）は自動で除去・丸めてから取り込みます。破損したファイルや、このアプリより新しい形式のファイルは取り込まず、現在のデータを保持します。取り込んだデータは自動保存にも反映されます。</p></div>'
     + "</div><div>"
@@ -2283,6 +2352,7 @@ function exportJSON(){
   a.download = "nanpin-plan-backup-" + new Date().toISOString().slice(0, 10) + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  recordExportNow();
   toast("JSONバックアップを書き出しました。");
 }
 document.getElementById("importFile").addEventListener("change", function(ev){
@@ -2643,8 +2713,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.7" && SW_CACHE_NAME === "nanpin-planner-v13",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.7／SW v13");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "1.8" && SW_CACHE_NAME === "nanpin-planner-v14",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v1.8／SW v14");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -2756,6 +2826,64 @@ function runSelfTests(){
     && mig52.account.collateralBasis === "after" && mig52.account.collateralMarket === null && mig52.account.collateralHaircut === null
     && mig52.account.collateral === 15617481,
     "入力方式・時価・掛目はJSON書き出し／読み込みで保持される。新項目のない旧データは方式＝直接入力・時価と掛目は空で補完され、代用評価額は従来どおり15,617,481円で読み込まれる");
+  /* 53 B1：受渡未到来の決済損益が空欄（初期値・旧データ）では、既存サンプルの結果が不変 */
+  var s53 = sanitizeState(sampleState());
+  var old53 = sampleState(); delete old53.account.unsettledPnl;
+  var mig53 = sanitizeState(old53);
+  var r53 = MarginSim.simulate(s53);
+  t("受渡未到来の決済損益が空欄ではサンプルの結果が不変", s53.account.unsettledPnl === null && mig53.account.unsettledPnl === null
+    && MarginSim.unsettledAmount(s53) === 0
+    && r53.planCost === 4493550 && Math.abs(r53.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r53.firstCallPrecise - 77.6) < 0.051,
+    "空欄（初期値）と旧データ（項目なし）はどちらも未入力（null）として補完され算入せず、実購入予定額4,493,550円・管理基準到達 −76.6%／追証基準到達 −77.6% は従来どおり");
+  /* 54 B1：フェーズAの再現シナリオで未受渡 +20,000 を入れると維持率が 46.0% になる */
+  var s54 = sampleState();
+  s54.instruments = []; s54.account.collateral = 400000; s54.account.cash = 100000; s54.account.unsettledPnl = null;
+  s54.positions = [
+    { id: "p54a", code: "", name: "益建玉", side: "buy", principal: 600000, pnl: 100000 },
+    { id: "p54b", code: "", name: "損建玉", side: "buy", principal: 400000, pnl: -150000 }];
+  s54.settings.fees = 10000;
+  s54 = sanitizeState(s54);
+  var r54base = MarginSim.simulate(s54);
+  s54.account.unsettledPnl = 20000;
+  var r54 = MarginSim.simulate(s54);
+  t("受渡未到来の決済損益を入れると維持率が46.0%になる（フェーズA再現）", Math.abs(r54base.current.rate - 44.0) < 0.001 && r54base.current.balance === 440000
+    && r54.current.balance === 460000 && Math.abs(r54.current.rate - 46.0) < 0.001,
+    "担保400,000＋現金100,000・建玉合計1,000,000・損益合計−50,000・費用10,000 では未入力で44.0%（440,000円）。未受渡 +20,000 を入れると分子が460,000円になり維持率は46.0%（SBI表示と一致）");
+  /* 55 B1：マイナス値で分子が減り、全シナリオへ固定額として適用され、JSONで往復する */
+  var s55base = sanitizeState(JSON.parse(JSON.stringify(s54))); s55base.account.unsettledPnl = null;
+  var r55base = MarginSim.simulate(s55base);
+  var s55neg = sanitizeState(JSON.parse(JSON.stringify(s54))); s55neg.account.unsettledPnl = -30000;
+  var r55neg = MarginSim.simulate(s55neg);
+  var rowsDiff55 = r55neg.rows.every(function(r, i){ return r.balance - r55base.rows[i].balance === -30000; });
+  var round55 = unpackState(packState(sanitizeState(s55neg)));
+  var s55pos = sanitizeState(JSON.parse(JSON.stringify(s54)));
+  var r55pos = MarginSim.simulate(s55pos);
+  var rowsDiff55pos = r55pos.rows.every(function(r, i){ return r.balance - r55base.rows[i].balance === 20000; });
+  t("受渡未到来の決済損益はマイナスで分子が減り全シナリオに固定額で適用・JSON往復する", r55neg.current.balance === r55base.current.balance - 30000
+    && rowsDiff55 && rowsDiff55pos && round55.ok && round55.state.account.unsettledPnl === -30000,
+    "未受渡 −30,000 では現在値の分子がその分だけ減る。+20,000／−30,000 とも全シナリオ行で差が一定（下落率で変動しない固定額）。値はJSON書き出し／読み込みでも保持される");
+  /* 56 B5：未入力（null）の評価損益が保存・復元の往復で 0 に化けず、概算警告の判定が維持される。明示0は0のまま */
+  var s56 = sampleState();
+  s56.positions = [
+    { id: "p56a", code: "", name: "未入力建玉", side: "buy", principal: 100000, pnl: null },
+    { id: "p56b", code: "", name: "明示0建玉", side: "buy", principal: 50000, pnl: 0 }];
+  var clean56 = sanitizeState(JSON.parse(JSON.stringify(s56)));
+  var round56 = unpackState(packState(clean56));
+  var risk56 = round56.ok ? otherPositionsRisk(round56.state) : null;
+  t("未入力の評価損益が往復で未入力のまま保持され明示0と区別される", clean56.positions[0].pnl === null && clean56.positions[1].pnl === 0
+    && round56.ok && round56.state.positions[0].pnl === null && round56.state.positions[1].pnl === 0
+    && !!risk56 && risk56.unknownPnl === true,
+    "未入力の建玉はサニタイズとJSON往復（保存→再読込・書き出し→読み込み相当）の後も null のままで「0」と表示されず、概算警告の判定（unknownPnl）も維持される。明示的に0と入力した建玉は往復後も0で、未入力扱いにならない");
+  /* 57 B2：最終エクスポート記録の判定（未記録／新しい記録／30日超で古い） */
+  var now57 = Date.parse("2026-11-18T00:00:00Z");
+  var st57none = exportRecordStatus("", now57);
+  var st57fresh = exportRecordStatus("2026-11-10T00:00:00Z", now57);
+  var st57old = exportRecordStatus("2026-10-01T00:00:00Z", now57);
+  var st57bad = exportRecordStatus("not-a-date", now57);
+  t("最終エクスポート記録の未記録・鮮度を判定できる", st57none.recorded === false && st57none.stale === true
+    && st57fresh.recorded === true && st57fresh.stale === false && st57fresh.days === 8
+    && st57old.recorded === true && st57old.stale === true && st57old.days === 48 && st57bad.recorded === false,
+    "記録が無い・壊れている場合は未記録として扱い、8日前の記録は促しなし、48日前（30日超）の記録は古いとして穏やかな促しの対象になる。記録はJSON本体ではなく端末側の保存領域（別キー）にだけ残す");
   return T;
 }
 
@@ -2766,6 +2894,7 @@ document.querySelectorAll("[data-view]").forEach(function(b){
 recalc();
 render();
 initPersistence();
+loadExportRecord();
 loadPrices();
 if ("serviceWorker" in navigator) {
   try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch (e) { /* 埋め込み表示などでは登録できない場合がある（GitHub Pages等の単独配置用） */ }
