@@ -28,6 +28,7 @@
         --bad: #b3261e;
         --chip: #ece7db;
         --input-bg: #ffffff;
+        --teal: #2e7d64;
         --shadow: 0 1px 2px rgba(60, 45, 20, .06), 0 4px 14px rgba(60, 45, 20, .05);
       }
       @media (prefers-color-scheme: dark) {
@@ -48,6 +49,7 @@
           --bad: #e0685e;
           --chip: #332f26;
           --input-bg: #1b1913;
+          --teal: #4cb294;
           --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
         }
       }
@@ -68,7 +70,7 @@
       main { max-width: 1060px; margin: 0 auto; padding: 14px 14px 40px; }
       h1 { font-size: 21px; margin: 4px 0 2px; letter-spacing: .02em; }
       h2 { font-size: 16px; margin: 0 0 10px; letter-spacing: .02em; }
-      h3 { font-size: 14px; margin: 14px 0 6px; }
+      h3 { font-size: 14px; margin: 16px 0 6px; }
       p { margin: 6px 0; }
       .lead { color: var(--muted); font-size: 13.5px; margin: 0 0 4px; }
       .verline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 2px; }
@@ -82,8 +84,7 @@
         background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
         box-shadow: var(--shadow); padding: 14px 14px 16px; margin: 14px 0;
       }
-      /* ---------- controls ---------- */
-      button, select, input[type="number"], input[type="text"] { min-height: 40px; }
+      button, select, input[type="number"] { min-height: 40px; }
       button {
         appearance: none; border: 1px solid var(--line); background: var(--panel2);
         color: var(--ink); border-radius: 8px; padding: 8px 14px;
@@ -92,179 +93,130 @@
       button:active { transform: translateY(1px); }
       button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
       button:disabled { opacity: .45; cursor: default; }
-      button.small { min-height: 36px; padding: 5px 10px; font-size: 13px; }
-      select, input[type="number"], input[type="text"] {
+      select, input[type="number"] {
         border: 1px solid var(--line); border-radius: 8px; background: var(--input-bg);
         color: var(--ink); padding: 7px 9px; font-size: 14px; width: 100%;
       }
       label.f { display: block; font-size: 12.5px; color: var(--muted); font-weight: 600; }
       label.f > select, label.f > input { margin-top: 3px; color: var(--ink); font-weight: 400; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px 12px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 12px; }
       .grid .wide { grid-column: span 2; }
       @media (max-width: 420px) { .grid .wide { grid-column: span 1; } }
       .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-      .row > * { flex: 0 0 auto; }
       .chk {
         display: inline-flex; align-items: center; gap: 7px; min-height: 40px;
-        padding: 4px 6px; font-size: 13.5px; cursor: pointer;
+        padding: 4px 8px; font-size: 13.5px; cursor: pointer;
+        border: 1px solid var(--line); border-radius: 8px; background: var(--panel2);
       }
       .chk input { width: 19px; height: 19px; accent-color: var(--accent); margin: 0; }
-      .model-params { border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 12px; }
       .hint { font-size: 12.5px; color: var(--muted); }
       .note-box {
         background: var(--panel2); border-radius: 8px; padding: 9px 12px;
         font-size: 13px; margin-top: 12px;
       }
-      /* ---------- chart ---------- */
-      .chart-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; justify-content: space-between; }
+      .err { color: var(--bad); font-weight: 700; font-size: 13.5px; }
+      .chart-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; justify-content: space-between; }
       .ohlc-line { font-size: 13px; color: var(--muted); }
       .ohlc-line b { color: var(--ink); font-weight: 700; }
       .price-now { font-size: 24px; font-weight: 800; letter-spacing: .01em; }
       .chg.up { color: var(--up); } .chg.down { color: var(--down); }
       .chg { font-weight: 700; font-size: 14px; }
-      canvas#chart { width: 100%; height: 380px; display: block; touch-action: pan-y; }
-      @media (max-width: 560px) { canvas#chart { height: 320px; } }
+      canvas#chart { width: 100%; height: 360px; display: block; touch-action: pan-y; }
+      canvas#varchart { width: 100%; height: 190px; display: block; }
+      @media (max-width: 560px) { canvas#chart { height: 310px; } }
       .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
       .legend .sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
-      .player-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
-      .player-bar select { width: auto; }
-      progress { width: 100%; height: 8px; appearance: none; margin-top: 8px; }
-      progress::-webkit-progress-bar { background: var(--panel2); border-radius: 4px; }
-      progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
-      progress::-moz-progress-bar { background: var(--accent); border-radius: 4px; }
-      .clock { font-weight: 700; font-size: 15px; }
-      /* ---------- stats / tables ---------- */
-      .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+      progress { width: 100%; height: 10px; appearance: none; margin-top: 8px; }
+      progress::-webkit-progress-bar { background: var(--panel2); border-radius: 5px; }
+      progress::-webkit-progress-value { background: var(--accent); border-radius: 5px; }
+      progress::-moz-progress-bar { background: var(--accent); border-radius: 5px; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
       .stat { background: var(--panel2); border-radius: 8px; padding: 8px 11px; }
       .stat-k { font-size: 11.5px; color: var(--muted); font-weight: 600; }
       .stat-v { font-size: 16.5px; font-weight: 700; margin-top: 1px; }
       .stat-u { font-size: 11.5px; color: var(--muted); font-weight: 400; }
       .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
-      table { border-collapse: collapse; width: 100%; font-size: 13px; }
-      th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+      table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+      th, td { padding: 5px 7px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
       th:first-child, td:first-child { text-align: left; }
-      thead th { font-size: 12px; color: var(--muted); border-bottom: 2px solid var(--line); vertical-align: bottom; }
-      td.pass { color: var(--ok); font-weight: 700; }
-      td.fail { color: var(--bad); font-weight: 700; }
+      thead th { font-size: 11.5px; color: var(--muted); border-bottom: 2px solid var(--line); vertical-align: bottom; }
+      thead th.run-head { white-space: normal; min-width: 138px; color: var(--ink); text-align: right; }
       .test-line { font-size: 14px; }
       .test-line .big { font-size: 18px; font-weight: 800; }
       ul.test-list { margin: 6px 0 0; padding-left: 20px; font-size: 13px; }
       ul.test-list li.ng { color: var(--bad); font-weight: 700; }
+      ol.defs { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; padding-left: 20px; }
+      ol.defs li { margin: 2px 0; }
       footer { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
-      .err { color: var(--bad); font-weight: 700; }
       .hidden { display: none !important; }
     </style>
   </head>
   <body>
     <main>
-      <h1>株価生成エンジン 実験室</h1>
-      <p class="lead">架空株価の生成モデルを切り替えて、同じ統計指標で比較・検証するための実験環境です。実データ・外部APIは使わず、すべてブラウザ内で生成します。</p>
+      <h1>株価生成エンジン実験室</h1>
+      <p class="lead">架空株価の生成エンジン（基準実装 price-engine.mjs v0.1準拠）をブラウザで動かし、単日プレビューと最大1万日のバッチ検証で統計的性質を確かめる実験環境です。実データ・外部APIは使わず、すべてブラウザ内で生成します。価格をテクニカルシグナルや都合で選別・変更することはしません。</p>
       <div class="verline">
-        <span class="badge">v0.1 エンジン実験版</span>
+        <span class="badge">v0.2（GPT仕様準拠版）</span>
         <span class="badge gray">第1段階：株価生成の実験環境</span>
-        <span class="badge gray">売買ゲーム本体は今後追加</span>
+        <span class="badge gray">売買・採点・反省ノートは今回の対象外</span>
       </div>
 
       <!-- ============ 設定 ============ -->
       <section class="panel" aria-labelledby="h-settings">
         <h2 id="h-settings">設定</h2>
         <div class="grid">
-          <label class="f wide">価格モデル
-            <select id="in-model">
-              <option value="gbm">GBM（基準）</option>
-              <option value="regime">ボラティリティ変動型GBM（レジーム切替＋日内季節性）</option>
-              <option value="jump">ジャンプ拡散型（Merton型）</option>
-              <option value="studentt">t分布型（Student-t 革新項）</option>
+          <label class="f">シード（整数）
+            <input type="number" id="in-seed" value="42" step="1" />
+          </label>
+          <label class="f">基本ボラの決め方
+            <select id="in-base-mode">
+              <option value="random" selected>日別ランダム（年率20〜80%一様抽選）</option>
+              <option value="fixed">固定値</option>
             </select>
           </label>
-          <label class="f">シード（整数）
-            <input type="number" id="in-seed" value="20261118" step="1" />
+          <label class="f">基本ボラ固定値（年率%）
+            <input type="number" id="in-base-pct" value="30" min="0" max="300" step="1" disabled />
           </label>
-          <label class="f">初期株価（円）
-            <input type="number" id="in-s0" value="3000" min="10" step="10" />
+          <label class="f">ジャンプ頻度 λ（回/日、0〜100）
+            <input type="number" id="in-lambda" value="1" min="0" max="100" step="0.1" />
           </label>
-          <label class="f">年率ボラティリティ σ（%）
-            <input type="number" id="in-sigma" value="25" min="1" max="300" step="1" />
+          <label class="f">ジャンプ標準偏差（%、既定0.8）
+            <input type="number" id="in-jump-sd" value="0.8" min="0" max="20" step="0.1" />
           </label>
-          <label class="f">年率ドリフト μ（%）
-            <input type="number" id="in-mu" value="0" step="0.5" />
-          </label>
-          <label class="f">1足あたりティック数
-            <input type="number" id="in-ticks" value="20" min="2" max="200" step="1" />
-          </label>
-          <label class="f">窓開けボラ（1回・%）
-            <input type="number" id="in-gap" value="0.8" min="0" max="10" step="0.1" />
+          <label class="f">過去足本数（0〜5000、既定500）
+            <input type="number" id="in-history" value="500" min="0" max="5000" step="1" />
           </label>
         </div>
-
-        <div class="model-params hidden" id="params-regime">
-          <div class="grid">
-            <label class="f">レジーム数
-              <select id="in-regimes">
-                <option value="2">2状態（低ボラ／高ボラ）</option>
-                <option value="3" selected>3状態（低／通常／高）</option>
-              </select>
-            </label>
-            <label class="f">低ボラ倍率
-              <input type="number" id="in-reg-low" value="0.55" min="0.05" max="3" step="0.05" />
-            </label>
-            <label class="f">通常ボラ倍率
-              <input type="number" id="in-reg-mid" value="1.0" min="0.05" max="3" step="0.05" />
-            </label>
-            <label class="f">高ボラ倍率
-              <input type="number" id="in-reg-high" value="1.9" min="0.05" max="4" step="0.05" />
-            </label>
-            <label class="f">平均滞在日数（日）
-              <input type="number" id="in-reg-stay" value="3" min="0.2" max="60" step="0.5" />
-            </label>
-          </div>
-          <label class="chk"><input type="checkbox" id="in-season" checked /> 日内ボラ季節性（U字型：寄り付き・大引けが高く昼が低い）を有効にする</label>
+        <div class="row" style="margin-top:12px;">
+          <label class="chk"><input type="checkbox" id="in-regimes" checked /> レジーム（3状態）</label>
+          <label class="chk"><input type="checkbox" id="in-season" checked /> 日内季節性</label>
+          <label class="chk"><input type="checkbox" id="in-jumps" checked /> ポアソンジャンプ</label>
+          <label class="chk"><input type="checkbox" id="in-volume" checked /> 仮想出来高</label>
         </div>
-
-        <div class="model-params hidden" id="params-jump">
-          <div class="grid">
-            <label class="f">ジャンプ頻度 λ（回/年）
-              <input type="number" id="in-jump-lambda" value="12" min="0" max="500" step="1" />
-            </label>
-            <label class="f">ジャンプ平均（%）
-              <input type="number" id="in-jump-mu" value="0" step="0.1" />
-            </label>
-            <label class="f">ジャンプ幅 σ（%）
-              <input type="number" id="in-jump-sigma" value="1.2" min="0" max="20" step="0.1" />
-            </label>
-          </div>
-          <p class="hint">ポアソン過程でジャンプ時点を決め、ジャンプ幅は正規分布から引くMerton型です。ジャンプ分はドリフト補正し、条件付き期待値は拡散部分の μ に一致させます。</p>
+        <p class="hint">レジームは状態倍率0.5／1／2.5、平均滞在30分のマルコフ遷移（5秒更新ごとに判定）。日内季節性は寄り付き・大引け・後場寄り付近で変動が増える未正規化の倍率関数です（基本ボラと実現年率は一致しません）。初期株価は生成開始時点の10,000円固定。昼休み・夜間のギャップは初期版では生成しません。内部は5秒刻み（1日3960更新）で生成し、5分足（66本/日）に集約します。</p>
+        <div class="row" style="margin-top:10px;">
+          <button class="primary" id="btn-preview">単日プレビューを生成</button>
+          <button id="btn-random-seed">新規シード（ランダム）</button>
+          <button id="btn-preset-gbm">純GBMプリセット</button>
+          <button id="btn-preset-full">拡張モデル（既定）プリセット</button>
         </div>
-
-        <div class="model-params hidden" id="params-studentt">
-          <div class="grid">
-            <label class="f">自由度 ν
-              <input type="number" id="in-t-nu" value="5" min="2.1" max="60" step="0.1" />
-            </label>
-          </div>
-          <p class="hint">革新項を標準化したStudent-t分布（分散1に規格化）に置き換えます。νが小さいほど裾が厚くなります。ν→∞でGBMに近づきます。</p>
-        </div>
-
-        <div class="row" style="margin-top:14px;">
-          <button class="primary" id="btn-gen">1日を生成</button>
-          <button id="btn-reseed">ランダムなシード</button>
-          <button id="btn-regen">再生成（同じ設定）</button>
-        </div>
-        <p class="hint" id="gen-info">市場時間：前場 9:00–11:30（30本）＋後場 12:30–15:30（36本）＝5分足 66本/日。過去足500本を助走として先に生成し、当日分を続けます。同じシード＋同じ設定では全く同じ系列が再現されます。</p>
+        <p class="err hidden" id="set-error" role="alert"></p>
+        <p class="hint" id="preview-meta"></p>
         <div class="note-box">
-          <b>今後の実験枠（未実装）：</b>Tempered Stable ジャンプ型とマルチフラクタル型は今回の対象外です。実装していないモデルを「使える」ようには表示しません。比較順序（GBM → ボラ変動型 → ジャンプ／裾の候補 → 実験枠）は企画書v0.1の推奨に沿っています。
+          <b>後置モジュール（未実装）：</b>安定分布（Tempered Stable含む）・マルチフラクタル・0DTEオプションヘッジは別モジュールとして後置します。未実装のものを「使える」ようには表示しません。
         </div>
       </section>
 
-      <!-- ============ チャート ============ -->
-      <section class="panel" aria-labelledby="h-chart">
+      <!-- ============ 単日プレビュー ============ -->
+      <section class="panel" aria-labelledby="h-preview">
         <div class="chart-head">
-          <h2 id="h-chart" style="margin:0;">チャート（5分足・出来高）</h2>
-          <label class="f" style="min-width:150px;">表示本数
+          <h2 id="h-preview" style="margin:0;">単日プレビュー（5分足）</h2>
+          <label class="f" style="min-width:140px;">表示本数
             <select id="in-view">
-              <option value="120">直近120本</option>
-              <option value="250">直近250本</option>
-              <option value="566" selected>全て（過去500＋当日66）</option>
+              <option value="66">66本（当日）</option>
+              <option value="132">132本</option>
+              <option value="264" selected>264本</option>
+              <option value="all">全て</option>
             </select>
           </label>
         </div>
@@ -275,63 +227,72 @@
         </div>
         <canvas id="chart" aria-label="ローソク足チャート"></canvas>
         <div class="legend">
-          <span><span class="sw" style="background:#e8a33d"></span>MA5</span>
-          <span><span class="sw" style="background:#7c5cd6"></span>MA25</span>
-          <span><span class="sw" style="background:#2e9e77"></span>MA75</span>
           <span>陽線＝赤／陰線＝青（日本の慣行）</span>
-          <span>ドラッグで表示範囲を移動、タップで足を選択</span>
+          <span>背景帯＝当日（day=0）、左側＝過去足</span>
+          <span>下段＝出来高</span>
+          <span>タップで足を選択</span>
         </div>
-        <div class="row" style="margin-top:4px;">
-          <label class="chk"><input type="checkbox" id="in-ma5" checked /> MA5</label>
-          <label class="chk"><input type="checkbox" id="in-ma25" checked /> MA25</label>
-          <label class="chk"><input type="checkbox" id="in-ma75" checked /> MA75</label>
+        <div class="row" style="margin-top:6px;">
+          <button id="btn-view-older">◀ 古い方へ</button>
+          <button id="btn-view-newer">新しい方へ ▶</button>
+          <span class="hint num" id="view-info"></span>
         </div>
+        <p class="ohlc-line num" id="bar-info" style="margin-top:8px;"></p>
 
-        <h3>当日再生（エンジンの目視確認用）</h3>
-        <div class="player-bar">
-          <button class="primary" id="btn-play">▶ 再生</button>
-          <button id="btn-restart">最初から</button>
-          <label class="f" style="min-width:118px;">速度
-            <select id="in-speed">
-              <option value="1">×1（実時間10分）</option>
-              <option value="4">×4</option>
-              <option value="10" selected>×10</option>
-              <option value="30">×30</option>
-              <option value="instant">即時完了</option>
-            </select>
-          </label>
-          <span class="clock num" id="play-clock">9:00 寄り付き前</span>
-          <span class="hint num" id="play-count"></span>
-        </div>
-        <progress id="play-progress" max="66" value="0"></progress>
-        <p class="hint">標準速度×1は実時間換算（前場5分＋後場5分＝10分）です。昼休みは時計が12:30へ進みます。</p>
-      </section>
-
-      <!-- ============ 統計 ============ -->
-      <section class="panel" aria-labelledby="h-stats">
-        <h2 id="h-stats">統計（単一セッション：過去500本＋当日66本）</h2>
+        <h3>当日の要約</h3>
         <div class="stats" id="stats-grid"></div>
-        <p class="hint" style="margin-top:10px;">収益率は5分足の対数収益率。尖度は超過尖度（正規分布で0）。最大ドローダウンは終値ベース。日中最大下落率は当日の高値から安値への最大下落。絶対収益率の自己相関はラグ1で、ボラティリティ・クラスタリングの指標です。</p>
+
+        <h3>分散の推移（当日66本）</h3>
+        <canvas id="varchart" aria-label="積算分散と実現分散の推移"></canvas>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--accent)"></span>積算分散（拡散成分：各バーの variance の累積）</span>
+          <span><span class="sw" style="background:var(--teal)"></span>実現分散（5分足対数収益率の二乗和の累積）</span>
+          <span class="num" id="var-legend"></span>
+        </div>
+
+        <h3>サンプルの書き出し</h3>
+        <div class="row">
+          <button id="btn-csv">CSVで保存</button>
+          <button id="btn-json">JSONで保存</button>
+          <span class="hint">シード・設定一式・日番号・開始市場時刻（HH:MM）・OHLCV・variance・jumps・completeフラグを含みます。この固定サンプルを次工程（テクニカル抽出）の入力に渡します。</span>
+        </div>
       </section>
 
-      <!-- ============ N日検証 ============ -->
-      <section class="panel" aria-labelledby="h-valid">
-        <h2 id="h-valid">複数日検証（モデル比較）</h2>
+      <!-- ============ バッチ検証 ============ -->
+      <section class="panel" aria-labelledby="h-batch">
+        <h2 id="h-batch">バッチ検証（モデル比較）</h2>
         <div class="row">
           <label class="f" style="min-width:130px;">検証日数
-            <select id="in-days">
-              <option value="50">50日</option>
-              <option value="100" selected>100日</option>
-              <option value="200">200日</option>
+            <select id="in-bdays">
+              <option value="100">100日</option>
+              <option value="500">500日</option>
+              <option value="1000" selected>1000日</option>
+              <option value="2000">2000日</option>
+              <option value="10000">10000日</option>
             </select>
           </label>
-          <button class="primary" id="btn-validate">N日検証を実行</button>
+          <button class="primary" id="btn-batch">バッチ検証を実行</button>
+          <button id="btn-batch-cancel" disabled>中止</button>
           <button id="btn-clear-cmp">比較表をクリア</button>
-          <span class="hint" id="valid-status"></span>
+          <span class="hint" id="batch-status">現在の設定とシードで実行します。各日は独立シード（基準シード＋連番、過去足なし）で生成します。</span>
         </div>
-        <p class="hint">各日はシードから派生した独立シードで生成します。再現性チェックは同一シードで2回生成し、全ティック価格が一致するか自動判定します。結果はモデルごとに履歴として残り、最大4件まで同じ表で並べて比較できます（スマホでは表を横スクロールできます）。</p>
-        <div class="tbl-scroll" id="cmp-wrap">
-          <p class="hint" id="cmp-empty">まだ検証結果がありません。「N日検証を実行」を押すと、ここに比較表が出ます。</p>
+        <progress id="batch-progress" max="100" value="0"></progress>
+        <div class="note-box">
+          <b>基準値（Node.js・独立シード1〜2000・過去足なしで再実行済み）：</b>
+          純GBMプリセット（基本ボラ30%固定・レジーム／季節性／ジャンプOFF）では日次収益率 平均−0.0196%・標準偏差1.899%・標準誤差0.0425%。
+          拡張モデル（既定・全ON）では平均−0.0568%・標準偏差4.332%・標準誤差0.0969%・ジャンプ合計2038件。
+          同じ日数・同じ基準シードで実行すれば、この値と見比べられます。
+        </div>
+        <ol class="defs">
+          <li>日次収益率は単純収益率（当日終値／当日始値−1）。標準偏差は母集団式（nで割る）、標準誤差＝標準偏差／√日数。分位点は線形補間。</li>
+          <li>5分足対数収益率は log(終値／直前終値)。当日最初の足は始値を直前値とします。超過尖度は母集団モーメントから計算（正規分布で0）。</li>
+          <li>自己相関はラグ1で、日をまたぐペアを除いた全ペアの相関係数（プール方式）。絶対収益率は5分足対数収益率の絶対値、単純収益率は5分足の単純収益率で計算します。</li>
+          <li>日中高安幅＝（当日最高値−当日最安値）／当日始値。最大ドローダウンは当日始値を起点に終値系列で計算し、日ごとの値の平均と最大を出します。</li>
+          <li>方向反転率は、連続する足の終値方向（上昇／下落）が入れ替わった割合。方向がゼロ（変化なし）のペアは分母から除外します。</li>
+          <li>全モデルで同じ定義・同じ集計単位を使います。生成はWeb Workerで実行し、画面は固まりません。</li>
+        </ol>
+        <div class="tbl-scroll" style="margin-top:12px;">
+          <p class="hint" id="cmp-empty">まだ検証結果がありません。「バッチ検証を実行」を押すと、ここに比較表が出ます。設定を変えて再実行すると列が追加され、最大4件まで並べて比較できます。</p>
           <table id="cmp-table" class="hidden">
             <thead><tr id="cmp-head"></tr></thead>
             <tbody id="cmp-body"></tbody>
@@ -341,376 +302,366 @@
 
       <!-- ============ 自己テスト ============ -->
       <section class="panel" aria-labelledby="h-test">
-        <h2 id="h-test">自己テスト</h2>
+        <h2 id="h-test">自己テスト（基準テスト test-engine.mjs の移植）</h2>
         <p class="test-line">自己テスト <span class="big num" id="test-score">実行中…</span></p>
         <ul class="test-list" id="test-list"></ul>
+        <div class="row" style="margin-top:10px;">
+          <button id="btn-retest">自己テストを再実行</button>
+        </div>
       </section>
 
       <footer>
-        <p>デイトレゲーム株価生成エンジン v0.1（エンジン実験版）｜売買ゲーム本体は今後追加予定です。価格はすべて架空の生成値で、実在銘柄・実データとは無関係です。外部通信は行いません。</p>
+        <p>デイトレゲーム株価生成エンジン実験室 v0.2（GPT仕様準拠版）｜エンジン本体は基準実装 price-engine.mjs のロジックをそのまま埋め込んでいます。価格はすべて架空の生成値で、実在銘柄・実データとは無関係です。外部通信は行いません。売買・採点・ゲーム時計・反省ノート・テクニカル判定は次工程以降の対象で、今回の実装には含まれません。</p>
       </footer>
     </main>
 
     <script>
     'use strict';
     /* =====================================================================
-       株価生成エンジン（独立モジュール）
-       将来のゲーム本体からは PriceEngine.generateSession / generateDay を
-       そのまま再利用できる。再現性：同じシード＋同じ設定 → 同じ系列。
+       株価生成エンジン：基準実装 price-engine.mjs（v0.1）のロジックを
+       そのまま埋め込んだもの。export を外した以外は変更していない。
+       乱数列の分離（p/v/j/w）、更新式、季節性関数、レジーム遷移確率、
+       日別ボラ抽選まで基準実装どおり。
        ===================================================================== */
-    var PriceEngine = (function () {
-      var TRADING_DAYS = 250;          // 年間営業日
-      var DAY_MINUTES = 330;           // 前場150分＋後場180分
-      var BAR_MINUTES = 5;
-      var BARS_PER_DAY = 66;           // 前場30本＋後場36本
-      var MORNING_BARS = 30;
-      var MIN_PER_YEAR = TRADING_DAYS * DAY_MINUTES; // 82,500分
-      var LUNCH_GAP_SCALE = 0.45;      // 昼休みの窓は夜間の0.45倍
-      var HISTORY_BARS = 500;
-
-      /* ---- シード付き乱数：mulberry32 ---- */
-      function hashSeed(seed) {
-        var h = (typeof seed === 'number' && isFinite(seed)) ? Math.floor(seed) : 0;
-        h = h >>> 0;
-        if (h === 0) h = 0x9e3779b9;
-        return h;
-      }
-      function RNG(seed) {
-        this.state = hashSeed(seed);
-        this._spare = null; // Box-Muller の余り
-      }
-      RNG.prototype.next = function () {
-        var t = (this.state += 0x6D2B79F5);
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-      /* 正規乱数：Box-Muller（余りを保持し、消費順を決定的に保つ） */
-      RNG.prototype.normal = function () {
-        if (this._spare !== null) { var s = this._spare; this._spare = null; return s; }
-        var u, v, r;
-        do { u = this.next(); } while (u <= 1e-12);
-        v = this.next();
-        r = Math.sqrt(-2 * Math.log(u));
-        this._spare = r * Math.sin(2 * Math.PI * v);
-        return r * Math.cos(2 * Math.PI * v);
-      };
-      /* ポアソン乱数（Knuth法、小さいλ向け） */
-      RNG.prototype.poisson = function (lambda) {
-        if (lambda <= 0) return 0;
-        if (lambda > 30) { // 大きいλは正規近似
-          var n = Math.round(lambda + Math.sqrt(lambda) * this.normal());
-          return n < 0 ? 0 : n;
+// Synthetic market, v0.1. Time unit: trading year.
+function generate(seed=1, options={}) {
+  const c={base:null, regimes:true, season:true, jumps:true, volume:true,
+    lambda:1, jumpSD:.008, history:500, ...options};
+  if(!Number.isInteger(c.history)||c.history<0||c.history>5000||
+    !Number.isFinite(c.lambda)||c.lambda<0||c.lambda>100||
+    !Number.isFinite(c.jumpSD)||c.jumpSD<0||c.jumpSD>.2||
+    (c.base!==null&&(!Number.isFinite(c.base)||c.base<0||c.base>3))) throw Error('Invalid settings');
+  function rng(s){return ()=>{s=(s+0x6D2B79F5)|0;let t=s;
+    t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)+.5;};}
+  const stream=k=>{const r=rng((Number(seed)^k)|0);return ()=>r()/4294967296};
+  const p=stream(11), v=stream(29), j=stream(47), w=stream(71);
+  const normal=u=>Math.sqrt(-2*Math.log(u()))*Math.cos(2*Math.PI*u());
+  const dt=1/(252*3960), h=c.lambda/3960;
+  const kappa=Math.expm1(c.jumpSD*c.jumpSD/2);
+  const days=Math.ceil(c.history/66)+1, bars=[];
+  let S=10000;
+  for(let d=0;d<days;d++){
+    const base=c.base??(.2+.6*v()); let state=1;
+    for(let b=0;b<66;b++){
+      const day=d-days+1, minute=b<30?540+5*b:750+5*(b-30);
+      let O=S,H=S,L=S,V=0,variance=0,jumps=0;
+      for(let t=0;t<60;t++){
+        if(c.regimes&&v()<1-Math.exp(-5/1800)){
+          state=(state+(v()<.5?1:2))%3;
         }
-        var L = Math.exp(-lambda), k = 0, p = 1;
-        do { k++; p *= this.next(); } while (p > L);
-        return k - 1;
-      };
-      /* 標準化Student-t乱数（分散1に規格化、ν>2） */
-      RNG.prototype.studentT = function (nu) {
-        var z = this.normal();
-        var half = nu / 2, x, v, u, y;
-        // ガンマ(half,1) を Marsaglia–Tsang 法で生成
-        var d = half - 1 / 3, c = 1 / Math.sqrt(9 * d), g;
-        while (true) {
-          do { x = this.normal(); v = 1 + c * x; } while (v <= 0);
-          v = v * v * v;
-          u = this.next();
-          y = x * x;
-          if (u < 1 - 0.0331 * y * y) { g = d * v; break; }
-          if (Math.log(u) < 0.5 * y + d * (1 - v + Math.log(v))) { g = d * v; break; }
+        const x=(b*60+t)/3960;
+        const f=c.season?(.75+.65*Math.exp(-x/.065)+.5*Math.exp(-(1-x)/.065)+.25*Math.exp(-Math.abs(x-30/66)/.025)):1;
+        const sigma=base*f*(c.regimes?[.5,1,2.5][state]:1);
+        let r=-.5*sigma*sigma*dt+sigma*Math.sqrt(dt)*normal(p);
+        if(c.jumps){let n=0,prod=j(),limit=Math.exp(-h);
+          while(prod>limit){n++;prod*=j();}
+          r+=-h*kappa;for(let a=0;a<n;a++)r+=c.jumpSD*normal(j);jumps+=n;
         }
-        var chi2 = 2 * g;
-        var t = z / Math.sqrt(chi2 / nu);
-        return t * Math.sqrt((nu - 2) / nu);
-      };
-
-      /* ---- 日内ボラ季節性：U字型（寄り付き・大引けで高く昼で低い） ---- */
-      function seasonalFactor(barIndex) {
-        var f;
-        if (barIndex < MORNING_BARS) {
-          f = 1 + 0.45 * Math.pow(1 - barIndex / MORNING_BARS, 2);       // 寄り付き 1.45 → 前引け 1.0
-        } else {
-          var j = barIndex - MORNING_BARS;                               // 後場 0..35
-          f = 1 + 0.28 * Math.pow(1 - j / (BARS_PER_DAY - MORNING_BARS), 2)
-                + 0.38 * Math.pow(j / (BARS_PER_DAY - MORNING_BARS), 2); // 後場寄り 1.28 → 大引け 1.38
-        }
-        return f;
+        S*=Math.exp(r); H=Math.max(H,S);L=Math.min(L,S);
+        variance+=sigma*sigma*dt;
+        if(c.volume)V+=Math.round(100*f*(1+Math.min(10,Math.abs(r)/.001))*Math.exp(.3*normal(w)-.045));
       }
-      function volumeSeasonal(barIndex) {
-        if (barIndex < MORNING_BARS) return 1 + 0.9 * Math.pow(1 - barIndex / MORNING_BARS, 2);
-        var j = barIndex - MORNING_BARS;
-        return 0.72 + 0.35 * Math.pow(1 - j / 36, 2) + 0.95 * Math.pow(j / 36, 2);
-      }
+      bars.push({day,minute,open:O,high:H,low:L,close:S,volume:V,
+        variance,jumps,complete:true});
+    }
+  }
+  return {seed,config:c,bars:bars.slice(-(c.history+66))};
+}
 
-      function clampParams(p) {
-        var q = {
-          model: ['gbm', 'regime', 'jump', 'studentt'].indexOf(p.model) >= 0 ? p.model : 'gbm',
-          seed: (typeof p.seed === 'number' && isFinite(p.seed)) ? Math.floor(p.seed) : 1,
-          s0: Math.max(10, +p.s0 || 3000),
-          sigma: Math.min(3, Math.max(0.01, (+p.sigmaPct || 25) / 100)),
-          mu: (+p.muPct || 0) / 100,
-          ticksPerBar: Math.min(200, Math.max(2, Math.round(+p.ticksPerBar || 20))),
-          gapSigma: Math.min(0.1, Math.max(0, (+p.gapPct || 0) / 100)),
-          regimeCount: p.regimeCount === 2 ? 2 : 3,
-          regLow: Math.max(0.05, +p.regLow || 0.55),
-          regMid: Math.max(0.05, +p.regMid || 1.0),
-          regHigh: Math.max(0.05, +p.regHigh || 1.9),
-          regStayDays: Math.min(60, Math.max(0.2, +p.regStayDays || 3)),
-          season: !!p.season,
-          jumpLambda: Math.max(0, +p.jumpLambda || 0),
-          jumpMu: (+p.jumpMuPct || 0) / 100,
-          jumpSigma: Math.max(0, (+p.jumpSigmaPct || 0) / 100),
-          tNu: Math.min(60, Math.max(2.1, +p.tNu || 5))
-        };
-        return q;
-      }
-
-      /* マルコフ切替レジーム：日単位で状態が移行する */
-      function makeRegime(p) {
-        var mults = p.regimeCount === 2 ? [p.regLow, p.regHigh] : [p.regLow, p.regMid, p.regHigh];
-        var stay = Math.exp(-1 / p.regStayDays); // 1日あたりの滞在確率
-        return {
-          mults: mults,
-          state: p.regimeCount === 2 ? 0 : 1,
-          stay: stay,
-          advance: function (rng) {
-            if (rng.next() >= this.stay) {
-              var n = this.mults.length, ns;
-              do { ns = Math.floor(rng.next() * n); } while (ns === this.state);
-              this.state = ns;
-            }
-            return this.mults[this.state];
-          }
-        };
-      }
-
-      /* 1日分（66本）を生成する。前日終値 prevClose から始める */
-      function generateDay(rng, p, prevClose, dayIndex) {
-        var ticks = p.ticksPerBar;
-        var dtTick = (BAR_MINUTES / ticks) / MIN_PER_YEAR; // 年単位
-        var sqrtDt = Math.sqrt(dtTick);
-        var regime = makeRegime(p);
-        var dayVolMult = (p.model === 'regime') ? regime.advance(rng) : 1;
-        // ジャンプ補正：E[exp(J)]-1 をドリフトから差し引き、条件付き期待値を μ に一致させる
-        var jumpComp = 0;
-        if (p.model === 'jump' && p.jumpLambda > 0) {
-          jumpComp = p.jumpLambda * (Math.exp(p.jumpMu + 0.5 * p.jumpSigma * p.jumpSigma) - 1);
-        }
-        var lambdaTick = p.jumpLambda * dtTick;
-        var price = prevClose * Math.exp(rng.normal() * p.gapSigma); // 夜間・休日の窓開け
-        var bars = [];
-        var tickPrices = [];
-        for (var b = 0; b < BARS_PER_DAY; b++) {
-          if (b === MORNING_BARS) {
-            price = price * Math.exp(rng.normal() * p.gapSigma * LUNCH_GAP_SCALE); // 昼休みの窓
-            var g = price / bars[b - 1].close - 1;
-            bars[b - 1].gapAfter = g;
-          }
-          var open = price, high = price, low = price;
-          var seas = (p.model === 'regime' && p.season) ? seasonalFactor(b) : 1;
-          var volTick = p.sigma * dayVolMult * seas;
-          var drift = (p.mu - jumpComp - 0.5 * volTick * volTick) * dtTick;
-          var diff = volTick * sqrtDt;
-          for (var t = 0; t < ticks; t++) {
-            var z = (p.model === 'studentt') ? rng.studentT(p.tNu) : rng.normal();
-            var r = drift + diff * z;
-            if (p.model === 'jump' && lambdaTick > 0) {
-              var nj = rng.poisson(lambdaTick);
-              for (var k = 0; k < nj; k++) r += p.jumpMu + p.jumpSigma * rng.normal();
-            }
-            price = price * Math.exp(r);
-            if (price > high) high = price;
-            if (price < low) low = price;
-            tickPrices.push(price);
-          }
-          var barRet = Math.log(price / open);
-          var shape = 0.55 + 2.6 * Math.min(1, Math.abs(barRet) / (volTick * Math.sqrt(BAR_MINUTES / MIN_PER_YEAR) * 2));
-          var vol = Math.round(60000 * volumeSeasonal(b) * shape * (0.75 + 0.5 * rng.next()));
-          bars.push({
-            day: dayIndex, index: b,
-            open: open, high: high, low: low, close: price,
-            volume: vol, regime: dayVolMult, gapAfter: 0
-          });
-        }
-        return { bars: bars, close: price, tickPrices: tickPrices };
-      }
-
-      /* セッション生成：過去500本（助走）＋当日66本 */
-      function generateSession(rawParams) {
-        var p = clampParams(rawParams || {});
-        var rng = new RNG(p.seed);
-        var histDays = Math.ceil(HISTORY_BARS / BARS_PER_DAY); // 8日分
-        var history = [], prev = p.s0;
-        for (var d = 0; d < histDays; d++) {
-          var hd = generateDay(rng, p, prev, d - histDays);
-          history = history.concat(hd.bars);
-          prev = hd.close;
-        }
-        history = history.slice(history.length - HISTORY_BARS);
-        var today = generateDay(rng, p, prev, 0);
-        return { params: p, history: history, today: today.bars, todayTicks: today.tickPrices, prevClose: prev };
-      }
-
-      /* 検証用：独立した1日（前日終値は初期株価から） */
-      function generateIndependentDay(seed, rawParams) {
-        var p = clampParams(rawParams || {});
-        p.seed = seed;
-        var rng = new RNG(seed);
-        return generateDay(rng, p, p.s0, 0);
-      }
-
+    /* =====================================================================
+       バッチ集計（Web Worker とメインスレッドのフォールバックで共用。
+       Worker には generate とこの3関数を toString() で埋め込むため、
+       外部の関数・変数を参照しない自己完結の実装にしている）
+       ===================================================================== */
+    function batchNewAgg() {
+      function pairs() { return { n: 0, sx: 0, sy: 0, sxy: 0, sxx: 0, syy: 0 }; }
       return {
-        RNG: RNG,
-        generateSession: generateSession,
-        generateDay: generateIndependentDay,
-        clampParams: clampParams,
-        BARS_PER_DAY: BARS_PER_DAY,
-        MORNING_BARS: MORNING_BARS,
-        HISTORY_BARS: HISTORY_BARS
+        days: 0, dailyRets: [], logRets: [], totalJumps: 0,
+        rangeSum: 0, ddSum: 0, ddMax: 0, revNum: 0, revDen: 0,
+        absPairs: pairs(), simPairs: pairs()
       };
-    })();
+    }
+    function batchAddDay(agg, bars) {
+      var dayOpen = bars[0].open, dayClose = bars[bars.length - 1].close;
+      agg.days++;
+      agg.dailyRets.push(dayClose / dayOpen - 1);
+      var hi = -Infinity, lo = Infinity, jumps = 0, i, b;
+      for (i = 0; i < bars.length; i++) {
+        b = bars[i];
+        if (b.high > hi) hi = b.high;
+        if (b.low < lo) lo = b.low;
+        jumps += b.jumps;
+      }
+      agg.totalJumps += jumps;
+      agg.rangeSum += (hi - lo) / dayOpen;
+      var peak = dayOpen, mdd = 0;
+      for (i = 0; i < bars.length; i++) {
+        if (bars[i].close > peak) peak = bars[i].close;
+        var dd = (peak - bars[i].close) / peak;
+        if (dd > mdd) mdd = dd;
+      }
+      agg.ddSum += mdd;
+      if (mdd > agg.ddMax) agg.ddMax = mdd;
+      var prev = dayOpen, logs = [], sims = [], dirs = [];
+      for (i = 0; i < bars.length; i++) {
+        var c = bars[i].close;
+        logs.push(Math.log(c / prev));
+        sims.push(c / prev - 1);
+        dirs.push(c > prev ? 1 : (c < prev ? -1 : 0));
+        prev = c;
+      }
+      for (i = 0; i < logs.length; i++) agg.logRets.push(logs[i]);
+      function addPairs(acc, xs) {
+        for (var k = 0; k + 1 < xs.length; k++) {
+          var x = xs[k], y = xs[k + 1];
+          acc.n++; acc.sx += x; acc.sy += y; acc.sxy += x * y; acc.sxx += x * x; acc.syy += y * y;
+        }
+      }
+      var absLogs = [];
+      for (i = 0; i < logs.length; i++) absLogs.push(Math.abs(logs[i]));
+      addPairs(agg.absPairs, absLogs);
+      addPairs(agg.simPairs, sims);
+      for (i = 1; i < dirs.length; i++) {
+        if (dirs[i] === 0 || dirs[i - 1] === 0) continue;
+        agg.revDen++;
+        if (dirs[i] !== dirs[i - 1]) agg.revNum++;
+      }
+    }
+    function batchFinalize(agg) {
+      function q(sorted, p) {
+        if (!sorted.length) return NaN;
+        var pos = (sorted.length - 1) * p, b = Math.floor(pos), r = pos - b;
+        return sorted[b + 1] !== undefined ? sorted[b] + r * (sorted[b + 1] - sorted[b]) : sorted[b];
+      }
+      function meanSd(a) {
+        var m = 0, i;
+        for (i = 0; i < a.length; i++) m += a[i];
+        m = a.length ? m / a.length : 0;
+        var s = 0;
+        for (i = 0; i < a.length; i++) { var d = a[i] - m; s += d * d; }
+        return { mean: m, sd: a.length ? Math.sqrt(s / a.length) : 0 };
+      }
+      function pairCorr(a) {
+        if (a.n < 3) return 0;
+        var num = a.n * a.sxy - a.sx * a.sy;
+        var den = Math.sqrt((a.n * a.sxx - a.sx * a.sx) * (a.n * a.syy - a.sy * a.sy));
+        return den === 0 ? 0 : num / den;
+      }
+      var d = meanSd(agg.dailyRets);
+      var ds = agg.dailyRets.slice().sort(function (a, b) { return a - b; });
+      var ls = agg.logRets.slice().sort(function (a, b) { return a - b; });
+      var lm = 0, i;
+      for (i = 0; i < agg.logRets.length; i++) lm += agg.logRets[i];
+      lm = agg.logRets.length ? lm / agg.logRets.length : 0;
+      var m2 = 0, m4 = 0;
+      for (i = 0; i < agg.logRets.length; i++) {
+        var z = agg.logRets[i] - lm, z2 = z * z;
+        m2 += z2; m4 += z2 * z2;
+      }
+      m2 = agg.logRets.length ? m2 / agg.logRets.length : 0;
+      m4 = agg.logRets.length ? m4 / agg.logRets.length : 0;
+      var qs = [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99];
+      var dq = {}, lq = {};
+      for (i = 0; i < qs.length; i++) {
+        dq[qs[i]] = q(ds, qs[i]);
+        lq[qs[i]] = q(ls, qs[i]);
+      }
+      return {
+        days: agg.days,
+        dailyMean: d.mean, dailySd: d.sd,
+        dailySe: agg.days ? d.sd / Math.sqrt(agg.days) : 0,
+        dailyQ: dq, logQ: lq,
+        logKurt: m2 > 0 ? m4 / (m2 * m2) - 3 : 0,
+        absAc: pairCorr(agg.absPairs), simAc: pairCorr(agg.simPairs),
+        rangeMean: agg.days ? agg.rangeSum / agg.days : 0,
+        ddMean: agg.days ? agg.ddSum / agg.days : 0, ddMax: agg.ddMax,
+        revRate: agg.revDen ? agg.revNum / agg.revDen : 0,
+        jumpsPerDay: agg.days ? agg.totalJumps / agg.days : 0,
+        ms: 0
+      };
+    }
+    /* Web Worker 本体（関数として定義し、toString() で Blob に埋め込む） */
+    function workerMain() {
+      self.onmessage = function (e) {
+        var m = e.data;
+        var agg = batchNewAgg();
+        var t0 = Date.now();
+        for (var i = 0; i < m.days; i++) {
+          var r = generate(m.baseSeed + i, Object.assign({}, m.config, { history: 0 }));
+          batchAddDay(agg, r.bars);
+          if (i % 20 === 19 || i === m.days - 1) {
+            self.postMessage({ type: 'progress', done: i + 1, total: m.days });
+          }
+        }
+        var out = batchFinalize(agg);
+        out.ms = Date.now() - t0;
+        self.postMessage({ type: 'done', result: out });
+      };
+    }
 
-    /* ================= 統計ユーティリティ ================= */
-    function mean(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return a.length ? s / a.length : NaN; }
-    function stdev(a, m) { if (a.length < 2) return 0; var s = 0; for (var i = 0; i < a.length; i++) { var d = a[i] - m; s += d * d; } return Math.sqrt(s / (a.length - 1)); }
-    function quantile(sorted, q) {
-      if (!sorted.length) return NaN;
-      var pos = (sorted.length - 1) * q, b = Math.floor(pos), r = pos - b;
-      return sorted[b + 1] !== undefined ? sorted[b] + r * (sorted[b + 1] - sorted[b]) : sorted[b];
-    }
-    function skewKurt(a, m, sd) {
-      if (a.length < 4 || sd === 0) return { skew: 0, kurt: 0 };
-      var s3 = 0, s4 = 0;
-      for (var i = 0; i < a.length; i++) { var z = (a[i] - m) / sd; s3 += z * z * z; s4 += z * z * z * z; }
-      return { skew: s3 / a.length, kurt: s4 / a.length - 3 };
-    }
-    function autocorrLag1(a) {
-      if (a.length < 3) return 0;
-      var m = mean(a), num = 0, den = 0;
-      for (var i = 0; i < a.length; i++) { var d = a[i] - m; den += d * d; if (i > 0) num += d * (a[i - 1] - m); }
-      return den === 0 ? 0 : num / den;
-    }
-    function maxDrawdown(closes) {
-      var peak = -Infinity, mdd = 0;
-      for (var i = 0; i < closes.length; i++) {
-        if (closes[i] > peak) peak = closes[i];
-        if (peak > 0) { var dd = (peak - closes[i]) / peak; if (dd > mdd) mdd = dd; }
-      }
-      return mdd;
-    }
-    function intradayMaxDrop(bars) {
-      var peak = -Infinity, worst = 0;
-      for (var i = 0; i < bars.length; i++) {
-        if (bars[i].high > peak) peak = bars[i].high;
-        if (peak > 0) { var dd = (peak - bars[i].low) / peak; if (dd > worst) worst = dd; }
-      }
-      return worst;
-    }
+    /* ================= 画面ユーティリティ ================= */
+    var $ = function (id) { return document.getElementById(id); };
     function fmtYen(x) { return Math.round(x).toLocaleString('ja-JP'); }
     function fmtPct(x, digits) { return (x * 100).toFixed(digits === undefined ? 2 : digits) + '%'; }
     function fmtNum(x, digits) { return isFinite(x) ? x.toFixed(digits === undefined ? 3 : digits) : '—'; }
+    function timeLabel(minute) {
+      var h = Math.floor(minute / 60), m = minute % 60;
+      return h + ':' + (m < 10 ? '0' : '') + m;
+    }
+    function barLabel(b) {
+      return (b.day === 0 ? '当日' : Math.abs(b.day) + '日前') + ' ' + timeLabel(b.minute);
+    }
+    function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-    /* ================= アプリ状態 ================= */
-    var $ = function (id) { return document.getElementById(id); };
     var state = {
-      session: null,       // 現在のセッション
-      revealed: 66,        // 再生で表示済みの当日本数
-      playing: false,
-      timer: null,
-      selected: -1,        // チャートで選択中の足（結合系列のindex）
-      viewOffset: 0,       // 表示ウィンドウの右端からのずれ
-      comparisons: []      // 検証結果の履歴（最大4件）
+      sample: null,        // {seed, config, bars}
+      viewEnd: 0,          // 表示ウィンドウの終端（exclusive）
+      selected: -1,
+      comparisons: [],
+      worker: null,
+      batchRunning: false,
+      batchCancel: false
     };
 
-    function readParams() {
-      var model = $('in-model').value;
+    /* ================= 設定の読み取りと検証 ================= */
+    function readSettings() {
+      var seedRaw = $('in-seed').value.trim();
+      var seed = Number(seedRaw);
+      if (seedRaw === '' || !Number.isInteger(seed)) return { ok: false, error: 'シードは整数で入力してください。' };
+      var mode = $('in-base-mode').value;
+      var base = null;
+      if (mode === 'fixed') {
+        var pct = parseFloat($('in-base-pct').value);
+        if (!isFinite(pct) || pct < 0 || pct > 300) return { ok: false, error: '基本ボラ固定値は年率0〜300%の範囲で入力してください（基準実装の検証範囲：base 0〜3）。' };
+        base = pct / 100;
+      }
+      var lambda = parseFloat($('in-lambda').value);
+      if (!isFinite(lambda) || lambda < 0 || lambda > 100) return { ok: false, error: 'ジャンプ頻度 λ は0〜100（回/日）の範囲で入力してください。' };
+      var jumpSdPct = parseFloat($('in-jump-sd').value);
+      if (!isFinite(jumpSdPct) || jumpSdPct < 0 || jumpSdPct > 20) return { ok: false, error: 'ジャンプ標準偏差は0〜20%の範囲で入力してください（基準実装の検証範囲：jumpSD 0〜0.2）。' };
+      var histRaw = $('in-history').value.trim();
+      var history = Number(histRaw);
+      if (histRaw === '' || !Number.isInteger(history) || history < 0 || history > 5000) return { ok: false, error: '過去足本数は0〜5000の整数で入力してください。' };
       return {
-        model: model,
-        seed: parseInt($('in-seed').value, 10),
-        s0: parseFloat($('in-s0').value),
-        sigmaPct: parseFloat($('in-sigma').value),
-        muPct: parseFloat($('in-mu').value),
-        ticksPerBar: parseInt($('in-ticks').value, 10),
-        gapPct: parseFloat($('in-gap').value),
-        regimeCount: parseInt($('in-regimes').value, 10),
-        regLow: parseFloat($('in-reg-low').value),
-        regMid: parseFloat($('in-reg-mid').value),
-        regHigh: parseFloat($('in-reg-high').value),
-        regStayDays: parseFloat($('in-reg-stay').value),
-        season: $('in-season').checked,
-        jumpLambda: parseFloat($('in-jump-lambda').value),
-        jumpMuPct: parseFloat($('in-jump-mu').value),
-        jumpSigmaPct: parseFloat($('in-jump-sigma').value),
-        tNu: parseFloat($('in-t-nu').value)
+        ok: true, seed: seed,
+        config: {
+          base: base,
+          regimes: $('in-regimes').checked,
+          season: $('in-season').checked,
+          jumps: $('in-jumps').checked,
+          volume: $('in-volume').checked,
+          lambda: lambda,
+          jumpSD: jumpSdPct / 100,
+          history: history
+        }
       };
     }
-    var MODEL_NAMES = { gbm: 'GBM', regime: 'ボラ変動型GBM', jump: 'ジャンプ拡散型', studentt: 't分布型' };
-    function modelLabel(p) {
-      var s = MODEL_NAMES[p.model] + '｜σ' + Math.round(p.sigma * 100) + '%';
-      if (p.model === 'regime') s += '｜' + p.regimeCount + '状態・滞在' + p.regStayDays + '日' + (p.season ? '・季節性ON' : '・季節性OFF');
-      if (p.model === 'jump') s += '｜λ' + p.jumpLambda + '回/年・幅' + (p.jumpSigma * 100).toFixed(1) + '%';
-      if (p.model === 'studentt') s += '｜ν=' + p.tNu;
-      if (p.mu !== 0) s += '｜μ' + (p.mu * 100) + '%';
-      return s;
+    function showError(msg) {
+      var el = $('set-error');
+      if (msg) { el.textContent = msg; el.classList.remove('hidden'); }
+      else el.classList.add('hidden');
+    }
+    function configLabel(c) {
+      var on = function (b) { return b ? 'ON' : 'OFF'; };
+      return (c.base === null ? '基本ボラ：日別抽選（20〜80%）' : '基本ボラ：固定 ' + Math.round(c.base * 100) + '%')
+        + '｜レジーム' + on(c.regimes) + '｜季節性' + on(c.season)
+        + '｜ジャンプ' + on(c.jumps) + '（λ' + c.lambda + '回/日・SD' + (c.jumpSD * 100).toFixed(1) + '%）'
+        + '｜出来高' + on(c.volume);
+    }
+    function configShort(c) {
+      return (c.base === null ? 'ボラ日別抽選' : 'ボラ固定' + Math.round(c.base * 100) + '%')
+        + ' / R' + (c.regimes ? '○' : '×') + ' 季' + (c.season ? '○' : '×')
+        + ' J' + (c.jumps ? '○' : '×') + ' 出' + (c.volume ? '○' : '×')
+        + ' / λ' + c.lambda + ' SD' + (c.jumpSD * 100).toFixed(1) + '%';
     }
 
-    /* ================= 生成と表示 ================= */
-    function allBars() {
-      if (!state.session) return [];
-      return state.session.history.concat(state.session.today.slice(0, state.revealed));
-    }
-    function generate(keepSeed) {
-      stopPlay();
-      var raw = readParams();
-      if (!isFinite(raw.seed)) { raw.seed = 1; $('in-seed').value = '1'; }
-      state.session = PriceEngine.generateSession(raw);
-      state.revealed = state.session.today.length;
-      state.selected = -1;
-      state.viewOffset = 0;
-      updateHeader();
+    /* ================= 単日プレビュー ================= */
+    function runPreview() {
+      var s = readSettings();
+      if (!s.ok) { showError(s.error); return false; }
+      showError(null);
+      var res;
+      try {
+        res = generate(s.seed, s.config);
+      } catch (e) {
+        showError('設定が基準実装の検証範囲外です（Invalid settings）。入力値を見直してください。');
+        return false;
+      }
+      state.sample = res;
+      state.viewEnd = res.bars.length;
+      state.selected = res.bars.length - 1;
+      $('preview-meta').textContent = 'シード ' + res.seed + '｜' + configLabel(res.config) + '｜過去足 ' + res.config.history + '本＋当日66本＝全' + res.bars.length + '本';
+      renderPreviewHead();
       drawChart();
-      renderStats();
-      updatePlayerUI();
+      renderSummary();
+      drawVarChart();
+      showBarInfo(state.selected);
+      return true;
     }
-    function updateHeader() {
-      var s = state.session;
-      if (!s) return;
-      var bars = allBars();
-      var last = bars[bars.length - 1];
-      var ref = state.revealed > 0 ? s.prevClose : last.close;
-      var price = state.revealed > 0 ? last.close : s.today[0].open;
-      var chg = price / ref - 1;
-      $('now-price').textContent = fmtYen(price) + ' 円';
-      var chEl = $('now-chg');
-      chEl.textContent = (chg >= 0 ? '+' : '') + fmtPct(chg) + '（前日終値 ' + fmtYen(ref) + ' 円比）';
-      chEl.className = 'chg num ' + (chg >= 0 ? 'up' : 'down');
-      showBarInfo(state.selected >= 0 ? state.selected : bars.length - 1);
+    function todayBars() {
+      if (!state.sample) return [];
+      return state.sample.bars.filter(function (b) { return b.day === 0; });
     }
-    function barTimeLabel(bar) {
-      var mins = bar.index < 30 ? 9 * 60 + bar.index * 5 : 12 * 60 + 30 + (bar.index - 30) * 5;
-      var h = Math.floor(mins / 60), m = mins % 60;
-      var day = bar.day === 0 ? '当日' : (Math.abs(bar.day) + '日前');
-      return day + ' ' + h + ':' + (m < 10 ? '0' : '') + m;
+    function renderPreviewHead() {
+      var t = todayBars();
+      if (!t.length) return;
+      var open = t[0].open, close = t[t.length - 1].close;
+      var chg = close / open - 1;
+      $('now-price').textContent = fmtYen(close) + ' 円';
+      var el = $('now-chg');
+      el.textContent = (chg >= 0 ? '+' : '') + fmtPct(chg) + '（当日始値 ' + fmtYen(open) + ' 円比）';
+      el.className = 'chg num ' + (chg >= 0 ? 'up' : 'down');
+      $('now-ohlc').textContent = '当日 ' + timeLabel(t[0].minute) + '〜' + timeLabel(t[t.length - 1].minute) + '（66本）';
+    }
+    function renderSummary() {
+      var t = todayBars();
+      if (!t.length) return;
+      var open = t[0].open, close = t[t.length - 1].close;
+      var hi = -Infinity, lo = Infinity, jumps = 0, vol = 0, i;
+      for (i = 0; i < t.length; i++) {
+        if (t[i].high > hi) hi = t[i].high;
+        if (t[i].low < lo) lo = t[i].low;
+        jumps += t[i].jumps; vol += t[i].volume;
+      }
+      var items = [
+        ['始値', fmtYen(open), '円'],
+        ['高値', fmtYen(hi), '円'],
+        ['安値', fmtYen(lo), '円'],
+        ['終値', fmtYen(close), '円'],
+        ['騰落率', fmtPct(close / open - 1), '（始値比）'],
+        ['日中高安幅', fmtPct((hi - lo) / open), '（始値比）'],
+        ['ジャンプ件数', jumps.toLocaleString('ja-JP'), '件（当日）'],
+        ['出来高合計', vol.toLocaleString('ja-JP'), state.sample.config.volume ? '' : '（出来高OFF）']
+      ];
+      $('stats-grid').innerHTML = items.map(function (it) {
+        return '<div class="stat"><div class="stat-k">' + it[0] + '</div><div class="stat-v num">' + it[1] + ' <span class="stat-u">' + it[2] + '</span></div></div>';
+      }).join('');
     }
     function showBarInfo(idx) {
-      var bars = allBars();
-      if (idx < 0 || idx >= bars.length) { $('now-ohlc').textContent = ''; return; }
+      var bars = state.sample ? state.sample.bars : [];
+      if (idx < 0 || idx >= bars.length) { $('bar-info').textContent = ''; return; }
       var b = bars[idx];
-      $('now-ohlc').innerHTML = '<b>' + barTimeLabel(b) + '</b> 始 ' + fmtYen(b.open) + ' / 高 ' + fmtYen(b.high) + ' / 安 ' + fmtYen(b.low) + ' / 終 ' + fmtYen(b.close) + ' / 出来高 ' + b.volume.toLocaleString('ja-JP') + '株';
+      $('bar-info').innerHTML = '<b>' + barLabel(b) + '</b> 始 ' + fmtYen(b.open) + ' / 高 ' + fmtYen(b.high) + ' / 安 ' + fmtYen(b.low) + ' / 終 ' + fmtYen(b.close)
+        + ' / 出来高 ' + b.volume.toLocaleString('ja-JP') + ' / variance ' + b.variance.toExponential(3) + ' / ジャンプ ' + b.jumps + '件';
     }
 
-    /* ================= チャート描画 ================= */
-    function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function sma(closes, n, i) {
-      if (i < n - 1) return null;
-      var s = 0; for (var k = i - n + 1; k <= i; k++) s += closes[k];
-      return s / n;
+    /* ================= 価格チャート ================= */
+    function viewCount() {
+      var v = $('in-view').value;
+      if (v === 'all') return state.sample ? state.sample.bars.length : 0;
+      return parseInt(v, 10);
     }
     function drawChart() {
       var cv = $('chart');
-      var bars = allBars();
-      if (!bars.length) return;
+      var sample = state.sample;
+      if (!sample || !sample.bars.length) return;
+      var bars = sample.bars;
+      var n = Math.min(viewCount(), bars.length);
+      var end = Math.max(n, Math.min(bars.length, state.viewEnd));
+      var start = Math.max(0, end - n);
+      end = start + Math.min(n, bars.length - start);
+      var vis = bars.slice(start, end);
       var dpr = window.devicePixelRatio || 1;
       var W = cv.clientWidth, H = cv.clientHeight;
       if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -718,266 +669,266 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       var ink = cssVar('--ink'), muted = cssVar('--muted'), line = cssVar('--line'),
-          up = cssVar('--up'), down = cssVar('--down'), panel = cssVar('--panel');
-      var viewN = parseInt($('in-view').value, 10);
-      var total = bars.length;
-      var end = Math.max(viewN, total - state.viewOffset);
-      var start = Math.max(0, end - viewN);
-      end = Math.min(total, start + viewN);
-      var vis = bars.slice(start, end);
-      var n = vis.length;
+          up = cssVar('--up'), down = cssVar('--down'), soft = cssVar('--accent-soft'),
+          accent = cssVar('--accent');
       var padR = 56, padL = 4, padT = 8;
       var volH = Math.round(H * 0.16), priceH = H - volH - padT - 18;
       var plotW = W - padR - padL;
-      var bw = plotW / n;
+      var bw = plotW / vis.length;
+      /* 当日帯 */
+      var todayIdx = -1;
+      for (var i = 0; i < vis.length; i++) { if (vis[i].day === 0) { todayIdx = i; break; } }
+      if (todayIdx >= 0) {
+        ctx.fillStyle = soft;
+        ctx.fillRect(padL + todayIdx * bw, padT - 2, plotW - todayIdx * bw, priceH + volH + 8);
+        ctx.fillStyle = accent;
+        ctx.font = '10.5px sans-serif';
+        ctx.fillText('当日', padL + todayIdx * bw + 3, padT + 9);
+      }
       var hi = -Infinity, lo = Infinity, vmax = 0;
-      for (var i = 0; i < n; i++) {
+      for (i = 0; i < vis.length; i++) {
         if (vis[i].high > hi) hi = vis[i].high;
         if (vis[i].low < lo) lo = vis[i].low;
         if (vis[i].volume > vmax) vmax = vis[i].volume;
       }
       var pad = (hi - lo) * 0.06 || 1; hi += pad; lo -= pad;
       var y = function (p) { return padT + (hi - p) / (hi - lo) * priceH; };
-      // グリッドと価格目盛
       ctx.font = '10.5px sans-serif'; ctx.fillStyle = muted; ctx.strokeStyle = line; ctx.lineWidth = 1;
       for (var g = 0; g <= 4; g++) {
         var pv = lo + (hi - lo) * g / 4, yy = y(pv);
         ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + plotW, yy); ctx.stroke();
         ctx.fillText(fmtYen(pv), padL + plotW + 5, yy + 3);
       }
-      // 前日終値ライン
-      var pc = state.session.prevClose;
-      if (pc > lo && pc < hi) {
-        ctx.strokeStyle = muted; ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.moveTo(padL, y(pc)); ctx.lineTo(padL + plotW, y(pc)); ctx.stroke();
-        ctx.setLineDash([]);
-      }
-      // 出来高
       var volTop = padT + priceH + 6;
-      for (i = 0; i < n; i++) {
+      for (i = 0; i < vis.length; i++) {
         var b = vis[i], x = padL + i * bw;
-        var vh = vmax > 0 ? vis[i].volume / vmax * volH : 0;
+        var vh = vmax > 0 ? b.volume / vmax * volH : 0;
         ctx.fillStyle = b.close >= b.open ? up : down;
-        ctx.globalAlpha = 0.55;
-        ctx.fillRect(x + bw * 0.18, volTop + volH - vh, Math.max(1, bw * 0.64), vh);
+        ctx.globalAlpha = b.day === 0 ? 0.75 : 0.4;
+        if (vh > 0) ctx.fillRect(x + bw * 0.18, volTop + volH - vh, Math.max(1, bw * 0.64), vh);
         ctx.globalAlpha = 1;
       }
-      // ローソク
-      for (i = 0; i < n; i++) {
+      if (vmax === 0) {
+        ctx.fillStyle = muted;
+        ctx.fillText('出来高OFF（出来高は生成されていません）', padL + 4, volTop + volH - 4);
+      }
+      for (i = 0; i < vis.length; i++) {
         b = vis[i]; x = padL + i * bw;
         var cx = x + bw / 2, col = b.close >= b.open ? up : down;
         ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+        ctx.globalAlpha = b.day === 0 ? 1 : 0.72;
         ctx.beginPath(); ctx.moveTo(cx, y(b.high)); ctx.lineTo(cx, y(b.low)); ctx.stroke();
         var yO = y(b.open), yC = y(b.close);
         var top = Math.min(yO, yC), hgt = Math.max(1, Math.abs(yC - yO));
-        if (b.close >= b.open) { ctx.fillRect(x + bw * 0.16, top, Math.max(1.4, bw * 0.68), hgt); }
-        else { ctx.fillRect(x + bw * 0.16, top, Math.max(1.4, bw * 0.68), hgt); }
+        ctx.fillRect(x + bw * 0.16, top, Math.max(1.4, bw * 0.68), hgt);
+        ctx.globalAlpha = 1;
         if (start + i === state.selected) {
           ctx.strokeStyle = ink; ctx.lineWidth = 1.4;
           ctx.strokeRect(x + 0.5, padT, Math.max(2, bw - 1), priceH + volH + 6);
         }
       }
-      // 移動平均
-      var closes = bars.map(function (b2) { return b2.close; });
-      var mas = [
-        { n: 5, on: $('in-ma5').checked, col: '#e8a33d' },
-        { n: 25, on: $('in-ma25').checked, col: '#7c5cd6' },
-        { n: 75, on: $('in-ma75').checked, col: '#2e9e77' }
-      ];
-      mas.forEach(function (ma) {
-        if (!ma.on) return;
-        ctx.strokeStyle = ma.col; ctx.lineWidth = 1.3; ctx.beginPath();
-        var started = false;
-        for (var i2 = 0; i2 < n; i2++) {
-          var v = sma(closes, ma.n, start + i2);
-          if (v === null) continue;
-          var xx = padL + i2 * bw + bw / 2, yv = y(v);
-          if (!started) { ctx.moveTo(xx, yv); started = true; } else ctx.lineTo(xx, yv);
-        }
-        ctx.stroke();
-      });
-      // 当日開始の区切り
-      var todayStart = state.session.history.length;
-      if (todayStart >= start && todayStart < end) {
-        var dx = padL + (todayStart - start) * bw;
-        ctx.strokeStyle = cssVar('--accent'); ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.moveTo(dx, padT); ctx.lineTo(dx, padT + priceH + volH + 6); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = cssVar('--accent');
-        ctx.fillText('当日', dx + 3, padT + 10);
-      }
-      // 時刻ラベル
       ctx.fillStyle = muted;
-      var stepL = Math.max(1, Math.floor(n / 5));
-      for (i = 0; i < n; i += stepL) {
+      var stepL = Math.max(1, Math.floor(vis.length / 5));
+      for (i = 0; i < vis.length; i += stepL) {
         b = vis[i];
-        var lbl = b.day === 0 ? barTimeLabel(b).slice(3) : (Math.abs(b.day) + '日前');
+        var lbl = (b.day === 0 ? '' : Math.abs(b.day) + '日前 ') + timeLabel(b.minute);
         ctx.fillText(lbl, padL + i * bw, H - 2);
       }
-      cv._geom = { start: start, bw: bw, padL: padL, n: n };
-    }
-    function chartPick(clientX) {
-      var cv = $('chart');
-      if (!cv._geom) return;
-      var rect = cv.getBoundingClientRect();
-      var x = clientX - rect.left;
-      var g = cv._geom;
-      var i = Math.floor((x - g.padL) / g.bw);
-      if (i < 0 || i >= g.n) return;
-      state.selected = g.start + i;
-      showBarInfo(state.selected);
-      drawChart();
+      $('view-info').textContent = '全' + bars.length + '本中 ' + (start + 1) + '〜' + end + '本目を表示';
+      cv._geom = { start: start, bw: bw, padL: padL, n: vis.length };
     }
     (function initChartInput() {
-      var cv = $('chart'), dragging = false, lastX = 0, moved = false;
-      cv.addEventListener('pointerdown', function (e) { dragging = true; lastX = e.clientX; moved = false; });
-      cv.addEventListener('pointermove', function (e) {
-        if (!dragging) return;
-        var dx = e.clientX - lastX;
-        var g = cv._geom;
-        if (g && Math.abs(dx) > g.bw) {
-          var barsShift = Math.round(dx / g.bw);
-          var total = allBars().length;
-          var viewN = parseInt($('in-view').value, 10);
-          state.viewOffset = Math.min(Math.max(0, total - viewN), Math.max(0, state.viewOffset + barsShift));
-          lastX = e.clientX; moved = true;
-          drawChart();
-        }
+      var cv = $('chart');
+      cv.addEventListener('pointerup', function (e) {
+        if (!cv._geom) return;
+        var rect = cv.getBoundingClientRect();
+        var i = Math.floor((e.clientX - rect.left - cv._geom.padL) / cv._geom.bw);
+        if (i < 0 || i >= cv._geom.n) return;
+        state.selected = cv._geom.start + i;
+        showBarInfo(state.selected);
+        drawChart();
       });
-      cv.addEventListener('pointerup', function (e) { dragging = false; if (!moved) chartPick(e.clientX); });
-      cv.addEventListener('pointercancel', function () { dragging = false; });
     })();
 
-    /* ================= 統計パネル ================= */
-    function renderStats() {
-      var s = state.session;
-      if (!s) return;
-      var all = s.history.concat(s.today);
-      var closes = all.map(function (b) { return b.close; });
-      var rets = [];
-      for (var i = 1; i < closes.length; i++) rets.push(Math.log(closes[i] / closes[i - 1]));
-      var m = mean(rets), sd = stdev(rets, m), sk = skewKurt(rets, m, sd);
-      var sorted = rets.slice().sort(function (a, b) { return a - b; });
-      var absRets = rets.map(Math.abs);
-      var items = [
-        ['収益率の平均', fmtPct(m, 3), '（5分足・対数）'],
-        ['収益率の標準偏差', fmtPct(sd, 3), '（5分足）'],
-        ['歪度', fmtNum(sk.skew), ''],
-        ['尖度（超過）', fmtNum(sk.kurt), '正規=0'],
-        ['1%分位点', fmtPct(quantile(sorted, 0.01), 2), ''],
-        ['99%分位点', fmtPct(quantile(sorted, 0.99), 2), ''],
-        ['最大ドローダウン', fmtPct(maxDrawdown(closes), 2), '（全期間・終値）'],
-        ['日中最大下落率', fmtPct(intradayMaxDrop(s.today), 2), '（当日）'],
-        ['|収益率| 自己相関', fmtNum(autocorrLag1(absRets)), 'ラグ1'],
-        ['当日騰落率', fmtPct(s.today[s.today.length - 1].close / s.prevClose - 1, 2), ''],
-        ['当日の値幅', fmtPct((Math.max.apply(null, s.today.map(function (b) { return b.high; })) - Math.min.apply(null, s.today.map(function (b) { return b.low; }))) / s.prevClose, 2), '（高値−安値）'],
-        ['当日出来高合計', s.today.reduce(function (a, b) { return a + b.volume; }, 0).toLocaleString('ja-JP'), '株']
-      ];
-      $('stats-grid').innerHTML = items.map(function (it) {
-        return '<div class="stat"><div class="stat-k">' + it[0] + '</div><div class="stat-v num">' + it[1] + ' <span class="stat-u">' + it[2] + '</span></div></div>';
-      }).join('');
-    }
-
-    /* ================= 当日再生プレイヤー ================= */
-    function stopPlay() {
-      state.playing = false;
-      if (state.timer) { clearInterval(state.timer); state.timer = null; }
-      $('btn-play').textContent = '▶ 再生';
-    }
-    function clockLabel(revealed) {
-      if (revealed <= 0) return '9:00 寄り付き前';
-      if (revealed >= 66) return '15:30 大引け';
-      var idx = revealed - 1;
-      var mins = idx < 30 ? 9 * 60 + (idx + 1) * 5 : 12 * 60 + 30 + (idx - 30 + 1) * 5;
-      if (revealed === 30) return '11:30 前引け（昼休み）';
-      var h = Math.floor(mins / 60), m = mins % 60;
-      return h + ':' + (m < 10 ? '0' : '') + m;
-    }
-    function updatePlayerUI() {
-      $('play-clock').textContent = clockLabel(state.revealed);
-      $('play-count').textContent = '当日 ' + state.revealed + ' / 66 本';
-      $('play-progress').value = state.revealed;
-    }
-    function setRevealed(n) {
-      state.revealed = Math.max(0, Math.min(66, n));
-      state.viewOffset = 0;
-      updateHeader();
-      drawChart();
-      updatePlayerUI();
-      if (state.revealed >= 66) stopPlay();
-    }
-    function togglePlay() {
-      if (state.playing) { stopPlay(); return; }
-      var speedVal = $('in-speed').value;
-      if (speedVal === 'instant') { setRevealed(66); return; }
-      if (state.revealed >= 66) setRevealed(0);
-      var speed = parseFloat(speedVal);
-      var interval = Math.max(30, 600000 / 66 / speed);
-      state.playing = true;
-      $('btn-play').textContent = '⏸ 一時停止';
-      state.timer = setInterval(function () { setRevealed(state.revealed + 1); }, interval);
-    }
-
-    /* ================= N日検証 ================= */
-    function runValidation() {
-      var days = parseInt($('in-days').value, 10);
-      var raw = readParams();
-      if (!isFinite(raw.seed)) raw.seed = 1;
-      var p = PriceEngine.clampParams(raw);
-      $('valid-status').textContent = '検証中…';
-      $('btn-validate').disabled = true;
-      setTimeout(function () {
-        var t0 = performance.now();
-        var posViol = 0, ohlcViol = 0, anomalyBars = 0, totalBars = 0;
-        var pooled = [], acs = [], dds = [], dailyRets = [];
-        for (var d = 0; d < days; d++) {
-          var daySeed = (Math.imul(p.seed, 2654435761) + Math.imul(d + 1, 2246822519)) >>> 0;
-          var day = PriceEngine.generateDay(daySeed, raw);
-          var bars = day.bars, closes = [];
-          for (var i = 0; i < bars.length; i++) {
-            var b = bars[i];
-            totalBars++;
-            if (!(b.open > 0 && b.high > 0 && b.low > 0 && b.close > 0)) posViol++;
-            if (!(b.high >= Math.max(b.open, b.close) && b.low <= Math.min(b.open, b.close) && b.high >= b.low)) ohlcViol++;
-            closes.push(b.close);
-            if (i > 0) {
-              var r = Math.log(b.close / bars[i - 1].close);
-              pooled.push(r);
-              if (Math.abs(r) > 0.10) anomalyBars++;
-            }
-          }
-          var absDay = [];
-          for (i = 1; i < closes.length; i++) absDay.push(Math.abs(Math.log(closes[i] / closes[i - 1])));
-          acs.push(autocorrLag1(absDay));
-          dds.push(maxDrawdown([p.s0].concat(closes)));
-          dailyRets.push(Math.log(day.close / p.s0));
+    /* ================= 分散チャート ================= */
+    function drawVarChart() {
+      var cv = $('varchart');
+      var t = todayBars();
+      if (!t.length) return;
+      var cumT = [], cumR = [], acc = 0, racc = 0, prev = t[0].open;
+      for (var i = 0; i < t.length; i++) {
+        acc += t[i].variance; cumT.push(acc);
+        var r = Math.log(t[i].close / prev);
+        racc += r * r; cumR.push(racc);
+        prev = t[i].close;
+      }
+      var dpr = window.devicePixelRatio || 1;
+      var W = cv.clientWidth, H = cv.clientHeight;
+      if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+      var ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      var muted = cssVar('--muted'), line = cssVar('--line'),
+          accent = cssVar('--accent'), teal = cssVar('--teal');
+      var padR = 8, padL = 46, padT = 8, padB = 16;
+      var plotW = W - padR - padL, plotH = H - padT - padB;
+      var vmax = Math.max(cumT[cumT.length - 1], cumR[cumR.length - 1]) * 1.1 || 1;
+      var X = function (i) { return padL + (t.length <= 1 ? 0 : i / (t.length - 1)) * plotW; };
+      var Y = function (v) { return padT + (1 - v / vmax) * plotH; };
+      ctx.font = '10.5px sans-serif'; ctx.fillStyle = muted; ctx.strokeStyle = line; ctx.lineWidth = 1;
+      for (var g = 0; g <= 3; g++) {
+        var vv = vmax * g / 3, yy = Y(vv);
+        ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + plotW, yy); ctx.stroke();
+        ctx.fillText((vv * 10000).toFixed(1), 4, yy + 3);
+      }
+      ctx.fillText('×10⁻⁴', 4, padT + 2);
+      function drawLine(series, col) {
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.beginPath();
+        for (var i = 0; i < series.length; i++) {
+          if (i === 0) ctx.moveTo(X(i), Y(series[i])); else ctx.lineTo(X(i), Y(series[i]));
         }
-        var elapsed = performance.now() - t0;
-        // 再現性：同一シードで2回生成し全ティック価格を比較
-        var repSeed = (Math.imul(p.seed, 2654435761) + 2246822519) >>> 0;
-        var d1 = PriceEngine.generateDay(repSeed, raw), d2 = PriceEngine.generateDay(repSeed, raw);
-        var repro = d1.tickPrices.length === d2.tickPrices.length;
-        if (repro) for (var j = 0; j < d1.tickPrices.length; j++) if (d1.tickPrices[j] !== d2.tickPrices[j]) { repro = false; break; }
-        var m = mean(pooled), sd = stdev(pooled, m), sk = skewKurt(pooled, m, sd);
-        var sorted = pooled.slice().sort(function (a, b) { return a - b; });
-        var res = {
-          label: modelLabel(p),
-          seed: p.seed, days: days,
-          posViol: posViol, ohlcViol: ohlcViol, repro: repro,
-          q01: quantile(sorted, 0.01), q99: quantile(sorted, 0.99),
-          kurt: sk.kurt, skew: sk.skew,
-          acMean: mean(acs),
-          ddMean: mean(dds), ddMax: Math.max.apply(null, dds),
-          anomalyRate: totalBars ? anomalyBars / totalBars : 0,
-          dailyMean: mean(dailyRets),
-          ms: elapsed
-        };
-        state.comparisons.push(res);
-        if (state.comparisons.length > 4) state.comparisons.shift();
-        renderComparisons();
-        $('valid-status').textContent = '完了：' + res.label + '（' + days + '日・シード ' + p.seed + '）';
-        $('btn-validate').disabled = false;
-      }, 30);
+        ctx.stroke();
+      }
+      drawLine(cumT, accent);
+      drawLine(cumR, teal);
+      ctx.fillStyle = muted;
+      var marks = [[0, '9:00'], [29, '11:25'], [30, '12:30'], [65, '15:25']];
+      for (var k = 0; k < marks.length; k++) {
+        ctx.fillText(marks[k][1], X(marks[k][0]) - 10, H - 3);
+      }
+      $('var-legend').textContent = '最終値：積算分散 ' + (acc * 10000).toFixed(2) + '×10⁻⁴／実現分散 ' + (racc * 10000).toFixed(2) + '×10⁻⁴';
+    }
+
+    /* ================= 書き出し ================= */
+    function download(name, text, type) {
+      var blob = new Blob([text], { type: type });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+    }
+    function exportCSV() {
+      if (!state.sample) return;
+      var s = state.sample, c = s.config;
+      var head = 'seed,base,regimes,season,jumps,volume,lambda,jumpSD,history,day,time,minute,open,high,low,close,volume,variance,jumps_count,complete';
+      var lines = [head];
+      for (var i = 0; i < s.bars.length; i++) {
+        var b = s.bars[i];
+        lines.push([s.seed, c.base === null ? 'null' : c.base, c.regimes, c.season, c.jumps, c.volume,
+          c.lambda, c.jumpSD, c.history, b.day, timeLabel(b.minute), b.minute,
+          b.open, b.high, b.low, b.close, b.volume, b.variance, b.jumps, b.complete].join(','));
+      }
+      download('daytrade-sample-seed' + s.seed + '.csv', lines.join('\n') + '\n', 'text/csv');
+    }
+    function exportJSON() {
+      if (!state.sample) return;
+      var s = state.sample;
+      var out = {
+        seed: s.seed, config: s.config,
+        bars: s.bars.map(function (b) {
+          return { day: b.day, time: timeLabel(b.minute), minute: b.minute, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume, variance: b.variance, jumps: b.jumps, complete: b.complete };
+        })
+      };
+      download('daytrade-sample-seed' + s.seed + '.json', JSON.stringify(out, null, 2), 'application/json');
+    }
+
+    /* ================= バッチ検証 ================= */
+    function setBatchUI(running, done, total) {
+      $('btn-batch').disabled = running;
+      $('btn-batch-cancel').disabled = !running;
+      if (total) $('batch-progress').value = Math.round(done / total * 100);
+    }
+    function finishBatch(result, cfg, seed, days) {
+      state.batchRunning = false;
+      setBatchUI(false, days, days);
+      $('batch-progress').value = 100;
+      $('batch-status').textContent = '完了：' + configShort(cfg) + '（基準シード ' + seed + '／' + days + '日）';
+      result.label = configShort(cfg);
+      result.seed = seed;
+      state.comparisons.push(result);
+      if (state.comparisons.length > 4) state.comparisons.shift();
+      renderComparisons();
+    }
+    function runBatch() {
+      if (state.batchRunning) return;
+      var s = readSettings();
+      if (!s.ok) { showError(s.error); $('batch-status').textContent = '設定エラー：' + s.error; return; }
+      showError(null);
+      var days = parseInt($('in-bdays').value, 10);
+      var cfg = s.config, seed = s.seed;
+      state.batchRunning = true;
+      state.batchCancel = false;
+      setBatchUI(true, 0, days);
+      $('batch-progress').value = 0;
+      $('batch-status').textContent = '検証中… 0 / ' + days + '日';
+      var src = 'var generate = ' + generate.toString() + ';\n'
+        + batchNewAgg.toString() + '\n' + batchAddDay.toString() + '\n' + batchFinalize.toString() + '\n'
+        + '(' + workerMain.toString() + ')();';
+      var worker = null;
+      try {
+        worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      } catch (e) { worker = null; }
+      if (!worker) { runBatchMainThread(cfg, seed, days); return; }
+      state.worker = worker;
+      var gotDone = false;
+      worker.onmessage = function (e) {
+        var m = e.data;
+        if (m.type === 'progress') {
+          $('batch-progress').value = Math.round(m.done / m.total * 100);
+          $('batch-status').textContent = '検証中… ' + m.done.toLocaleString('ja-JP') + ' / ' + m.total.toLocaleString('ja-JP') + '日';
+        } else if (m.type === 'done') {
+          gotDone = true;
+          worker.terminate(); state.worker = null;
+          finishBatch(m.result, cfg, seed, days);
+        }
+      };
+      worker.onerror = function () {
+        if (gotDone) return;
+        try { worker.terminate(); } catch (e) {}
+        state.worker = null;
+        runBatchMainThread(cfg, seed, days);
+      };
+      worker.postMessage({ baseSeed: seed, days: days, config: cfg });
+    }
+    function runBatchMainThread(cfg, seed, days) {
+      /* Workerが使えない環境向けフォールバック：同じ集計を分割実行する */
+      $('batch-status').textContent = '検証中…（メインスレッドで分割実行）';
+      var agg = batchNewAgg();
+      var t0 = performance.now();
+      var i = 0;
+      function step() {
+        if (state.batchCancel) {
+          state.batchRunning = false;
+          setBatchUI(false, 0, days);
+          $('batch-status').textContent = '中止しました。';
+          return;
+        }
+        var until = Math.min(days, i + 10);
+        for (; i < until; i++) {
+          var r = generate(seed + i, Object.assign({}, cfg, { history: 0 }));
+          batchAddDay(agg, r.bars);
+        }
+        $('batch-progress').value = Math.round(i / days * 100);
+        $('batch-status').textContent = '検証中… ' + i.toLocaleString('ja-JP') + ' / ' + days.toLocaleString('ja-JP') + '日';
+        if (i < days) { setTimeout(step, 0); return; }
+        var out = batchFinalize(agg);
+        out.ms = performance.now() - t0;
+        finishBatch(out, cfg, seed, days);
+      }
+      step();
+    }
+    function cancelBatch() {
+      state.batchCancel = true;
+      if (state.worker) {
+        try { state.worker.terminate(); } catch (e) {}
+        state.worker = null;
+        state.batchRunning = false;
+        setBatchUI(false, 0, 1);
+        $('batch-status').textContent = '中止しました。';
+      }
     }
     function renderComparisons() {
       var cs = state.comparisons;
@@ -989,117 +940,174 @@
       $('cmp-empty').classList.add('hidden');
       $('cmp-table').classList.remove('hidden');
       $('cmp-head').innerHTML = '<th>指標</th>' + cs.map(function (c) {
-        return '<th>' + c.label + '<br><span style="font-weight:400">シード ' + c.seed + '／' + c.days + '日</span></th>';
+        return '<th class="run-head">' + c.label + '<br><span style="font-weight:400">基準シード ' + c.seed + '／' + c.days + '日</span></th>';
       }).join('');
-      function row(name, fn, cls) {
-        return '<tr><td>' + name + '</td>' + cs.map(function (c) {
-          var v = fn(c);
-          return '<td' + (cls ? ' class="' + cls(c) + '"' : '') + '>' + v + '</td>';
-        }).join('') + '</tr>';
+      function row(name, fn) {
+        return '<tr><td>' + name + '</td>' + cs.map(function (c) { return '<td>' + fn(c) + '</td>'; }).join('') + '</tr>';
       }
-      var passCls = function (ok) { return function (c) { return ok(c) ? 'pass' : 'fail'; }; };
-      $('cmp-body').innerHTML =
-        row('価格の正値性違反', function (c) { return c.posViol + ' 件'; }, passCls(function (c) { return c.posViol === 0; })) +
-        row('OHLC整合性違反', function (c) { return c.ohlcViol + ' 件'; }, passCls(function (c) { return c.ohlcViol === 0; })) +
-        row('再現性（同シード2回生成）', function (c) { return c.repro ? '一致 ✓' : '不一致 ✗'; }, passCls(function (c) { return c.repro; })) +
-        row('収益率 1%分位点', function (c) { return fmtPct(c.q01, 2); }) +
-        row('収益率 99%分位点', function (c) { return fmtPct(c.q99, 2); }) +
-        row('尖度（超過）', function (c) { return fmtNum(c.kurt, 2); }) +
-        row('歪度', function (c) { return fmtNum(c.skew, 2); }) +
-        row('|収益率| 自己相関（平均）', function (c) { return fmtNum(c.acMean, 3); }) +
-        row('最大ドローダウン 平均', function (c) { return fmtPct(c.ddMean, 2); }) +
-        row('最大ドローダウン 最大', function (c) { return fmtPct(c.ddMax, 2); }) +
-        row('異常値発生率（1足±10%超）', function (c) { return fmtPct(c.anomalyRate, 3); }) +
-        row('日次収益率の平均', function (c) { return fmtPct(c.dailyMean, 3); }) +
-        row('生成速度', function (c) { return Math.round(c.ms).toLocaleString('ja-JP') + ' ms（' + c.days + '日）'; });
+      var QK = [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99];
+      var html = '';
+      html += row('日次収益率 平均', function (c) { return fmtPct(c.dailyMean, 4); });
+      html += row('日次収益率 標準偏差', function (c) { return fmtPct(c.dailySd, 3); });
+      html += row('日次収益率 標準誤差', function (c) { return fmtPct(c.dailySe, 4); });
+      QK.forEach(function (k) {
+        html += row('日次収益率 ' + Math.round(k * 100) + '%分位点', function (c) { return fmtPct(c.dailyQ[k], 2); });
+      });
+      QK.forEach(function (k) {
+        html += row('5分足対数収益率 ' + Math.round(k * 100) + '%分位点', function (c) { return fmtPct(c.logQ[k], 3); });
+      });
+      html += row('5分足対数収益率 超過尖度', function (c) { return fmtNum(c.logKurt, 2); });
+      html += row('|収益率| 自己相関（ラグ1）', function (c) { return fmtNum(c.absAc, 3); });
+      html += row('単純収益率 自己相関（ラグ1）', function (c) { return fmtNum(c.simAc, 3); });
+      html += row('日中高安幅 平均', function (c) { return fmtPct(c.rangeMean, 2); });
+      html += row('最大ドローダウン 平均', function (c) { return fmtPct(c.ddMean, 2); });
+      html += row('最大ドローダウン 最大', function (c) { return fmtPct(c.ddMax, 2); });
+      html += row('方向反転率', function (c) { return fmtPct(c.revRate, 1); });
+      html += row('ジャンプ頻度（件/日）', function (c) { return fmtNum(c.jumpsPerDay, 3); });
+      html += row('生成所要時間', function (c) { return (c.ms / 1000).toFixed(2) + ' 秒（' + c.days + '日）'; });
+      $('cmp-body').innerHTML = html;
     }
 
     /* ================= 自己テスト ================= */
     function runSelfTests() {
       var tests = [];
-      function add(name, ok, detail) { tests.push({ name: name, ok: !!ok, detail: detail || '' }); }
-      try {
-        // 1. 乱数の再現性
-        var r1 = new PriceEngine.RNG(42), r2 = new PriceEngine.RNG(42), same = true;
-        for (var i = 0; i < 1000; i++) if (r1.next() !== r2.next()) { same = false; break; }
-        add('乱数の再現性（同シードで一致）', same);
-        // 2. シードを変えると系列が変わる
-        var r3 = new PriceEngine.RNG(43); r1 = new PriceEngine.RNG(42);
-        var diff = false;
-        for (i = 0; i < 100; i++) if (r1.next() !== r3.next()) { diff = true; break; }
-        add('シード変更で系列が変わる', diff);
-        // 3. 正規乱数の平均・分散
-        var rn = new PriceEngine.RNG(7), xs = [];
-        for (i = 0; i < 20000; i++) xs.push(rn.normal());
-        var xm = mean(xs), xv = stdev(xs, xm);
-        add('正規乱数の平均≈0・分散≈1', Math.abs(xm) < 0.03 && Math.abs(xv - 1) < 0.03, '平均 ' + fmtNum(xm) + '／標準偏差 ' + fmtNum(xv));
-        // 4. t乱数の分散（ν=5、標準化済みで≈1）
-        var rt = new PriceEngine.RNG(11), ts = [];
-        for (i = 0; i < 20000; i++) ts.push(rt.studentT(5));
-        var tm = mean(ts), tv = stdev(ts, tm);
-        add('t分布乱数（ν=5）の分散≈1', Math.abs(tv - 1) < 0.08, '標準偏差 ' + fmtNum(tv));
-        // 5〜7. セッションの整合性（全モデル共通の代表としてGBMで生成）
-        var ses = PriceEngine.generateSession({ model: 'gbm', seed: 99, s0: 3000, sigmaPct: 25, muPct: 0, ticksPerBar: 10, gapPct: 0.8 });
-        var all = ses.history.concat(ses.today), posOk = true, ohlcOk = true;
-        for (i = 0; i < all.length; i++) {
-          var b = all[i];
-          if (!(b.open > 0 && b.high > 0 && b.low > 0 && b.close > 0)) posOk = false;
-          if (!(b.high >= Math.max(b.open, b.close) && b.low <= Math.min(b.open, b.close) && b.high >= b.low)) ohlcOk = false;
-        }
-        add('価格の正値性（全566本）', posOk);
-        add('OHLC整合性（全566本）', ohlcOk);
-        add('足の本数（過去500＋当日66）', ses.history.length === 500 && ses.today.length === 66, ses.history.length + '＋' + ses.today.length + '本');
-        // 8. セッション再現性
-        var ses2 = PriceEngine.generateSession({ model: 'gbm', seed: 99, s0: 3000, sigmaPct: 25, muPct: 0, ticksPerBar: 10, gapPct: 0.8 });
-        var sesSame = ses.today[65].close === ses2.today[65].close && ses.history[0].close === ses2.history[0].close;
-        add('セッション再現性（同シード・同設定）', sesSame);
-      } catch (e) {
-        add('自己テスト実行', false, String(e && e.message || e));
+      function t(name, fn) {
+        var ok = false, detail = '';
+        try { var r = fn(); ok = !!r.ok; detail = r.detail || ''; }
+        catch (e) { ok = false; detail = '例外：' + e.message; }
+        tests.push({ name: name, ok: ok, detail: detail });
       }
-      var passed = tests.filter(function (t) { return t.ok; }).length;
-      $('test-score').textContent = passed + ' / ' + tests.length + (passed === tests.length ? ' 合格' : '（失敗あり）');
-      $('test-score').style.color = passed === tests.length ? 'var(--ok)' : 'var(--bad)';
-      $('test-list').innerHTML = tests.map(function (t) {
-        return '<li' + (t.ok ? '' : ' class="ng"') + '>' + (t.ok ? '✓' : '✗') + ' ' + t.name + (t.detail ? ' <span class="num">（' + t.detail + '）</span>' : '') + '</li>';
-      }).join('');
+      t('同シード再現性（generate(42) を2回生成し完全一致）', function () {
+        var a = JSON.stringify(generate(42));
+        var b = JSON.stringify(generate(42));
+        return { ok: a === b, detail: a === b ? '' : '2回の生成結果が一致しません' };
+      });
+      t('既定設定で全566本（過去500＋当日66）', function () {
+        var a = generate(42);
+        return { ok: a.bars.length === 566, detail: '実測 ' + a.bars.length + '本' };
+      });
+      t('全価格が正値', function () {
+        var a = generate(42), bad = 0;
+        a.bars.forEach(function (b) { if (!(b.open > 0 && b.high > 0 && b.low > 0 && b.close > 0)) bad++; });
+        return { ok: bad === 0, detail: bad ? '違反 ' + bad + '件' : '' };
+      });
+      t('OHLC大小関係（low ≤ open/close ≤ high）', function () {
+        var a = generate(42), bad = 0;
+        a.bars.forEach(function (b) { if (!(b.low <= Math.min(b.open, b.close) && b.high >= Math.max(b.open, b.close))) bad++; });
+        return { ok: bad === 0, detail: bad ? '違反 ' + bad + '件' : '' };
+      });
+      t('当日（day=0）が66本', function () {
+        var a = generate(42);
+        var n = a.bars.filter(function (b) { return b.day === 0; }).length;
+        return { ok: n === 66, detail: '実測 ' + n + '本' };
+      });
+      t('出来高OFFでも価格系列が不変', function () {
+        var a = generate(42), b = generate(42, { volume: false });
+        var same = a.bars.length === b.bars.length && a.bars.every(function (x, i) { return x.close === b.bars[i].close; });
+        return { ok: same, detail: same ? '' : '出来高切替で価格が変わりました' };
+      });
+      t('ジャンプOFFでジャンプ0件', function () {
+        var a = generate(42, { jumps: false });
+        var n = a.bars.reduce(function (s, b) { return s + b.jumps; }, 0);
+        return { ok: n === 0, detail: '実測 ' + n + '件' };
+      });
+      var passed = tests.filter(function (x) { return x.ok; }).length;
+      $('test-score').textContent = passed + ' / ' + tests.length + ' 合格';
+      $('test-list').innerHTML = tests.map(function (x) {
+        return '<li' + (x.ok ? '' : ' class="ng"') + '>' + (x.ok ? '✓' : '✗') + ' ' + x.name + (x.detail ? '（' + x.detail + '）' : '') + '</li>';
+      }).join('') + '<li id="baseline-test">基準値チェック（純GBM 200日）：実行中…</li>';
+      /* 基準値チェック：純GBM・独立シード1〜200・過去足なし */
+      setTimeout(function () {
+        var el = $('baseline-test');
+        if (!el) return;
+        try {
+          var rs = [];
+          for (var s = 1; s <= 200; s++) {
+            var b = generate(s, { base: 0.3, regimes: false, season: false, jumps: false, history: 0 }).bars;
+            rs.push(b[b.length - 1].close / b[0].open - 1);
+          }
+          var m = 0, i;
+          for (i = 0; i < rs.length; i++) m += rs[i];
+          m /= rs.length;
+          var v = 0;
+          for (i = 0; i < rs.length; i++) { var d = rs[i] - m; v += d * d; }
+          var sd = Math.sqrt(v / rs.length);
+          var ok = Math.abs(sd - 0.01899) <= 0.004;
+          el.className = ok ? '' : 'ng';
+          el.textContent = (ok ? '✓' : '✗') + ' 基準値チェック（純GBM 200日）：日次SD ' + fmtPct(sd, 3)
+            + '（基準1.899%±0.4pt以内か）／平均 ' + fmtPct(m, 4) + '／標準誤差 ' + fmtPct(sd / Math.sqrt(rs.length), 4)
+            + '。2000日での基準値は平均−0.0196%・SD 1.899%・SE 0.0425%';
+        } catch (e) {
+          el.className = 'ng';
+          el.textContent = '✗ 基準値チェックで例外：' + e.message;
+        }
+      }, 30);
     }
 
-    /* ================= イベント配線 ================= */
-    function syncModelParams() {
-      var m = $('in-model').value;
-      $('params-regime').classList.toggle('hidden', m !== 'regime');
-      $('params-jump').classList.toggle('hidden', m !== 'jump');
-      $('params-studentt').classList.toggle('hidden', m !== 'studentt');
-    }
-    $('in-model').addEventListener('change', syncModelParams);
-    $('btn-gen').addEventListener('click', function () { generate(); });
-    $('btn-regen').addEventListener('click', function () { generate(); });
-    $('btn-reseed').addEventListener('click', function () {
+    /* ================= イベントと初期化 ================= */
+    $('in-base-mode').addEventListener('change', function () {
+      $('in-base-pct').disabled = $('in-base-mode').value !== 'fixed';
+    });
+    $('btn-random-seed').addEventListener('click', function () {
       $('in-seed').value = String(1 + Math.floor(Math.random() * 2000000000));
-      generate();
+      runPreview();
     });
-    $('btn-play').addEventListener('click', togglePlay);
-    $('btn-restart').addEventListener('click', function () { stopPlay(); setRevealed(0); });
-    $('in-speed').addEventListener('change', function () { if (state.playing) { stopPlay(); togglePlay(); } });
-    ['in-view', 'in-ma5', 'in-ma25', 'in-ma75'].forEach(function (id) {
-      $(id).addEventListener('change', function () { state.viewOffset = 0; drawChart(); });
+    $('btn-preview').addEventListener('click', runPreview);
+    $('btn-preset-gbm').addEventListener('click', function () {
+      $('in-base-mode').value = 'fixed';
+      $('in-base-pct').disabled = false;
+      $('in-base-pct').value = '30';
+      $('in-regimes').checked = false;
+      $('in-season').checked = false;
+      $('in-jumps').checked = false;
+      $('in-volume').checked = true;
+      runPreview();
     });
-    $('btn-validate').addEventListener('click', runValidation);
-    $('btn-clear-cmp').addEventListener('click', function () { state.comparisons = []; renderComparisons(); $('valid-status').textContent = ''; });
+    $('btn-preset-full').addEventListener('click', function () {
+      $('in-base-mode').value = 'random';
+      $('in-base-pct').disabled = true;
+      $('in-lambda').value = '1';
+      $('in-jump-sd').value = '0.8';
+      $('in-regimes').checked = true;
+      $('in-season').checked = true;
+      $('in-jumps').checked = true;
+      $('in-volume').checked = true;
+      runPreview();
+    });
+    $('in-view').addEventListener('change', function () {
+      if (state.sample) state.viewEnd = state.sample.bars.length;
+      drawChart();
+    });
+    $('btn-view-older').addEventListener('click', function () {
+      if (!state.sample) return;
+      var n = viewCount();
+      state.viewEnd = Math.max(n, state.viewEnd - Math.floor(n / 2));
+      drawChart();
+    });
+    $('btn-view-newer').addEventListener('click', function () {
+      if (!state.sample) return;
+      var n = viewCount();
+      state.viewEnd = Math.min(state.sample.bars.length, state.viewEnd + Math.floor(n / 2));
+      drawChart();
+    });
+    $('btn-csv').addEventListener('click', exportCSV);
+    $('btn-json').addEventListener('click', exportJSON);
+    $('btn-batch').addEventListener('click', runBatch);
+    $('btn-batch-cancel').addEventListener('click', cancelBatch);
+    $('btn-clear-cmp').addEventListener('click', function () {
+      state.comparisons = [];
+      renderComparisons();
+    });
+    $('btn-retest').addEventListener('click', runSelfTests);
     var resizeTimer = null;
     window.addEventListener('resize', function () {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () { $('chart').width = 0; drawChart(); }, 120);
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () { drawChart(); drawVarChart(); }, 150);
     });
-    if (window.matchMedia) {
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mq.addEventListener) mq.addEventListener('change', function () { drawChart(); });
-    }
 
-    /* ================= 初期化 ================= */
-    syncModelParams();
-    generate();
+    runPreview();
     runSelfTests();
+
     if ('serviceWorker' in navigator) {
       try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
     }
