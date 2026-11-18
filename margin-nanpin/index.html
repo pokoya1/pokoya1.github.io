@@ -201,6 +201,8 @@ details.more summary{font-weight:700;color:var(--accent-ink);cursor:pointer;padd
 .card.detail-card:not([open ]) .detail-toggle .label-close{display:none}
 .detail-body{padding:0 16px 16px;border-top:1px solid var(--line)}
 .detail-body .sub{margin-top:12px}
+/* 前提サマリー（全画面共通・折りたたみ）：初期表示は要点1行のみで、銘柄数が多くても1行に収める */
+.premise-oneline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:.92rem;line-height:1.5;padding-top:.35rem}
 @media(max-width:640px){.detail-summary-in{flex-wrap:wrap}.detail-toggle{margin-top:6px}}
 .kv{display:grid;grid-template-columns:minmax(150px,auto) 1fr;gap:4px 14px;font-size:.9rem}
 .kv dt{color:var(--muted);font-weight:700}
@@ -292,8 +294,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "2.1";
-var SW_CACHE_NAME = "nanpin-planner-v20";
+var APP_VERSION = "2.2";
+var SW_CACHE_NAME = "nanpin-planner-v21";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -343,7 +345,11 @@ function sampleState(){
                 /* シナリオ設定（形式v3のまま追加する任意項目・ステップ1で地ならし、ステップ3で実装）：
                    種別は一律（uniform・初期値）／詳細（perInstrument＝銘柄別終点）。終点マップは
                    「銘柄コード → 終点下落率(%)」で、詳細モードの経路評価に使う */
-                scenarioType: "uniform", scenarioEndpoints: {} }
+                scenarioType: "uniform", scenarioEndpoints: {},
+                /* 表示モード（ステップ4・v2.2）：UI設定として保存する任意項目（形式は v3 のまま）。
+                   簡易（simple）／詳細（detailed）の切替は表示と導線だけで、データと計算は共有する。
+                   項目のない旧データ・旧JSONは「詳細」として読み込む（既存利用者の見た目を変えない） */
+                viewMode: "detailed" }
   };
 }
 
@@ -465,7 +471,10 @@ function sanitizeState(s){
         if (code && isFinite(v)) m[code] = clamp(v, 0, 100);
       });
       return m;
-    })()
+    })(),
+    /* 表示モード（ステップ4・v2.2）：任意項目。旧データ・旧JSONに項目がなければ「詳細（detailed）」で
+       補完し、不正な値は「詳細」に倒す。モードは表示・導線だけに効き、計算には一切影響しない */
+    viewMode: st.viewMode === "simple" ? "simple" : "detailed"
   };
   out.version = DATA_VERSION;
   return out;
@@ -913,17 +922,60 @@ function reachShort(baseDrop){
   if (!isDetailedScenario(state)) return "−" + Number(baseDrop).toFixed(1) + "%";
   return "進行度 " + progressPctOf(baseDrop).toFixed(1) + "%";
 }
-/* 前提サマリー（ダッシュボード）：効いているシナリオ前提の要約。どちらのモードでも表示する */
-function scenarioSummaryHtml(){
+/* ---------- 前提サマリー（ステップ4・4-2）：全画面共通の折りたたみ部品 ----------
+   初期表示は要点の1行（種別と担保の要点）＋展開操作のみに留め、銘柄数が多くても1行に収まる形にする
+   （銘柄別の終点は1行には含めず、展開時にだけ表示する）。展開すると全前提（シナリオ種別、各銘柄の終点、
+   担保の連動割合と終点の両表現、同時到達は登録順、計画外建玉の近似）を表示する。
+   開閉状態は ui.premiseOpen（表示だけの状態）で保持し、保存データの内容には影響させない */
+function premiseOneLine(){
   var s = state.settings;
-  var collat = "担保は市場下落の " + Math.round(sim.factor * 100) + "% 連動（進行度1時点の終点下落率 −" + (Math.round(collateralEndpointPct(s) * 10) / 10) + "%）";
+  var collat = "担保は市場下落の " + Math.round(sim.factor * 100) + "%連動（終点 −" + (Math.round(collateralEndpointPct(s) * 10) / 10) + "%）";
+  return isDetailedScenario(state)
+    ? "前提：詳細シナリオ（銘柄別終点）／" + collat
+    : "前提：一律シナリオ（全銘柄同率・最大 −" + s.maxDrop + "%）／" + collat;
+}
+function premiseBodyHtml(){
+  var s = state.settings;
+  var collat = "担保は市場下落の " + Math.round(sim.factor * 100) + "% 連動（進行度1時点の終点下落率 −" + (Math.round(collateralEndpointPct(s) * 10) / 10) + "%）で、連動割合と終点下落率の2つの表現を持つ1つの設定です";
   if (!isDetailedScenario(state)){
-    return '<div class="card"><h2>シナリオ前提</h2><p class="sub" style="margin-bottom:0">種別：<strong>一律</strong>。すべての銘柄が計画基準価格から同じ下落率で下落します（想定最大下落率 −' + s.maxDrop + '%まで）。' + collat + '。購入段階は下落率の到達順に処理します。前提の変更は「設定・データ」画面で行えます。</p></div>';
+    return '<p class="sub" style="margin-bottom:0">種別：<strong>一律</strong>。すべての銘柄が計画基準価格から同じ下落率で下落します（想定最大下落率 −' + s.maxDrop + '%まで）。' + collat + '。購入段階は下落率の到達順に処理します。計画銘柄以外の既存建玉は、各建玉自体の価格には連動せず、計画銘柄と同じ下落率で変動する近似として扱います。前提の変更は「設定・データ」画面で行えます。</p>';
   }
   var eps = state.instruments.map(function(ins){
     return esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + "：終点 −" + MarginSim.endpointFor(state, ins).toFixed(1) + "%";
   }).join("／");
-  return '<div class="card"><h2>シナリオ前提</h2><p class="sub" style="margin-bottom:0">種別：<strong>詳細（銘柄別終点）</strong>。共通の進行度（0→100%）に対して、各銘柄が自分の終点下落率まで比例して下落します。終点：' + eps + '。' + collat + '。複数の購入段階が同じ進行度で発動する場合は、<strong>銘柄の登録順</strong>に処理します。計画銘柄以外の既存建玉は、基準パス（想定最大下落率への比例）で連動する近似のままです。終点は「購入計画」画面の各銘柄で変更できます。</p></div>';
+  return '<p class="sub" style="margin-bottom:0">種別：<strong>詳細（銘柄別終点）</strong>。共通の進行度（0→100%）に対して、各銘柄が自分の終点下落率まで比例して下落します。終点：' + eps + '。' + collat + '。複数の購入段階が同じ進行度で発動する場合は、<strong>銘柄の登録順</strong>に処理します。計画銘柄以外の既存建玉は、基準パス（想定最大下落率への比例）で連動する近似のままです。終点は「購入計画」画面の各銘柄で変更できます。</p>';
+}
+function scenarioSummaryHtml(){
+  return '<details class="card detail-card" id="premiseSummary"' + (ui.premiseOpen ? " open" : "") + '><summary aria-label="シナリオ前提の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><div class="premise-oneline">' + esc(premiseOneLine()) + '</div></div><span class="detail-toggle"><span class="label-open">前提を展開</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><h2 style="margin-top:12px;font-size:1.02rem;font-weight:900">シナリオ前提</h2>' + premiseBodyHtml() + "</div></details>";
+}
+function bindPremise(el){
+  var p = el.querySelector("#premiseSummary");
+  if (p) p.addEventListener("toggle", function(){ ui.premiseOpen = p.open; });
+}
+
+/* ---------- 簡易モードの要約と結果コメント（ステップ4・4-1） ----------
+   新しい計算は作らず、既存エンジン（MarginSim.simulate / pathEvaluate）の結果だけを要約値として返す。
+   簡易モードの表示はこの要約と、詳細モードと同じ sim（グローバル）から作るため、両モードで値は一致する */
+function dashboardSummary(st){
+  var r = MarginSim.simulate(st);
+  var path = MarginSim.pathEvaluate(st, st.settings.maxDrop);
+  return { rate: r.current.rate, balance: r.current.balance, principal: r.current.principal,
+           planCost: r.planCost, planBudget: r.planBudget,
+           firstMgmt: r.firstMgmtPrecise, firstCall: r.firstCallPrecise,
+           minRate: path.minRate, minRateDrop: path.minRateDrop, minPnl: r.minPnl };
+}
+/* 結果コメント：要約値から定型で組み立てる。断定的な助言にはせず、想定である旨と証券会社での確認を添える */
+function resultCommentText(){
+  var s = dashboardSummary(state), st = state.settings;
+  var parts = [];
+  if (s.rate === null) parts.push("現在は建玉がないため、維持率は対象外です");
+  else parts.push("現在の維持率は " + fmtPct(s.rate) + " の推計です（自主管理基準 " + st.management + "%／追証基準 " + st.marginCall + "%）");
+  if (s.firstMgmt !== null) parts.push("未実行の計画をすべて実行する前提では、自主管理基準には " + reachShort(s.firstMgmt) + " で到達する想定です");
+  else parts.push("未実行の計画をすべて実行する前提でも、想定範囲では自主管理基準に到達しない想定です");
+  if (s.firstCall !== null) parts.push("追証基準には " + reachShort(s.firstCall) + " で到達する想定です");
+  if (s.minRate !== null && s.minRateDrop !== null) parts.push("経路上の最低維持率は " + fmtPct(s.minRate) + "（" + reachShort(s.minRateDrop) + " 時点）の想定です");
+  if (s.planCost > 0) parts.push("未実行の購入計画の実購入予定額は合計 " + fmtYen(s.planCost) + " です");
+  return parts.join("。") + "。これらは本ツールの計算モデルによる想定です。実際の可否は証券会社の表示で確認してください。";
 }
 
 /* ============================================================
@@ -1576,7 +1628,7 @@ var PlanSlots = (function(){
    JSON バックアップ（書き出し／読み込み）も同じ封筒・同じ検証を通す。 */
 var state = sampleState();
 var sim = MarginSim.simulate(state);
-var ui = { view: "dashboard", selectedInsId: state.instruments[0].id, selectedDrop: null, chartScale: "auto", detailOpen: false };
+var ui = { view: "dashboard", selectedInsId: state.instruments[0].id, selectedDrop: null, chartScale: "auto", detailOpen: false, premiseOpen: false };
 
 function recalc(){ sim = MarginSim.simulate(state); scheduleSave(); }
 
@@ -1959,6 +2011,28 @@ function render(){
   else if (ui.view === "account") renderAccount();
   else renderSettings();
 }
+/* ---------- 表示モード（ステップ4・4-1）：簡易／詳細の切替 ----------
+   切替は表示と導線だけのもので、データと計算エンジンは完全に共有する。モードは settings.viewMode
+   として保存され（形式v3のまま追加した任意項目）、切替でデータを消したり変えたりはしない */
+function viewMode(){ return state.settings.viewMode === "simple" ? "simple" : "detailed"; }
+function setViewMode(m){
+  state.settings.viewMode = m === "simple" ? "simple" : "detailed";
+  recalc(); render();
+  toast(m === "simple" ? "簡易モードに切り替えました（データと計算結果は変わりません）。" : "詳細モードに切り替えました（データと計算結果は変わりません）。");
+}
+function modeSwitchHtml(){
+  var vm = viewMode();
+  return '<div class="card"><h2>表示モード</h2><p class="sub">簡易モードは最小の入力から主要な結果へ誘導する入口、詳細モードは全機能を表示します。切替は表示と導線だけのもので、データや計算結果は変わりません。</p>'
+    + '<span class="seg" role="group" aria-label="表示モード切替"><button data-mode="simple" aria-pressed="' + (vm === "simple") + '">簡易</button><button data-mode="detailed" aria-pressed="' + (vm === "detailed") + '">詳細</button></span>'
+    + (vm === "simple" ? '<p class="hint">購入段階の個別編集・シナリオ終点の個別設定・計画スロットの比較詳細・価格中継の詳細設定などは、詳細モードで表示します。</p>' : "")
+    + "</div>";
+}
+function bindModeSwitch(el){
+  el.querySelectorAll("[data-mode]").forEach(function(b){
+    guardButtonClick(b);
+    b.onclick = function(){ commitActiveInput(); if (b.getAttribute("data-mode") !== viewMode()) setViewMode(b.getAttribute("data-mode")); };
+  });
+}
 function rateStatus(rate){
   if (rate === null) return { cls: "mute", label: "対象外" };
   if (rate < state.settings.marginCall) return { cls: "danger", label: "追証基準割れ" };
@@ -2018,6 +2092,16 @@ function renderDashboard(){
         + '<div class="h-big">' + heroMain + '</div><div class="h-sub">' + heroSub + "</div></div>";
 
   html += scenarioSummaryHtml();
+
+  html += modeSwitchHtml();
+
+  if (viewMode() === "simple"){
+    html += simpleDashboardHtml(cur, st);
+    el.innerHTML = html;
+    el.querySelectorAll("[data-goto]").forEach(function(b){ b.onclick = function(){ switchView(b.getAttribute("data-goto")); }; });
+    bindPremise(el); bindModeSwitch(el);
+    return;
+  }
 
   html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
     + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
@@ -2152,6 +2236,42 @@ function renderDashboard(){
   el.querySelectorAll("tr[data-drop]").forEach(function(tr){
     tr.onclick = function(){ ui.selectedDrop = num(tr.getAttribute("data-drop")); ui.detailOpen = true; renderDashboard(); };
   });
+  bindPremise(el); bindModeSwitch(el);
+}
+/* ---------- 簡易ダッシュボード（ステップ4・4-1） ----------
+   現在の維持率、管理・追証基準への到達、購入計画の要約、結果コメント、前提サマリー（上の共通部品）、
+   詳細モードへの切替導線を1画面に集約する。表示値は詳細モードと同じ sim から作るため値は一致する */
+function simpleDashboardHtml(cur, st){
+  var brokerRate = state.account.brokerRate;
+  var dispRate = brokerRate !== null ? brokerRate : cur.rate;
+  var mgmtMarginPt = dispRate !== null ? dispRate - st.management : null;
+  var callMarginPt = dispRate !== null ? dispRate - st.marginCall : null;
+  var html = '<div class="card"><h2>結果コメント</h2><p class="sub" style="margin-bottom:0">' + esc(resultCommentText()) + "</p></div>";
+  html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
+    + kpi(brokerRate !== null ? "証券会社表示の維持率（実績）" : "現在の保証金維持率（実績から推計）", dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
+    + kpi("自主管理基準（" + st.management + "%）までの余裕", mgmtMarginPt === null ? "—" : (mgmtMarginPt >= 0 ? "+" : "−") + Math.abs(mgmtMarginPt).toFixed(1) + "<small> pt</small>", mgmtMarginPt === null ? "建玉なし" : "現在の維持率と管理基準の差", mgmtMarginPt !== null && mgmtMarginPt < 0 ? "alert" : "")
+    + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginPt === null ? "建玉なし" : "現在の維持率と追証基準の差", callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
+    + kpi("現在の信用建玉総額（実績）", fmtYen(cur.principal), "銘柄別保有＋計画銘柄以外の既存建玉の建代金合計（実績）", "")
+    + "</div>";
+  if (cur.belowMinMargin){
+    html += '<div class="notice danger"><strong>最低保証金の警告：</strong> 現在の実質保証金 ' + fmtYen(cur.balance) + ' は、最低保証金額 ' + fmtYen(st.minMargin) + ' を下回っています。制度上、新規建てには委託保証金が最低保証金額以上必要で、実質保証金がこれを下回ると回復のための差し入れが必要になります。証券会社の表示で実額をご確認ください。</div>';
+  }
+  html += otherPositionsWarningHtml(state);
+  if (state.meta.isSample){
+    html += '<div class="notice warn"><strong>サンプルデータで表示しています。</strong> 代用有価証券評価額 15,617,481円（掛目適用後）・委託保証金現金 70,309円・既存建玉 64,800円（評価損益は未入力のため補完していません）と、国内ETFのナンピン計画（累計予算 4,500,000円）です。「口座・保有状況」画面で実データに書き換えてください。ETFの計画基準価格 3,000円は仮のサンプル値です。</div>';
+  }
+  html += '<div class="card"><h2>購入計画の要約</h2><p class="sub">銘柄ごとの予算合計（未実行段階）と実購入予定額です。管理・追証基準への到達は全銘柄合算の推計で、詳細モードと同じ計算結果です。</p>';
+  if (!state.instruments.length){
+    html += '<p class="hint">銘柄が登録されていません。「購入計画」画面から登録してください。</p>';
+  }
+  state.instruments.forEach(function(ins){
+    var budget = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
+    var cost = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
+    html += '<div class="posline"><div class="posline-main"><strong>' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '</strong><span class="posline-sub">予算合計 ' + fmtYen(budget) + "／実購入予定額 " + fmtYen(cost) + '</span></div></div>';
+  });
+  html += '<p class="hint">未実行の購入予定総額（全銘柄・推計）：<strong class="num">' + fmtYen(sim.planCost) + '</strong>（予算合計 ' + fmtYen(sim.planBudget) + '）<br>管理基準（' + st.management + '%）への到達：<strong>' + (sim.firstMgmtPrecise !== null ? reachText(sim.firstMgmtPrecise) : "想定範囲では到達しません") + '</strong>／追証基準（' + st.marginCall + '%）への到達：<strong>' + (sim.firstCallPrecise !== null ? reachText(sim.firstCallPrecise) : "想定範囲では到達しません") + '</strong></p>'
+    + '<div class="rowflex"><button class="btn small" data-goto="plan">購入計画（簡易）を見る</button><button class="btn small" data-goto="account">口座・保有（簡易）を見る</button><button class="btn small" data-mode="detailed" type="button">詳細モードに切り替える</button></div></div>';
+  return html;
 }
 function kpi(label, value, note, cls){
   return '<div class="kpi ' + (cls || "") + '"><div class="k-label">' + esc(label) + '</div><div class="k-value num">' + value + '</div><div class="k-note">' + esc(note) + "</div></div>";
@@ -2236,6 +2356,7 @@ function currentInstrument(){
 function renderPlan(){
   var el = document.getElementById("view-plan");
   var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) + (isDetailedScenario(state) ? "" : "（0.1%精度）") : (isDetailedScenario(state) ? "なし（進行度100%まで）" : "なし（−" + state.settings.maxDrop + "%まで）")) + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
+  html += scenarioSummaryHtml();
   html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
   state.instruments.forEach(function(ins){
     var tot = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
@@ -2246,7 +2367,7 @@ function renderPlan(){
   var ins = currentInstrument();
   if (!ins){
     html += '<div class="card"><h2>銘柄が登録されていません</h2><p class="sub">「銘柄を追加」から登録してください。</p></div>';
-    el.innerHTML = html; bindPlanCommon(el); return;
+    el.innerHTML = html; bindPlanCommon(el); bindPremise(el); return;
   }
   var quote = PriceFeed.stock(pricesData, ins.code);
   var curChg = changePct(ins.planBasePrice, ins.closePrice);
@@ -2264,6 +2385,11 @@ function renderPlan(){
   function chgPill(v){ return v === null ? '<span class="pill mute">—</span>' : '<span class="pill ' + (v >= 0 ? "up" : "down") + '">' + (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%</span>"; }
   function fmtIdx(v){ return (v === null || v === undefined || !isFinite(v)) ? "データなし" : Number(v).toLocaleString("ja-JP", { maximumFractionDigits: 2 }); }
 
+  /* 簡易モードでは銘柄情報・参考指数の詳細編集は出さず、計画の要約に置き換える（ステップ4・4-1）。
+     一括設定と予算逆算は簡易モードでもそのまま使える */
+  if (viewMode() === "simple"){
+    html += planSimpleSummaryHtml(ins);
+  } else {
   html += '<div class="grid2" style="margin-top:14px"><div class="card" style="margin-top:0"><h2>銘柄情報' + (ins.baseIsSample ? ' <span class="badge sample">計画基準価格は仮のサンプル値</span>' : "") + '</h2>'
     + '<p class="sub">価格は3つに分けて管理します。<strong>計画基準価格</strong>はナンピン購入の判断基準（下落率の起点）で、実際に購入して平均建値が変わっても自動では変更しません。<strong>平均建値</strong>は下の「現在の保有」で入力する実績の価格、<strong>最新終値</strong>は終値データ（prices.json）から自動で取り込む現在価格です。購入トリガーは計画基準価格からの下落率です。「銘柄情報を取得」を押すと、登録済みコードでは銘柄名・区分・売買単位（ETFは1口／10口など銘柄ごとに異なります）も終値データの値に合わせて取り込みます。未登録コードで価格中継が設定されている場合は、中継から終値だけを取り込みます（銘柄名・区分・売買単位は中継では取得できません）。</p>'
     + '<div class="coderow"><div class="field" style="flex:1;min-width:0"><label class="flabel" for="f_code">銘柄コード</label><input type="text" id="f_code" value="' + esc(ins.code) + '" autocomplete="off"></div><button class="btn" id="fetchQuote" type="button">銘柄情報を取得</button></div>'
@@ -2317,6 +2443,7 @@ function renderPlan(){
         + (indexQualityNotes(ixLatest, ins.ref.name) ? '<div class="notice warn" style="margin-top:10px">' + esc(indexQualityNotes(ixLatest, ins.ref.name)) + "</div>" : "")
         + '<p class="hint">' + ((ixLatest || ixBase) ? "終値データ（prices.json）から自動表示しています。" : "この指数の終値データは未取得のため、手入力値で騰落率を計算します。") + "</p>")
     + "</div></div>";
+  }
 
   /* ---------- 購入計画の一括設定（第5節） ---------- */
   if (!ui.bulk) ui.bulk = { total: 1000000, start: 5, end: 65, step: 5, mode: "equal" };
@@ -2352,9 +2479,11 @@ function renderPlan(){
   /* ---------- リスクから逆算（ステップ1・v1.9） ---------- */
   html += reverseSectionHtml(ins);
 
-  /* ---------- 計画の比較・保存（ステップ2・v2.0） ---------- */
-  html += slotsSectionHtml(ins);
+  /* ---------- 計画の比較・保存（ステップ2・v2.0）：比較の詳細は詳細モードでのみ表示する ---------- */
+  if (viewMode() !== "simple") html += slotsSectionHtml(ins);
 
+  /* ---------- 購入段階の個別編集：詳細モードでのみ表示する ---------- */
+  if (viewMode() !== "simple"){
   var sorted = ins.stages.slice().sort(function(a, b){ return a.dropPct - b.dropPct; });
   html += '<div class="card"><h2>ナンピン購入計画（' + esc(normalizeCode(ins.code)) + " " + esc(ins.name) + '）</h2>'
     + '<p class="sub">購入数量は売買単位（' + ins.unit + '）で切り捨て、実購入額が予算を超えないように計算します。想定価格は計画基準価格×(1−下落率)を円未満切り捨て。実際に購入した段階は「実行済み」にすると実績として記録され、将来シミュレーションでは再購入しません（実績は上の「現在の保有」へ反映して管理します）。未実行の段階は実行済みの実績を残したまま自由に変更できます。</p>'
@@ -2411,13 +2540,29 @@ function renderPlan(){
   var planCostIns = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
   var execAmountIns = ins.stages.filter(function(s){ return s.executed; }).reduce(function(a, s){ return a + (s.execAmount || 0); }, 0);
   html += '</div><p class="hint">この銘柄の今後の計画：予算合計 <strong class="num">' + fmtYen(planBudgetIns) + '</strong>／実購入予定合計 <strong class="num">' + fmtYen(planCostIns) + '</strong>（差は売買単位への丸めによる未使用分）' + (execAmountIns > 0 ? '／実行済みの実購入額合計 <strong class="num">' + fmtYen(execAmountIns) + "</strong>（実績・シミュレーション対象外）" : "") + "</p></div>";
+  }
   el.innerHTML = html;
   bindPlanCommon(el);
-  bindInstrumentForm(el, ins);
-  bindStages(el, ins);
+  bindPremise(el); bindModeSwitch(el);
+  if (viewMode() !== "simple"){ bindInstrumentForm(el, ins); bindStages(el, ins); bindSlots(el, ins); }
   bindBulk(el, ins);
   bindReverse(el, ins);
-  bindSlots(el, ins);
+}
+/* ---------- 計画の要約（簡易モード・ステップ4） ----------
+   選択中銘柄の要約表示。値は詳細モードと同じ sim.stageRes から作るため一致する */
+function planSimpleSummaryHtml(ins){
+  var planBudgetIns = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ return a + s.budget; }, 0);
+  var planCostIns = ins.stages.filter(function(s){ return s.enabled && !s.executed; }).reduce(function(a, s){ var r = sim.stageRes[s.id]; return a + (r ? r.cost : 0); }, 0);
+  var execCount = ins.stages.filter(function(s){ return s.executed; }).length;
+  return '<div class="card"><h2>計画の要約（' + esc(normalizeCode(ins.code) || "コード未設定") + " " + esc(ins.name) + '）</h2>'
+    + '<dl class="kv"><dt>計画基準価格</dt><dd class="num">' + fmtYen(ins.planBasePrice) + "</dd>"
+    + "<dt>最新終値</dt><dd class='num'>" + (ins.closePrice !== null ? fmtYen(ins.closePrice) : "未取得") + "</dd>"
+    + "<dt>未実行の購入段階</dt><dd class='num'>" + ins.stages.filter(function(s){ return !s.executed; }).length + "段階</dd>"
+    + "<dt>実行済みの購入段階</dt><dd class='num'>" + execCount + "段階</dd>"
+    + "<dt>予算合計（未実行）</dt><dd class='num'>" + fmtYen(planBudgetIns) + "</dd>"
+    + "<dt>実購入予定合計</dt><dd class='num'>" + fmtYen(planCostIns) + "</dd></dl>"
+    + '<p class="hint">購入段階の個別編集・シナリオ終点の設定・銘柄情報の詳細編集・計画スロットの比較は詳細モードで表示します。下の「購入計画の一括設定」と「リスクから逆算」は簡易モードでも使えます。</p>'
+    + '<div class="rowflex"><button class="btn small" data-mode="detailed" type="button">詳細モードに切り替える</button></div></div>';
 }
 /* ---------- リスクから逆算セクション（プレビュー専用。入力値は保存データに含めない） ---------- */
 function reverseSectionHtml(ins){
@@ -3006,7 +3151,7 @@ function refreshMinibar(){
 function renderAccount(){
   var el = document.getElementById("view-account"), a = state.account, cur = sim.current;
   var hcInfo = collateralHaircutInfo(a);
-  var html = '<div class="card"><h2>口座情報</h2><p class="sub">代用有価証券評価額は<strong>掛目適用後の評価額を直接入力</strong>する方式が標準です。入力方式を切り替えると、適用前の時価と掛目（%）から適用後評価額を自動計算することもできます。どちらの方式でも、計算には常に適用後の評価額を使います。</p>'
+  var html = scenarioSummaryHtml() + '<div class="card"><h2>口座情報</h2><p class="sub">代用有価証券評価額は<strong>掛目適用後の評価額を直接入力</strong>する方式が標準です。入力方式を切り替えると、適用前の時価と掛目（%）から適用後評価額を自動計算することもできます。どちらの方式でも、計算には常に適用後の評価額を使います。</p>'
     + '<div class="formgrid c3">'
     + fld("証券会社名", '<input type="text" id="a_broker" value="' + esc(a.broker) + '" placeholder="例：○○証券" autocomplete="off">')
     + fld("代用有価証券の入力方式", '<select id="a_basis"><option value="after"' + (hcInfo.mode === "after" ? " selected" : "") + '>適用後の評価額を直接入力（標準）</option><option value="before"' + (hcInfo.mode === "before" ? " selected" : "") + ">適用前の時価と掛目から計算</option></select>")
@@ -3032,6 +3177,12 @@ function renderAccount(){
     + (a.brokerRate !== null && cur.rate !== null ? '<dt>証券会社表示との差</dt><dd class="num">' + (a.brokerRate - cur.rate >= 0 ? "+" : "−") + Math.abs(a.brokerRate - cur.rate).toFixed(1) + " pt（計算モデルが異なるため差が生じます）</dd>" : "")
     + "</dl></div>";
 
+  /* 簡易モードでは建玉の個別編集は出さず、件数と建代金合計の要約に置き換える（ステップ4・4-1）。
+     口座の基本項目（上の口座情報カード）は簡易モードでも編集できる */
+  if (viewMode() === "simple"){
+    var totPSimple = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
+    html += '<div class="card"><h2>計画銘柄以外の既存建玉（要約）</h2><p class="sub">登録件数 ' + state.positions.length + '件／建代金合計 <strong class="num">' + fmtYen(totPSimple) + '</strong>（銘柄別保有の建代金合計は <strong class="num">' + fmtYen(cur.holdingsPrincipal) + '</strong>）。建玉の追加・個別編集は詳細モードで表示します。</p>' + otherPositionsWarningHtml(state) + '<div class="rowflex mt"><button class="btn small" data-mode="detailed" type="button">詳細モードに切り替える</button></div></div>';
+  } else {
   html += '<div class="card"><h2>計画銘柄以外の既存建玉</h2><p class="sub">購入計画の対象銘柄<strong>以外</strong>で、すでに保有している信用建玉を登録します。計画対象銘柄の保有は「購入計画」画面の銘柄ごとの「現在の保有」で管理してください。<strong>同じ建玉を両方に登録すると二重計上になります。</strong>全体の計算では、銘柄別保有とここの建玉を合算します。評価損益は空欄（未入力）にできます。その場合シミュレーションでは概算として扱い、勝手な値で補完しません。</p>'
     + '<div class="rowflex"><button class="btn primary small" id="addPos">＋ 建玉を追加</button></div><div id="posList">';
   state.positions.forEach(function(p){
@@ -3046,7 +3197,9 @@ function renderAccount(){
   });
   var totP = state.positions.reduce(function(s, p){ return s + p.principal; }, 0);
   html += '</div><p class="hint">計画銘柄以外の既存建玉の建代金合計：<strong class="num">' + fmtYen(totP) + '</strong>／銘柄別保有の建代金合計：<strong class="num">' + fmtYen(cur.holdingsPrincipal) + '</strong>（担保は銘柄ごとに重複計上せず、口座全体で一度だけ計算します）</p>' + otherPositionsWarningHtml(state) + "</div>";
+  }
   el.innerHTML = html;
+  bindPremise(el); bindModeSwitch(el);
 
   function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderAccount(); }); }
   on("#a_broker", function(n){ a.broker = n.value.trim().slice(0, 60); state.meta.isSample = false; });
@@ -3075,6 +3228,7 @@ function renderAccount(){
   on("#a_unsettled", function(n){ var v = n.value === "" ? NaN : num(n.value, NaN); a.unsettledPnl = isFinite(v) ? clamp(v, -1e12, 1e12) : null; state.meta.isSample = false; });
   on("#a_brokerRate", function(n){ a.brokerRate = n.value === "" ? null : num(n.value, NaN); if (!isFinite(a.brokerRate)) a.brokerRate = null; });
   on("#a_updated", function(n){ state.meta.updatedAt = n.value.trim(); });
+  if (viewMode() !== "simple"){
   guardButtonClick(el.querySelector("#addPos"));
   el.querySelector("#addPos").onclick = function(){
     commitActiveInput();
@@ -3103,6 +3257,7 @@ function renderAccount(){
       });
     });
   });
+  }
 }
 </script>
 <script>
@@ -3110,8 +3265,12 @@ function renderAccount(){
 /* ================= 設定・データ管理 ================= */
 function renderSettings(){
   var el = document.getElementById("view-settings"), s = state.settings;
+  var simple = viewMode() === "simple";
   var html = '<div class="grid2 wide"><div>'
-    + '<div class="card" style="margin-top:14px"><h2>シミュレーション設定</h2><p class="sub">これらは証券会社の制度そのものではなく、本ツールの計算に使う変更可能なパラメータです。実際の制度条件は証券会社にご確認ください。</p>'
+    + modeSwitchHtml()
+    + scenarioSummaryHtml()
+    + (simple ? '<div class="card"><h2>詳細設定について</h2><p class="sub">シミュレーション設定（閾値・担保の連動・シナリオ種別など）と価格中継の詳細設定は、結果を変える設定のため詳細モードでのみ表示します。下のデータ管理（バックアップの書き出し・読み込み）は簡易モードでも使えます。</p></div>' : "")
+    + (simple ? "" : '<div class="card" style="margin-top:14px"><h2>シミュレーション設定</h2><p class="sub">これらは証券会社の制度そのものではなく、本ツールの計算に使う変更可能なパラメータです。実際の制度条件は証券会社にご確認ください。</p>'
     + '<div class="formgrid">'
     + fld("自主管理基準（%）", '<input type="number" id="s_mgmt" min="0" max="100" step="0.5" value="' + s.management + '">')
     + fld("追証基準（%）", '<input type="number" id="s_call" min="0" max="100" step="0.5" value="' + s.marginCall + '">')
@@ -3130,14 +3289,14 @@ function renderSettings(){
     + '<p class="hint"><strong>担保の下落の起点について：</strong>担保の下落は現在の評価額を起点に計算します。計画の下落率は計画基準価格が起点で、起点が異なります（上の「担保の価格変動条件」は、現在の代用評価額が市場の下落に対してどの割合で連動するかの想定です）。</p>'
     + '<p class="hint"><strong>控除費用について：</strong>控除費用は、委託手数料・買方金利・貸株料など、保証金から差し引かれる費用の見込み額を入れる欄です。配当落調整金は買建では受け取りのため控除しません（売建では支払いになります）。現金（委託保証金現金）の入力に既に反映済みの分は二重に入れないでください。</p>'
     + '<p class="hint"><strong>評価損益の保証金算入方法（SBI証券公式ルール準拠）：</strong>委託保証金率の計算では、評価損益合計がマイナス（損）の場合のみ差し引き、プラス（益）の場合はゼロとして計算します。そのため本ツールでも、維持率の分子では建玉評価損益を min(評価損益, 0) として扱い、<strong>評価益は維持率に算入しません</strong>（従来の「評価益も算入する」方式から変更しました。ダッシュボード等での評価損益そのものの表示は、従来どおりプラスも表示します）。この算入方法は制度に合わせた固定仕様のため、設定では切り替えません。</p>'
-    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。実質保証金 ＝ 保証金現金 ＋ 代用評価額 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '。新規建てには委託保証金が最低保証金額（初期値300,000円・上で変更可能）以上必要で、実質保証金がこれを下回ると差し入れが必要になるため、現在値とシミュレーション各行で警告します。' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? "現在、口座画面で入力した受渡未到来の決済損益（" + fmtSignedYen(state.account.unsettledPnl) + "）が、下落率で変動しない固定額として実質保証金に加わっています。" : "口座画面で受渡未到来の決済損益を入力した場合は、その金額が下落率で変動しない固定額として実質保証金に加わります（未入力の場合は加わりません）。") + '</p></div>'
+    + '<p class="hint">計算式：維持率 ＝（代用評価額 ＋ 保証金現金 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '）÷ 建代金合計 × 100。建玉がない場合は「対象外」と表示します。実質保証金 ＝ 保証金現金 ＋ 代用評価額 ＋ min(建玉評価損益, 0) − 控除費用' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? " ＋ 受渡未到来の決済損益" : "") + '。新規建てには委託保証金が最低保証金額（初期値300,000円・上で変更可能）以上必要で、実質保証金がこれを下回ると差し入れが必要になるため、現在値とシミュレーション各行で警告します。' + (state.account.unsettledPnl !== null && state.account.unsettledPnl !== undefined ? "現在、口座画面で入力した受渡未到来の決済損益（" + fmtSignedYen(state.account.unsettledPnl) + "）が、下落率で変動しない固定額として実質保証金に加わっています。" : "口座画面で受渡未到来の決済損益を入力した場合は、その金額が下落率で変動しない固定額として実質保証金に加わります（未入力の場合は加わりません）。") + '</p></div>')
 
-    + '<div class="card"><h2>価格中継（任意コード取得）</h2><p class="sub">終値データ（prices.json）に登録されていない銘柄コードでも、価格中継から終値を取得できるようにします。登録済みコードは従来どおり prices.json を優先し、中継は使いません。中継URLはこの端末のアプリデータ内にだけ保存されます。URLを空欄にすると中継は無効になります。</p>'
+    + (simple ? "" : '<div class="card"><h2>価格中継（任意コード取得）</h2><p class="sub">終値データ（prices.json）に登録されていない銘柄コードでも、価格中継から終値を取得できるようにします。登録済みコードは従来どおり prices.json を優先し、中継は使いません。中継URLはこの端末のアプリデータ内にだけ保存されます。URLを空欄にすると中継は無効になります。</p>'
     + fld("中継URL", '<input type="text" id="relay_url" value="' + esc(s.relayUrl || "") + '" placeholder="https://…workers.dev" autocomplete="off" inputmode="url">')
     + '<div class="rowflex mt"><button class="btn small" id="relayTestBtn" type="button">中継をテスト</button><button class="btn small" id="relayResetBtn" type="button">初期値に戻す</button><span class="hint" id="relayTestResult" role="status" style="margin-top:0"></span></div>'
     + '<p class="hint">中継へ送るのは銘柄コードだけです。口座情報・保有情報は送りません。</p>'
     + '<p class="hint">銘柄名・区分・売買単位は中継では取得できません（登録情報または手入力を使ってください）。</p>'
-    + '<p class="hint">初期値：' + esc(DEFAULT_RELAY_URL) + '。https:// で始まるURLだけを保存できます。それ以外を入力した場合は除去され、中継は無効になります。</p></div>'
+    + '<p class="hint">初期値：' + esc(DEFAULT_RELAY_URL) + '。https:// で始まるURLだけを保存できます。それ以外を入力した場合は除去され、中継は無効になります。</p></div>')
 
     + '<div class="card"><h2>データ管理</h2><p class="sub">入力したデータは、この端末のブラウザ内（IndexedDB）に形式バージョン付きで自動保存され、再起動後も自動で復元されます。保存先はこの端末・このブラウザ内のみで、他の端末とは同期されません。機種変更やブラウザのデータ消去に備えて、JSONバックアップも併用してください。</p>'
     + '<p class="hint" id="persistInfo">' + esc(persistInfoText()) + "</p>"
@@ -3173,6 +3332,7 @@ function renderSettings(){
     + '<button class="btn" id="runTests">テストを実行</button><div id="testResults"></div></div>'
     + "</div></div>";
   el.innerHTML = html;
+  bindPremise(el); bindModeSwitch(el);
 
   function on(id, fn){ var n = el.querySelector(id); if (n) n.addEventListener("change", function(){ fn(n); recalc(); renderSettings(); if (ui.view === "settings") toast("設定を反映しました。"); }); }
   on("#s_mgmt", function(n){ s.management = clamp(num(n.value, 25), 0, 100); });
@@ -3657,8 +3817,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.1" && SW_CACHE_NAME === "nanpin-planner-v20",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.1／SW v20");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.2／SW v21");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -4064,26 +4224,26 @@ function runSelfTests(){
     && Math.abs(r78.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r78.firstCallPrecise - 77.6) < 0.051
     && Array.isArray(s78.instruments[0].slots) && s78.instruments[0].slots.length === 0,
     "サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変。サンプルのスロットは空で、既存の計算結果に影響しない");
-  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1。版は v2.1／SW v20）。
-     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
+  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1。版は v2.2／SW v21）。
+     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
      （埋め込み表示など）ではバージョン定数の一致をもって可能な範囲の確認とする */
-  var sw79ok = APP_VERSION === "2.1" && SW_CACHE_NAME === "nanpin-planner-v20";
+  var sw79ok = APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21";
   var sw79src = "";
   try {
     var xhr79 = new XMLHttpRequest();
-    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
+    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
     xhr79.send(null);
     if ((xhr79.status === 200 || xhr79.status === 0) && xhr79.responseText) sw79src = String(xhr79.responseText);
   } catch (e79) { sw79src = ""; }
   var sw79fileChecked = !!sw79src;
   if (sw79fileChecked){
-    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v20") >= 0
+    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v21") >= 0
       && /new Request\(e\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw79src)
       && sw79src.indexOf("isNavigation") >= 0;
   }
   t("Service Workerのページ取得がキャッシュ再検証を指定する", sw79ok,
-    "アプリ v2.1／SWキャッシュ名 nanpin-planner-v20" + (sw79fileChecked
-      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIwIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMe+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjAg44G45pu05paw77yI6Kmz57Sw5LiL6JC944K344OK44Oq44Kq44Gu6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v20"
+    "アプリ v2.2／SWキャッシュ名 nanpin-planner-v21" + (sw79fileChecked
+      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v21"
       : "。この環境では生成物ファイルを読めないため、バージョン定数の一致で確認（実ファイルの内容確認は公開版で行う）"));
   /* 80 計画比較セクションの注記が現在の想定最大下落率を動的に表示する（v2.0.1・修正2） */
   var s80 = sanitizeState(sampleState());
@@ -4198,6 +4358,63 @@ function runSelfTests(){
     && r87.rows.every(function(r){ return Math.abs(r.progress - r.drop / 80) < 1e-9 && Math.abs(r.dropsByIns["dA"] - r.drop / 2) < 1e-9; })
     && (first87 === null || Math.abs(first87 * 10 - Math.round(first87 * 10)) < 1e-9),
     "基準パス−40%（進行度50%）ではAの下落率は終点の半分 −20%、Bは −40% になり、全行で進行度と銘柄別下落率が比例関係を保つ。到達下落率（基準パス）は0.1%刻みの格子上の値で返る");
+  /* 88 表示モード（ステップ4）：項目のない旧データは「詳細」に補完され、簡易はJSON往復で保持され、不正値は「詳細」に倒れる。データ形式は v3 のまま */
+  var old88 = sampleState(); delete old88.settings.viewMode;
+  var mig88 = sanitizeState(old88);
+  var s88 = sanitizeState(sampleState()); s88.settings.viewMode = "simple";
+  var round88 = unpackState(packState(s88));
+  var bad88 = sampleState(); bad88.settings.viewMode = "weird";
+  t("表示モードが旧データでは詳細に補完され簡易がJSON往復で保持される", mig88.settings.viewMode === "detailed"
+    && round88.ok && round88.state.settings.viewMode === "simple"
+    && sanitizeState(bad88).settings.viewMode === "detailed" && DATA_VERSION === 3,
+    "viewMode 項目のない旧データ・旧JSONは「詳細（detailed）」で補完され、既存利用者の見た目は変わらない。「簡易（simple）」は封筒に包んだJSON往復で保持され、不正な値は「詳細」に倒れる。データ形式バージョンは3のまま（移行なし）");
+  /* 89 モード切替でデータが変わらない：保存データはモード項目以外同一で、計算結果（到達・実購入予定額・経路最低維持率）が両モードで一致する */
+  var s89a = sanitizeState(sampleState());
+  var sim89a = MarginSim.simulate(s89a); var path89a = MarginSim.pathEvaluate(s89a, 80);
+  var s89b = sanitizeState(JSON.parse(JSON.stringify(s89a))); s89b.settings.viewMode = "simple";
+  var sim89b = MarginSim.simulate(s89b); var path89b = MarginSim.pathEvaluate(s89b, 80);
+  function strip89(st){ var c = JSON.parse(JSON.stringify(st)); delete c.settings.viewMode; return JSON.stringify(c); }
+  t("モード切替でデータと計算結果が変わらない", strip89(s89a) === strip89(s89b)
+    && sim89a.planCost === sim89b.planCost && sim89a.planBudget === sim89b.planBudget
+    && sim89a.firstMgmtPrecise === sim89b.firstMgmtPrecise && sim89a.firstCallPrecise === sim89b.firstCallPrecise
+    && path89a.minRate === path89b.minRate && path89a.minRateDrop === path89b.minRateDrop,
+    "詳細モードと簡易モードで、保存データは viewMode 項目以外が完全一致し、実購入予定額・予算合計・管理／追証基準の到達・経路上の最低維持率とその下落率もすべて一致する（モードは表示・導線だけに効く）");
+  /* 90 簡易モードの要約値（現在維持率・到達・実購入予定額）が詳細モードの値と一致し、回帰値も不変 */
+  var s90 = sanitizeState(sampleState());
+  var sum90 = dashboardSummary(s90);
+  var sim90 = MarginSim.simulate(s90);
+  t("簡易モードの要約値が詳細モードの値と一致する", sum90.rate === sim90.current.rate && sum90.balance === sim90.current.balance
+    && sum90.planCost === sim90.planCost && sum90.planBudget === sim90.planBudget
+    && sum90.firstMgmt === sim90.firstMgmtPrecise && sum90.firstCall === sim90.firstCallPrecise
+    && sum90.planCost === 4493550 && Math.abs(sum90.firstMgmt - 76.6) < 0.051 && Math.abs(sum90.firstCall - 77.6) < 0.051,
+    "簡易ダッシュボードの要約（dashboardSummary）は既存エンジンの結果そのもので、現在維持率・実質保証金・実購入予定額 4,493,550円・管理基準到達 −76.6%／追証基準到達 −77.6% が詳細モードの表示値と一致する");
+  /* 91 前提サマリー（ステップ4・4-2）：初期表示は要点1行（銘柄別終点を含まない）で、展開すると全前提が表示される */
+  var savedState91 = state, savedSim91 = sim;
+  var s91 = sanitizeState(sampleState());
+  s91.settings.scenarioType = "perInstrument"; s91.settings.scenarioEndpoints = { "1308": 40 };
+  state = s91; sim = MarginSim.simulate(s91);
+  var line91 = premiseOneLine();
+  var html91 = scenarioSummaryHtml();
+  state = savedState91; sim = savedSim91;
+  t("前提サマリーの初期表示が要点1行で展開すると全前提が表示される", html91.indexOf("<details") === 0 && html91.indexOf('class="premise-oneline"') >= 0
+    && line91.indexOf("\n") < 0 && line91.indexOf("1308") < 0 && line91.indexOf("詳細シナリオ") >= 0 && line91.indexOf("担保は市場下落の") >= 0
+    && html91.indexOf("終点 −40.0%") >= 0 && html91.indexOf("銘柄の登録順") >= 0 && html91.indexOf("近似") >= 0 && html91.indexOf("連動割合と終点下落率の2つの表現") >= 0,
+    "折りたたみ部品（details）の初期表示は「前提：詳細シナリオ（銘柄別終点）／担保は市場下落の100%連動（終点 −80%）」の要点1行のみで、銘柄コードや銘柄別終点は含まない（銘柄数が増えても1行に収まる）。展開部にはシナリオ種別・各銘柄の終点（1308 は −40.0%）・担保の両表現・同時到達は銘柄の登録順・計画外建玉の近似まで全前提が入る");
+  /* 92 結果コメントは既存エンジンの結果から定型で組み立てられ、想定である旨と証券会社での確認を含む */
+  var savedState92 = state, savedSim92 = sim;
+  state = sanitizeState(sampleState()); sim = MarginSim.simulate(state);
+  var cmt92 = resultCommentText();
+  var rate92 = sim.current.rate;
+  state = savedState92; sim = savedSim92;
+  t("結果コメントがエンジン結果から組み立てられ注意文を含む", cmt92.indexOf("現在の維持率は " + fmtPct(rate92)) >= 0
+    && cmt92.indexOf("4,493,550円") >= 0 && cmt92.indexOf("想定です") >= 0
+    && cmt92.indexOf("実際の可否は証券会社の表示で確認してください") >= 0,
+    "コメントは新しい計算を作らず、現在の維持率・到達・経路上の最低維持率・実購入予定額（サンプルでは 4,493,550円）など既存エンジンの結果から定型で組み立てる。断定的な助言にはせず「〜の想定です」とし、「実際の可否は証券会社の表示で確認してください」の注意を必ず含む");
+  /* 93 バージョン v2.2／SW v21 と既存サンプルの回帰値（ステップ4でも計算エンジン・サンプルは無変更） */
+  var r93 = MarginSim.simulate(sanitizeState(sampleState()));
+  t("アプリ v2.2／SW nanpin-planner-v21 で回帰値が不変", APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21"
+    && r93.planCost === 4493550 && Math.abs(r93.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r93.firstCallPrecise - 77.6) < 0.051,
+    "アプリ v2.2／Service Workerキャッシュ名 nanpin-planner-v21。サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変");
   return T;
 }
 
