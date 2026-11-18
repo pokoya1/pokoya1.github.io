@@ -1,6 +1,6 @@
-/* テクニカル抽出実験室 v0.3 — Service Worker
+/* テクニカル抽出実験室 v0.4 — Service Worker
    オフライン起動用。キャッシュ名はこのアプリ専用。 */
-var CACHE_NAME = 'technical-lab-v0.3';
+var CACHE_NAME = 'technical-lab-v0.4';
 var CORE = [
   './index.html',
   './manifest.webmanifest',
