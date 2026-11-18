@@ -1,6 +1,6 @@
 /* 信用ナンピン計画・リスク管理 Service Worker（オフライン用キャッシュ）
    GitHub Pages 等に単独配置した場合に有効。Muse の埋め込み表示では登録できないことがあります。 */
-var CACHE = "nanpin-planner-v19";
+var CACHE = "nanpin-planner-v20";
 var CORE = ["./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
@@ -26,7 +26,8 @@ self.addEventListener("fetch", function (e) {
      使えない場合に限りキャッシュから返す（オフライン起動は従来どおり維持する）。
      取得できた応答はキャッシュも更新しておき、次回のオフライン起動に備える。
      v2.0.1：取得はキャッシュ再検証（cache: "no-cache"）を指定し、ブラウザのHTTPキャッシュが
-     古い文書を返すことを防ぐ。再検証で変更がなければサーバーの 304 応答で済むため転送量は増えない */
+     古い文書を返すことを防ぐ。再検証で変更がなければサーバーの 304 応答で済むため転送量は増えない。
+     v2.1：キャッシュ名を nanpin-planner-v20 へ更新（詳細下落シナリオの追加に伴う版上げ） */
   var isNavigation = e.request.mode === "navigate";
   var isIndexDocument = /(^|\/)index\.html([?#]|$)/.test(e.request.url) || /\/$/.test(new URL(e.request.url).pathname);
   if (isNavigation || isIndexDocument) {
