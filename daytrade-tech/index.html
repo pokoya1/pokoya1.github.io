@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <title>テクニカル抽出実験室</title>
+    <style>
+      :root {
+        --bg: #f6f3ec; --surface: #fffdf8; --surface2: #efe9dc; --ink: #26231d; --muted: #6f695c;
+        --line: #ddd4c2; --accent: #17615a; --accent-ink: #ffffff; --amber: #a86f14;
+        --up: #cf4b32; --down: #2f6db3; --ok: #1e7a46; --ng: #b3372c; --warn-bg: #fdf3d8;
+        --chip: #ece5d3; --shadow: 0 1px 3px rgba(60,50,20,.12);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #131917; --surface: #1c2320; --surface2: #242c28; --ink: #e9e5d9; --muted: #a39c8b;
+          --line: #39423c; --accent: #3d9c8d; --accent-ink: #0d1512; --amber: #d9a441;
+          --up: #e0684e; --down: #5b93d6; --ok: #4cc07a; --ng: #e0684e; --warn-bg: #33301c;
+          --chip: #2a332e; --shadow: 0 1px 3px rgba(0,0,0,.4);
+        }
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light dark; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+        font-size: 15px; line-height: 1.65; }
+      button, select, input[type="text"], input[type="number"] { min-height: 2.25rem; font: inherit; }
+      button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+        border-radius: 8px; padding: .35rem .8rem; }
+      button:hover { border-color: var(--accent); }
+      button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+      button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+      button:disabled { opacity: .45; cursor: not-allowed; }
+      select { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: .3rem .5rem; }
+      .wrap { max-width: 1180px; margin: 0 auto; padding: 1rem clamp(.8rem, 3vw, 1.6rem) 3rem; }
+      h1 { font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif; font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+        margin: .4rem 0 .2rem; letter-spacing: .04em; }
+      h2 { font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 1.18rem; margin: 0 0 .6rem;
+        border-bottom: 2px solid var(--accent); padding-bottom: .3rem; }
+      h3 { font-size: 1rem; margin: 1rem 0 .4rem; }
+      section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        padding: 1rem 1.1rem 1.1rem; margin: 1rem 0; box-shadow: var(--shadow); }
+      .sub { color: var(--muted); font-size: .88rem; }
+      .ver { display: inline-block; background: var(--chip); border-radius: 999px; padding: .05rem .6rem; font-size: .78rem; vertical-align: middle; }
+      .caution { background: var(--warn-bg); border: 1px solid var(--line); border-radius: 10px; padding: .6rem .9rem; font-size: .88rem; }
+      .caution li { margin: .15rem 0; }
+      ul.tight { margin: .3rem 0 .3rem 1.1rem; padding: 0; }
+      /* master switch */
+      .master { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+      .switch { position: relative; display: inline-flex; align-items: center; gap: .7rem; cursor: pointer; padding: .4rem 0; min-height: 2.75rem; }
+      .switch input { appearance: none; -webkit-appearance: none; width: 3.4rem; height: 2rem; margin: 0; cursor: pointer; flex: none;
+        border-radius: 999px; background: var(--surface2); border: 1px solid var(--line); position: relative; transition: background .15s; }
+      .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 1.55rem; height: 1.55rem; border-radius: 50%;
+        background: var(--surface); border: 1px solid var(--line); transition: left .15s; }
+      .switch input:checked { background: var(--accent); }
+      .switch input:checked::after { left: calc(3.4rem - 1.55rem - 5px); }
+      .switch input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+      .master-state { font-weight: 700; font-size: 1.05rem; }
+      .master-state.on { color: var(--ok); } .master-state.off { color: var(--ng); }
+      .off-banner { display: none; border: 1.5px dashed var(--ng); color: var(--ng); border-radius: 10px;
+        padding: .6rem .9rem; font-weight: 700; margin-top: .6rem; }
+      body.engine-off .off-banner { display: block; }
+      body.engine-off .needs-engine { opacity: .45; pointer-events: none; }
+      /* controls */
+      .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+      .row + .row { margin-top: .6rem; }
+      label.chk { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .4rem; min-height: 2.25rem; cursor: pointer; }
+      label.chk input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+      .file-label { display: inline-flex; align-items: center; border: 1px dashed var(--accent); border-radius: 8px;
+        padding: .35rem .8rem; min-height: 2.25rem; cursor: pointer; color: var(--accent); font-weight: 700; }
+      .error { color: var(--ng); font-weight: 700; white-space: pre-wrap; }
+      .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .86rem; }
+      .num { font-variant-numeric: tabular-nums; }
+      /* counts */
+      .counts { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .5rem; }
+      .count-chip { background: var(--chip); border-radius: 8px; padding: .2rem .6rem; font-size: .85rem; }
+      .count-chip b { font-size: 1rem; }
+      .anchor-ok { color: var(--ok); font-weight: 700; }
+      /* chart */
+      #chart { width: 100%; height: 430px; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+      input[type="range"] { flex: 1 1 220px; min-height: 2.25rem; accent-color: var(--accent); }
+      .legend { display: flex; flex-wrap: wrap; gap: .8rem; font-size: .82rem; color: var(--muted); margin-top: .4rem; }
+      .legend i { display: inline-block; width: .9rem; height: .9rem; border-radius: 2px; vertical-align: -1px; margin-right: .25rem; }
+      /* rules */
+      .cat-block { border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; margin-top: .7rem; }
+      .cat-head { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; }
+      .cat-name { font-weight: 700; }
+      .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .2rem .8rem; margin-top: .3rem; }
+      .rule-grid label.chk { flex-wrap: wrap; min-width: 0; }
+      .rule-grid .cnt { color: var(--muted); font-size: .82rem; }
+      /* events */
+      .ev-list { display: flex; flex-direction: column; gap: .45rem; }
+      .ev-row { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: baseline; text-align: left; width: 100%;
+        border: 1px solid var(--line); border-radius: 10px; padding: .55rem .8rem; background: var(--surface); }
+      .ev-row.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+      .ev-time { color: var(--muted); font-size: .85rem; min-width: 8.5rem; }
+      .ev-name { font-weight: 700; }
+      .badge { border-radius: 999px; padding: .02rem .55rem; font-size: .78rem; font-weight: 700; }
+      .b-confirmed { background: #dcefe2; color: #14532d; } .b-forming { background: #fdf3d8; color: #7a5410; }
+      .b-approximate { background: #e8e2f2; color: #4c3a75; } .b-expired { background: #ececec; color: #555; }
+      @media (prefers-color-scheme: dark) {
+        .b-confirmed { background: #173d28; color: #7fe0a8; } .b-forming { background: #3d3413; color: #ecd28a; }
+        .b-approximate { background: #2e2748; color: #c3b2ec; } .b-expired { background: #333; color: #bbb; }
+      }
+      .score { margin-left: auto; font-weight: 700; }
+      /* detail table */
+      table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+      th, td { border: 1px solid var(--line); padding: .35rem .5rem; text-align: left; vertical-align: top; }
+      th { background: var(--surface2); }
+      td.num, th.num { text-align: right; }
+      .pass { color: var(--ok); font-weight: 700; } .fail { color: var(--ng); font-weight: 700; }
+      .miss-chip { display: inline-block; background: var(--warn-bg); border: 1px solid var(--amber); color: var(--ink);
+        border-radius: 999px; padding: .05rem .6rem; font-size: .8rem; margin: .1rem .2rem .1rem 0; }
+      .table-scroll { overflow-x: auto; }
+      .report p, .report li { font-size: .93rem; }
+      .kbd-note { font-size: .85rem; color: var(--muted); }
+      @media (max-width: 640px) {
+        #chart { height: 340px; }
+        .ev-time { min-width: 0; }
+        .score { margin-left: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.1 ／ 工程2〜4</span></h1>
+        <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
+        <div class="caution">
+          <ul class="tight">
+            <li><b>適合度スコアは形状・条件への一致度</b>であり、勝率や予測確率ではありません。</li>
+            <li>イベントの「方向」は<b>伝統的な解釈</b>であり、予測ではありません。</li>
+            <li>閾値と重みは<b>工学的仮定</b>です。伝統的定義の唯一の正解ではありません。</li>
+            <li>条件付き収益率などの観測は<b>探索的</b>なもので、予測力の証明にはなりません。</li>
+          </ul>
+        </div>
+      </header>
+
+      <section aria-labelledby="h-master">
+        <h2 id="h-master">検出エンジンの接続（マスタースイッチ）</h2>
+        <div class="master">
+          <div>
+            <div class="master-state on" id="masterState">接続中：検出を実行します</div>
+            <p class="sub" style="margin:.25rem 0 0;">懸念対策として、検出器は生成・表示側から<b>内部的に切り離せる独立モジュール</b>にしました。OFFにすると検出器は<b>実行自体をされず</b>、チャートは生のローソク足だけに戻ります（表示フィルタではありません）。ランダムウォークではクロスや包み足などが大量に検出されるため、切り離して観察したいときに使ってください。ルール単位・カテゴリ単位のON/OFFも下の節にあります。</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="masterToggle" checked aria-label="検出エンジンの接続・切断" />
+            <span>検出エンジン</span>
+          </label>
+        </div>
+        <div class="off-banner">検出エンジンは切断中です。イベント一覧・詳細・書き出しは停止しています。チャートとデータ読み込みは使えます。</div>
+      </section>
+
+      <section aria-labelledby="h-data">
+        <h2 id="h-data">データ入力</h2>
+        <div class="row">
+          <button id="btnSampleExt" class="primary">組み込みサンプル：拡張モデル seed 42</button>
+          <button id="btnSampleGbm">組み込みサンプル：純GBM seed 7</button>
+          <label class="file-label" for="fileInput">CSV / JSONファイルを読み込む</label>
+          <input type="file" id="fileInput" accept=".csv,.json,text/csv,application/json" hidden />
+        </div>
+        <p class="sub">JSONは <span class="mono">{seed, config, bars}</span> 形式またはバーの配列。CSVは <span class="mono">day,minute,open,high,low,close,volume</span> を含むヘッダー行が必要です（株価生成エンジン実験室の書き出し形式に対応）。</p>
+        <p class="mono" id="dataInfo">—</p>
+        <p class="sub" id="internalNote"></p>
+        <p class="error" id="dataError" role="alert"></p>
+        <div class="needs-engine">
+          <h3>検出サマリー（検証アンカー）</h3>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルールでの検出結果です。拡張モデル seed 42 を全期間・全ルールONで実行すると、正本（Node）の実測 <b>総数310件</b> と一致しなければなりません。</p>
+          <div class="counts" id="anchorSummary"></div>
+          <p class="mono" id="anchorCheck"></p>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-chart">
+        <h2 id="h-chart">チャートと時点スライダー</h2>
+        <div class="row">
+          <label>転換点（ZigZag）尺度
+            <select id="zzScale">
+              <option value="1">×1</option>
+              <option value="2" selected>×2（既定）</option>
+              <option value="3">×3</option>
+            </select>
+          </label>
+          <label class="chk"><input type="checkbox" id="zzShow" checked /> 転換点の折れ線を表示</label>
+          <button id="btnFullRange">全期間に戻す</button>
+        </div>
+        <div class="row">
+          <span class="mono" id="sliderLabel">現在時点：—</span>
+        </div>
+        <div class="row">
+          <input type="range" id="timeSlider" min="1" step="1" value="566" aria-label="時点スライダー（この時点までの足で検出を再実行）" />
+        </div>
+        <canvas id="chart" width="1000" height="430" aria-label="ローソク足チャート"></canvas>
+        <div class="legend">
+          <span><i style="background:var(--up)"></i>陽線</span>
+          <span><i style="background:var(--down)"></i>陰線</span>
+          <span><i style="background:#d9a441"></i>SMA5</span>
+          <span><i style="background:#8a7f63"></i>SMA20</span>
+          <span><i style="background:var(--accent)"></i>ZigZag確定点</span>
+          <span>候補（未確定）点は破線・別色 ／ 薄い帯は過去足（ウォームアップ）、濃い部分が当日足（day=0）</span>
+        </div>
+        <p class="sub">スライダーを動かすと、その時点までの足（prefix）だけで表示と検出を再実行します。未来足を隠した状態を再現するため、確定済みイベントが後から書き換わることはありません。チャートはスライダー時点を右端とする最大200本を表示します。</p>
+      </section>
+
+      <section aria-labelledby="h-rules" class="needs-engine">
+        <h2 id="h-rules">ルールON/OFF（実行の切り替え）</h2>
+        <p class="sub">OFFにしたルールは<b>実行自体をしません</b>。下の「状態フィルタ」とは別物です。カテゴリ単位の一括切替もできます。</p>
+        <div id="rulePanel"></div>
+        <h3>状態フィルタ（表示の絞り込み）</h3>
+        <div class="row" id="stateFilters">
+          <label class="chk"><input type="checkbox" class="state-filter" value="confirmed" checked /> 成立（confirmed）</label>
+          <label class="chk"><input type="checkbox" class="state-filter" value="forming" checked /> 形成中（forming）</label>
+          <label class="chk"><input type="checkbox" class="state-filter" value="approximate" /> 近似（approximate）</label>
+          <label class="chk"><input type="checkbox" class="state-filter" value="expired" /> 失効（expired）</label>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-events" class="needs-engine">
+        <h2 id="h-events">イベント一覧</h2>
+        <p class="mono" id="eventCount">—</p>
+        <div class="ev-list" id="eventList"></div>
+      </section>
+
+      <section aria-labelledby="h-detail" class="needs-engine">
+        <h2 id="h-detail">イベント詳細</h2>
+        <div id="detailPanel"><p class="sub">一覧の行を選ぶと、条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴を表示します。ダブル系を選ぶとチャートにネックラインと3転換点も描きます。</p></div>
+      </section>
+
+      <section aria-labelledby="h-export" class="needs-engine">
+        <h2 id="h-export">書き出し</h2>
+        <div class="row">
+          <button id="btnExportJson">イベント一覧をJSONで保存</button>
+          <button id="btnExportCsv">イベント一覧をCSVで保存</button>
+        </div>
+        <p class="sub">現在の一覧（状態フィルタ適用後）を書き出します。検出時点・ルール・状態・適合度・条件内訳・解説を含みます。</p>
+      </section>
+
+      <section aria-labelledby="h-verify">
+        <h2 id="h-verify">検証</h2>
+        <h3>アプリ内チェック（その場で実行）</h3>
+        <div class="row"><button id="btnRunChecks" class="primary">チェックを実行</button></div>
+        <div id="checkResults"><p class="sub">現在のデータで、①同一入力の2回実行が完全一致すること、②検出の前後で入力データが不変であること、を確認します。</p></div>
+        <h3>Node正本の検証実績（静的記録）</h3>
+        <ul class="tight">
+          <li>単体・未来情報・スケール不変性テスト：<b>19/19 合格</b>（手計算可能な指標、典型成立・不成立・近似例、閾値境界、ゼロ値幅、欠測、未確定足、日またぎ、prefix一致、価格スケール不変性）。</li>
+          <li>未来情報テスト：prefixのみの実行結果と全データ実行の同時点までのイベント履歴が一致。確定イベントは未来足の追加で変更されません。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数310件・ルール別件数が、この画面の表示と一致すること。</li>
+        </ul>
+        <h3>バッチ測定の要約（Node正本・拡張モデル1000日、history=500、当日足のみ集計）</h3>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ルール</th><th class="num">1日あたり件数</th><th>ルール</th><th class="num">1日あたり件数</th></tr></thead>
+            <tbody>
+              <tr><td>十字線</td><td class="num">11.8</td><td>赤三兵</td><td class="num">0.6</td></tr>
+              <tr><td>長い下ヒゲ</td><td class="num">8.6</td><td>SMAクロス（強気／弱気）</td><td class="num">2.0 ／ 2.1</td></tr>
+              <tr><td>強気包み足</td><td class="num">9.3</td><td>RSI進入（売られすぎ／買われすぎ）</td><td class="num">0.8 ／ 0.8</td></tr>
+              <tr><td>ダブルトップ</td><td class="num">0.27</td><td>ダブルボトム</td><td class="num">0.26</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="sub">純GBMでも各1000日で測定済み。ランダムウォーク相手では単純な形状ルールが1日に何件も出ることが分かります。これらの頻度や条件付き収益率は<b>探索的な観測であり、予測力の証明ではありません</b>。頻度だけを理由に成立条件は緩めていません。</p>
+      </section>
+
+      <section aria-labelledby="h-report" class="report">
+        <h2 id="h-report">実装・検証レポート（2026-11-18）</h2>
+        <h3>実装内容</h3>
+        <ul class="tight">
+          <li>工程2：入力アダプター（時刻順・有限値・正価格・OHLC関係・出来高を検証し、variance/jumps等の内部情報は型の段階で落とす）、共通数学部品（実体・ヒゲ・TR・ATR14＝Wilder平滑、SMA、EMA、RSI14、標準偏差、回帰傾き、最高・最安）、終値ベースの因果的ZigZag（尺度×1/×2/×3、反転閾値は判定時点のATR×倍率、確定点は不変、最後の点は候補のみ）。</li>
+          <li>工程3：ルール登録方式の共通判定機構。ルールは id・version・name・category・family・lookback・parameters・evaluate を持つ独立モジュールで、追加時にcoreの変更は不要。必須条件と加点条件を分け、加重平均で適合度（0〜100）を算出。状態は confirmed / forming / approximate / expired 等を区別し、パターンの終了時刻と検出可能時刻を分けています。</li>
+          <li>工程4：仮ルール10種（十字線、長い下ヒゲ、強気包み足、赤三兵、ダブルトップ、ダブルボトム、SMA5/20強気・弱気クロス、RSI14売られすぎ・買われすぎ進入）と、この実験室UI（読み込み、チャート、時点スライダー、ON/OFF、詳細、全件一覧、JSON/CSV出力）。</li>
+        </ul>
+        <h3>計画への改良として採用した点</h3>
+        <ul class="tight">
+          <li><b>懸念対策のマスタースイッチ</b>：検出器を内部モジュールとして分離し、接続/切断のON/OFFを付けました。OFFでは検出を実行せず、大量検出に埋もれず生チャートを観察できます。ルール別・カテゴリ別のON/OFFも「表示フィルタではなく実行の切替」として実装しています。</li>
+          <li>バッチ測定は生成条件を実験室と揃え、history=500 のウォームアップ付きで当日足のみ集計（Node正本で実施）。</li>
+          <li>ダブル系の「直前の上昇/下落」は「第1極値が直前20本の最高（最安）終値であること」と数式化し、加点条件として明示。ZigZagの閾値ATRは反転判定を行う現在の足の値で固定。ダブル系の既定尺度は×2。RSIは再発火ヒステリシス（売られすぎは35、買われすぎは65に戻るまで再発火しない）を明文化。</li>
+          <li>転換点の3尺度同時表示はせず、選択中の尺度だけを表示（既定×2）。</li>
+        </ul>
+        <h3>検証結果（実測）</h3>
+        <ul class="tight">
+          <li>組み込み検出器はNode正本と同一コードで、検証アンカー（拡張 seed 42：総数310件、包み足101・十字線86・下ヒゲ75・クロス強気18／弱気17・RSI買われすぎ5／売られすぎ4・赤三兵2・ダブルトップ1・ダブルボトム1）に一致することを組み込み前にNodeで確認済み。この画面のサマリーでも同じ値を表示します。</li>
+          <li>Node正本：単体・未来情報・スケール不変性テスト19/19合格。バッチは純GBM／拡張モデル各1000日を測定（要約表は上の節）。</li>
+          <li>アプリ内チェック（再現性・入力不変）は上の節でその場で実行できます。</li>
+        </ul>
+        <h3>問題点・未検証</h3>
+        <ul class="tight">
+          <li>ランダムウォーク相手では十字線・下ヒゲ・包み足が1日に合計約30件出ます（バッチ実測）。一覧は状態フィルタ既定（成立＋形成中）でも多く、ルールOFFやマスター切断で切り離せるようにしましたが、工程6の重複排除・頻度整理は未実施です。</li>
+          <li>ダブル系はZigZag尺度に強く依存します。尺度を変えると候補が大きく変わるため、較正は工程6の課題です。</li>
+          <li>検出後1/3/6足の条件付き収益率は、この画面では表示していません（バッチ側の観測項目として工程6で日単位集約・ブートストラップと併せて扱う想定）。</li>
+          <li>Service Workerの登録状態と実機（スマホ）での表示は、ビルド環境からは直接確認できない項目があります。</li>
+        </ul>
+        <h3>アドバイス（次工程への提案）</h3>
+        <ul class="tight">
+          <li>工程5の180ルール着手前に、まず工程6側の「重複排除と頻度の物差し」を先に固めるのが安全です。ルールを増やすほどランダムデータでの誤検出も増えるためです。</li>
+          <li>反省ノート（工程7）では、適合度ではなく「独立した内容の数」で代表候補を選ぶ設計が既に計画にあるので、この実験室のイベントIDと状態遷移履歴をそのまま引き渡し形式に使うのがよいです。</li>
+          <li>マスタースイッチの考え方はゲーム統合（工程8）でも有効です。本番では「判定レイヤーを切って価格だけを眺める」デバッグ経路として残すことを勧めます。</li>
+        </ul>
+      </section>
+
+      <footer>
+        <p class="sub">テクニカル抽出実験室 v0.1 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+      </footer>
+    </div>
+
+    <script>
+'use strict';
+/* ===== 正本コード1：価格生成エンジン（exportを外して埋め込み。ロジック無変更） ===== */
+// Synthetic market, v0.1. Time unit: trading year.
+function generate(seed=1, options={}) {
+  const c={base:null, regimes:true, season:true, jumps:true, volume:true,
+    lambda:1, jumpSD:.008, history:500, ...options};
+  if(!Number.isInteger(c.history)||c.history<0||c.history>5000||
+    !Number.isFinite(c.lambda)||c.lambda<0||c.lambda>100||
+    !Number.isFinite(c.jumpSD)||c.jumpSD<0||c.jumpSD>.2||
+    (c.base!==null&&(!Number.isFinite(c.base)||c.base<0||c.base>3))) throw Error('Invalid settings');
+  function rng(s){return ()=>{s=(s+0x6D2B79F5)|0;let t=s;
+    t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)+.5;};}
+  const stream=k=>{const r=rng((Number(seed)^k)|0);return ()=>r()/4294967296};
+  const p=stream(11), v=stream(29), j=stream(47), w=stream(71);
+  const normal=u=>Math.sqrt(-2*Math.log(u()))*Math.cos(2*Math.PI*u());
+  const dt=1/(252*3960), h=c.lambda/3960;
+  const kappa=Math.expm1(c.jumpSD*c.jumpSD/2);
+  const days=Math.ceil(c.history/66)+1, bars=[];
+  let S=10000;
+  for(let d=0;d<days;d++){
+    const base=c.base??(.2+.6*v()); let state=1;
+    for(let b=0;b<66;b++){
+      const day=d-days+1, minute=b<30?540+5*b:750+5*(b-30);
+      let O=S,H=S,L=S,V=0,variance=0,jumps=0;
+      for(let t=0;t<60;t++){
+        if(c.regimes&&v()<1-Math.exp(-5/1800)){
+          state=(state+(v()<.5?1:2))%3;
+        }
+        const x=(b*60+t)/3960;
+        const f=c.season?(.75+.65*Math.exp(-x/.065)+.5*Math.exp(-(1-x)/.065)+.25*Math.exp(-Math.abs(x-30/66)/.025)):1;
+        const sigma=base*f*(c.regimes?[.5,1,2.5][state]:1);
+        let r=-.5*sigma*sigma*dt+sigma*Math.sqrt(dt)*normal(p);
+        if(c.jumps){let n=0,prod=j(),limit=Math.exp(-h);
+          while(prod>limit){n++;prod*=j();}
+          r+=-h*kappa;for(let a=0;a<n;a++)r+=c.jumpSD*normal(j);jumps+=n;
+        }
+        S*=Math.exp(r); H=Math.max(H,S);L=Math.min(L,S);
+        variance+=sigma*sigma*dt;
+        if(c.volume)V+=Math.round(100*f*(1+Math.min(10,Math.abs(r)/.001))*Math.exp(.3*normal(w)-.045));
+      }
+      bars.push({day,minute,open:O,high:H,low:L,close:S,volume:V,
+        variance,jumps,complete:true});
+    }
+  }
+  return {seed,config:c,bars:bars.slice(-(c.history+66))};
+}
+
+function adaptBars(rawBars, meta = {}) {
+  if (!Array.isArray(rawBars) || rawBars.length === 0) throw new Error('empty input');
+  const volumeDeclaredOff = meta && meta.config && meta.config.volume === false;
+  const bars = rawBars.map((b, i) => {
+    const bar = {
+      index: i,
+      day: b.day ?? 0,
+      minute: b.minute ?? null,
+      open: +b.open, high: +b.high, low: +b.low, close: +b.close,
+      volume: volumeDeclaredOff ? null : (b.volume == null ? null : +b.volume),
+      complete: b.complete !== false,
+    };
+    return bar;
+  });
+  let volumeMissing = volumeDeclaredOff;
+  if (!volumeDeclaredOff && bars.every(b => b.volume === 0)) { bars.forEach(b => b.volume = null); volumeMissing = true; }
+  const errors = [];
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    for (const k of ['open', 'high', 'low', 'close']) if (!Number.isFinite(b[k])) errors.push(`bar ${i}: ${k} not finite`);
+    if (b.low > Math.min(b.open, b.close)) errors.push(`bar ${i}: low > min(open,close)`);
+    if (b.high < Math.max(b.open, b.close)) errors.push(`bar ${i}: high < max(open,close)`);
+    if (b.low <= 0) errors.push(`bar ${i}: non-positive price`);
+    if (b.volume != null && b.volume < 0) errors.push(`bar ${i}: negative volume`);
+    if (i > 0) {
+      const p = bars[i - 1];
+      if (b.day < p.day || (b.day === p.day && b.minute != null && p.minute != null && b.minute <= p.minute)) errors.push(`bar ${i}: not in time order`);
+    }
+  }
+  if (errors.length) throw new Error('invalid bars: ' + errors.slice(0, 5).join('; '));
+  return { bars, volumeMissing };
+}
+
+function computeFeatures(bars) {
+  const n = bars.length;
+  const F = {
+    body: new Array(n), upper: new Array(n), lower: new Array(n), range: new Array(n),
+    bodyRatio: new Array(n).fill(null), dir: new Array(n),
+    tr: new Array(n), atr14: new Array(n).fill(null),
+    sma5: new Array(n).fill(null), sma20: new Array(n).fill(null),
+    ema12: new Array(n).fill(null), ema26: new Array(n).fill(null),
+    rsi14: new Array(n).fill(null), sd20: new Array(n).fill(null),
+    slope20: new Array(n).fill(null), hi20: new Array(n).fill(null), lo20: new Array(n).fill(null),
+  };
+  const closes = bars.map(b => b.close);
+  const sma = (arr, i, p) => { if (i < p - 1) return null; let s = 0; for (let k = i - p + 1; k <= i; k++) s += arr[k]; return s / p; };
+  let ema12 = null, ema26 = null, atr = null, avgGain = null, avgLoss = null;
+  for (let i = 0; i < n; i++) {
+    const b = bars[i];
+    F.body[i] = Math.abs(b.close - b.open);
+    F.upper[i] = b.high - Math.max(b.open, b.close);
+    F.lower[i] = Math.min(b.open, b.close) - b.low;
+    F.range[i] = b.high - b.low;
+    F.bodyRatio[i] = F.range[i] > 0 ? F.body[i] / F.range[i] : null;
+    F.dir[i] = Math.sign(b.close - b.open);
+    F.tr[i] = i === 0 ? F.range[i] : Math.max(F.range[i], Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close));
+    if (i === 13) { let s = 0; for (let k = 0; k <= 13; k++) s += F.tr[k]; atr = s / 14; }
+    else if (i > 13) atr = (13 * atr + F.tr[i]) / 14;
+    if (i >= 13) F.atr14[i] = atr;
+    F.sma5[i] = sma(closes, i, 5);
+    F.sma20[i] = sma(closes, i, 20);
+    if (i === 11) ema12 = sma(closes, i, 12);
+    else if (i > 11) ema12 = ema12 + (2 / 13) * (closes[i] - ema12);
+    if (i >= 11) F.ema12[i] = ema12;
+    if (i === 25) ema26 = sma(closes, i, 26);
+    else if (i > 25) ema26 = ema26 + (2 / 27) * (closes[i] - ema26);
+    if (i >= 25) F.ema26[i] = ema26;
+    if (i >= 1) {
+      const d = closes[i] - closes[i - 1], g = Math.max(d, 0), l = Math.max(-d, 0);
+      if (i === 14) { let sg = 0, sl = 0; for (let k = 1; k <= 14; k++) { const dd = closes[k] - closes[k - 1]; sg += Math.max(dd, 0); sl += Math.max(-dd, 0); } avgGain = sg / 14; avgLoss = sl / 14; }
+      else if (i > 14) { avgGain = (13 * avgGain + g) / 14; avgLoss = (13 * avgLoss + l) / 14; }
+      if (i >= 14) F.rsi14[i] = (avgGain === 0 && avgLoss === 0) ? 50 : (avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+    }
+    if (i >= 19) {
+      const m = F.sma20[i]; let v = 0; for (let k = i - 19; k <= i; k++) v += (closes[k] - m) ** 2;
+      F.sd20[i] = Math.sqrt(v / 20);
+      let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = 20;
+      for (let k = 0; k < p; k++) { const x = k, y = closes[i - p + 1 + k]; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+      F.slope20[i] = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+      let hi = -Infinity, lo = Infinity; for (let k = i - 19; k <= i; k++) { hi = Math.max(hi, bars[k].high); lo = Math.min(lo, bars[k].low); }
+      F.hi20[i] = hi; F.lo20[i] = lo;
+    }
+  }
+  return F;
+}
+
+function zigzag(bars, F, k) {
+  const closes = bars.map(b => b.close);
+  const pivots = [];
+  let mode = 'undetermined';
+  let candHigh = { index: 0, price: closes[0] }, candLow = { index: 0, price: closes[0] };
+  let candidate = null;
+  for (let i = 0; i < bars.length; i++) {
+    const c = closes[i], atr = F.atr14[i];
+    if (mode === 'undetermined') {
+      if (c > candHigh.price) candHigh = { index: i, price: c };
+      if (c < candLow.price) candLow = { index: i, price: c };
+      if (atr != null && atr > 0) {
+        if (c >= candLow.price + k * atr) { pivots.push({ ...candLow, type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c }; }
+        else if (c <= candHigh.price - k * atr) { pivots.push({ ...candHigh, type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c }; }
+      }
+    } else if (mode === 'seekHigh') {
+      if (c > candHigh.price) candHigh = { index: i, price: c };
+      candidate = { ...candHigh, type: 'high' };
+      if (atr != null && atr > 0 && c <= candHigh.price - k * atr) { pivots.push({ ...candHigh, type: 'high', confirmedIndex: i }); mode = 'seekLow'; candLow = { index: i, price: c }; candidate = null; }
+    } else {
+      if (c < candLow.price) candLow = { index: i, price: c };
+      candidate = { ...candLow, type: 'low' };
+      if (atr != null && atr > 0 && c >= candLow.price + k * atr) { pivots.push({ ...candLow, type: 'low', confirmedIndex: i }); mode = 'seekHigh'; candHigh = { index: i, price: c }; candidate = null; }
+    }
+  }
+  if (mode === 'seekHigh') candidate = { ...candHigh, type: 'high' };
+  if (mode === 'seekLow') candidate = { ...candLow, type: 'low' };
+  return { pivots, candidate };
+}
+
+const RULES = [];
+function registerRule(rule) { RULES.push(rule); return rule; }
+function crit(name, measured, threshold, pass, match, weight, mandatory) {
+  return { name, measured, threshold, pass: !!pass, match: match == null ? (pass ? 1 : 0) : Math.max(0, Math.min(1, match)), weight, mandatory: !!mandatory };
+}
+function scoreOf(criteria) {
+  let sw = 0, s = 0; for (const c of criteria) { sw += c.weight; s += c.weight * c.match; }
+  return sw > 0 ? Math.round(100 * s / sw) : null;
+}
+function makeEvent(rule, o) {
+  const missing = o.criteria.filter(c => c.mandatory && !c.pass).map(c => c.name);
+  return {
+    eventId: `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version,
+    state: o.state, score: o.score, direction: o.direction ?? null,
+    startIndex: o.startIndex, endIndex: o.endIndex, detectedIndex: o.detectedIndex,
+    criteria: o.criteria, missingCriteria: missing, overlays: o.overlays ?? [],
+    explanation: o.explanation, history: o.history ?? [{ state: o.state, index: o.detectedIndex }],
+    parameters: rule.parameters,
+  };
+}
+const fmt = (x, d = 2) => x == null ? '—' : (+x).toFixed(d);
+
+registerRule({
+  id: 'doji', version: '0.1', name: '十字線', category: 'candlestick', family: 'single-bar', lookback: 1,
+  parameters: { bodyRatioMax: 0.1, approxBodyRatioMax: 0.2 },
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0 || F.bodyRatio[i] == null) continue;
+      const br = F.bodyRatio[i];
+      const cs = [crit('値幅が正', F.range[i], '>0', true, 1, 1, true),
+                  crit('実体/値幅 ≤ 0.1', br, P.bodyRatioMax, br <= P.bodyRatioMax, 1 - br / 0.5, 3, true)];
+      if (br <= P.bodyRatioMax) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `実体/値幅=${fmt(br, 3)}（閾値0.1以下）で十字線が成立。方向性は示さない形状。` }));
+      else if (br <= P.approxBodyRatioMax) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `実体/値幅=${fmt(br, 3)}で十字線に近似（成立閾値0.1は未達）。` }));
+    }
+    return ev;
+  }
+});
+
+registerRule({
+  id: 'long-lower-shadow', version: '0.1', name: '長い下ヒゲ', category: 'candlestick', family: 'single-bar', lookback: 1,
+  parameters: { lowerVsBody: 2, lowerVsRange: 0.6, approxLowerVsBody: 1.5, approxLowerVsRange: 0.5 },
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 0; i < bars.length; i++) {
+      if (!bars[i].complete || F.range[i] <= 0) continue;
+      const lo = F.lower[i], bo = F.body[i], ra = F.range[i];
+      const ratioBody = bo > 0 ? lo / bo : (lo > 0 ? Infinity : 0), ratioRange = lo / ra;
+      const cs = [crit('下ヒゲ ≥ 実体×2', ratioBody === Infinity ? 99 : ratioBody, P.lowerVsBody, ratioBody >= P.lowerVsBody, Math.min(1, ratioBody / 3), 2, true),
+                  crit('下ヒゲ ≥ 値幅×0.6', ratioRange, P.lowerVsRange, ratioRange >= P.lowerVsRange, ratioRange, 2, true)];
+      if (ratioBody >= P.lowerVsBody && ratioRange >= P.lowerVsRange) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `下ヒゲ=${fmt(lo)}円（実体の${fmt(ratioBody, 1)}倍、値幅の${fmt(ratioRange * 100, 0)}%）で長い下ヒゲが成立。伝統的には下値での買い意欲のサインと解釈される（予測ではない）。` }));
+      else if (ratioBody >= P.approxLowerVsBody && ratioRange >= P.approxLowerVsRange) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `下ヒゲは実体の${fmt(ratioBody, 1)}倍・値幅の${fmt(ratioRange * 100, 0)}%で、長い下ヒゲに近似（成立条件未達）。` }));
+    }
+    return ev;
+  }
+});
+
+registerRule({
+  id: 'bullish-engulfing', version: '0.1', name: '強気包み足', category: 'candlestick', family: 'two-bar', lookback: 2,
+  parameters: { approxCoverRatio: 0.8 },
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete || !bars[i - 1].complete) continue;
+      const p = bars[i - 1], c = bars[i];
+      if (!(F.dir[i - 1] < 0 && F.dir[i] > 0)) continue;
+      const prevBodyTop = p.open, prevBodyBot = p.close, prevBody = prevBodyTop - prevBodyBot;
+      if (prevBody <= 0) continue;
+      const coverTop = c.close - prevBodyTop, coverBot = prevBodyBot - c.open;
+      const coverRatio = Math.min(c.close, prevBodyTop) - Math.max(c.open, prevBodyBot);
+      const full = coverTop >= 0 && coverBot >= 0;
+      const cs = [crit('前足が陰線', F.dir[i - 1], -1, true, 1, 1, true),
+                  crit('当足が陽線', F.dir[i], 1, true, 1, 1, true),
+                  crit('実体が前実体を包含', Math.min(coverTop, coverBot), 0, full, full ? 1 : Math.max(0, coverRatio / prevBody), 3, true)];
+      if (full) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陽線の実体（${fmt(c.open)}〜${fmt(c.close)}円）が前陰線の実体（${fmt(prevBodyBot)}〜${fmt(prevBodyTop)}円）を包含し、強気包み足が成立。` }));
+      else if (coverRatio / prevBody >= P.approxCoverRatio) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `実体の被覆率は${fmt(coverRatio / prevBody * 100, 0)}%で完全包含に届かず近似。` }));
+    }
+    return ev;
+  }
+});
+
+registerRule({
+  id: 'three-soldiers', version: '0.1', name: '赤三兵', category: 'candlestick', family: 'three-bar', lookback: 13,
+  parameters: { bodyRatioMin: 0.5, upperRatioMax: 0.25, contextBars: 10 },
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 2; i < bars.length; i++) {
+      const idx = [i - 2, i - 1, i];
+      if (!idx.every(j => bars[j].complete && F.dir[j] > 0 && F.range[j] > 0)) continue;
+      if (!(bars[i - 1].close > bars[i - 2].close && bars[i].close > bars[i - 1].close)) continue;
+      const openInPrevBody = j => bars[j].open >= Math.min(bars[j - 1].open, bars[j - 1].close) && bars[j].open <= Math.max(bars[j - 1].open, bars[j - 1].close);
+      if (!(openInPrevBody(i - 1) && openInPrevBody(i))) continue;
+      const brOK = idx.every(j => F.bodyRatio[j] >= P.bodyRatioMin), upOK = idx.every(j => F.upper[j] / F.range[j] <= P.upperRatioMax);
+      let contextPass = null, slopePrev = null;
+      if (i - 2 - P.contextBars >= 0) {
+        const j0 = i - 2 - P.contextBars, j1 = i - 3;
+        let sx = 0, sy = 0, sxy = 0, sxx = 0; const p = j1 - j0 + 1;
+        for (let k = 0; k < p; k++) { const x = k, y = bars[j0 + k].close; sx += x; sy += y; sxy += x * y; sxx += x * x; }
+        slopePrev = (p * sxy - sx * sy) / (p * sxx - sx * sx);
+        contextPass = slopePrev <= 0;
+      }
+      const cs = [crit('3陽線・終値上昇・始値が直前実体内', 1, 1, true, 1, 2, true),
+                  crit('各実体/値幅 ≥ 0.5', Math.min(...idx.map(j => F.bodyRatio[j])), P.bodyRatioMin, brOK, Math.min(...idx.map(j => F.bodyRatio[j])), 2, true),
+                  crit('各上ヒゲ/値幅 ≤ 0.25', Math.max(...idx.map(j => F.upper[j] / F.range[j])), P.upperRatioMax, upOK, 1 - Math.max(...idx.map(j => F.upper[j] / F.range[j])), 1, true),
+                  crit('前方の下落文脈（10本回帰傾き ≤ 0）', slopePrev, 0, contextPass === true, contextPass == null ? null : (contextPass ? 1 : 0), 1, false)];
+      const shapeOK = brOK && upOK;
+      if (shapeOK && contextPass === true) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `3本連続陽線で終値が上昇し、前方の下落文脈も確認でき、赤三兵が成立。` }));
+      else if (shapeOK) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `形状は赤三兵だが、前方の下落文脈が${contextPass == null ? '判定不能（データ不足）' : '確認できない'}ため近似とする。` }));
+    }
+    return ev;
+  }
+});
+
+function crossRule(id, name, bullish) {
+  return {
+    id, version: '0.1', name, category: 'trend', family: 'moving-average', lookback: 21, parameters: {},
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [];
+      for (let i = 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const a0 = F.sma5[i - 1], b0 = F.sma20[i - 1], a1 = F.sma5[i], b1 = F.sma20[i];
+        if (a0 == null || b0 == null || a1 == null || b1 == null) continue;
+        const hit = bullish ? (a0 <= b0 && a1 > b1) : (a0 >= b0 && a1 < b1);
+        if (!hit) continue;
+        const sep = F.atr14[i] > 0 ? Math.abs(a1 - b1) / F.atr14[i] : 0;
+        const cs = [crit(bullish ? '前時点 SMA5 ≤ SMA20' : '前時点 SMA5 ≥ SMA20', a0 - b0, 0, true, 1, 1, true),
+                    crit(bullish ? '現時点 SMA5 > SMA20' : '現時点 SMA5 < SMA20', a1 - b1, 0, true, Math.min(1, sep + 0.3), 2, true)];
+        ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: bullish ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, overlays: [{ type: 'sma', index: i }], explanation: `SMA5（${fmt(a1)}円）がSMA20（${fmt(b1)}円）を${bullish ? '上抜け' : '下抜け'}した${bullish ? '強気' : '弱気'}クロス。伝統的なトレンド転換の解釈であり予測ではない。` }));
+      }
+      return ev;
+    }
+  };
+}
+registerRule(crossRule('sma-cross-bullish', 'SMA5/20 強気クロス', true));
+registerRule(crossRule('sma-cross-bearish', 'SMA5/20 弱気クロス', false));
+
+function rsiRule(id, name, oversold) {
+  return {
+    id, version: '0.1', name, category: 'oscillator', family: 'rsi', lookback: 15,
+    parameters: oversold ? { enter: 30, rearm: 35 } : { enter: 70, rearm: 65 },
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [], P = this.parameters;
+      let armed = true;
+      for (let i = 1; i < bars.length; i++) {
+        const r0 = F.rsi14[i - 1], r1 = F.rsi14[i];
+        if (r0 == null || r1 == null) continue;
+        if (!armed) { if (oversold ? r1 >= P.rearm : r1 <= P.rearm) armed = true; else continue; }
+        if (!bars[i].complete) continue;
+        const hit = oversold ? (r0 >= P.enter && r1 < P.enter) : (r0 <= P.enter && r1 > P.enter);
+        if (!hit) continue;
+        armed = false;
+        const cs = [crit(oversold ? 'RSI14 が 30 未満へ進入' : 'RSI14 が 70 超へ進入', r1, P.enter, true, Math.min(1, Math.abs(r1 - P.enter) / 10 + 0.3), 2, true)];
+        ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `RSI14 が ${fmt(r0, 1)} → ${fmt(r1, 1)} と${oversold ? '30未満（売られすぎ圏）' : '70超（買われすぎ圏）'}へ進入。伝統的解釈であり予測ではない。再発火は RSI が ${P.rearm} に戻るまで抑止する。` }));
+      }
+      return ev;
+    }
+  };
+}
+registerRule(rsiRule('rsi-oversold', 'RSI14 売られすぎ進入', true));
+registerRule(rsiRule('rsi-overbought', 'RSI14 買われすぎ進入', false));
+
+function doubleRule(id, name, top) {
+  return {
+    id, version: '0.1', name, category: 'pattern', family: 'double', lookback: 90,
+    parameters: { zigzagScale: 2, proxAtr: 0.5, depthAtr: 1.5, minGap: 2, maxGap: 30, expireBars: 30, trendBars: 20 },
+    evaluate(ctx) {
+      const { bars, F } = ctx, P = this.parameters, ev = [];
+      const zz = ctx.zigzags[P.zigzagScale];
+      if (!zz) return ev;
+      const piv = zz.pivots, closes = bars.map(b => b.close);
+      const t1 = top ? 'high' : 'low', t2 = top ? 'low' : 'high';
+      for (let s = 0; s + 2 < piv.length; s++) {
+        const p1 = piv[s], mid = piv[s + 1], p2 = piv[s + 2];
+        if (!(p1.type === t1 && mid.type === t2 && p2.type === t1)) continue;
+        const atr2 = F.atr14[p2.index];
+        if (atr2 == null || atr2 <= 0) continue;
+        const prox = Math.abs(p2.price - p1.price), depth = top ? Math.min(p1.price, p2.price) - mid.price : mid.price - Math.max(p1.price, p2.price);
+        const gap1 = mid.index - p1.index, gap2 = p2.index - mid.index;
+        let trendPass = false;
+        if (p1.index >= P.trendBars - 1) {
+          let ext = top ? -Infinity : Infinity;
+          for (let k = p1.index - P.trendBars + 1; k <= p1.index; k++) ext = top ? Math.max(ext, closes[k]) : Math.min(ext, closes[k]);
+          trendPass = Math.abs(ext - p1.price) < 1e-9;
+        }
+        const cs = [crit('2極値の近似（差 ≤ ATR×0.5）', prox / atr2, P.proxAtr, prox <= P.proxAtr * atr2, 1 - Math.min(1, prox / atr2 / P.proxAtr) * 0.5, 30, true),
+                    crit(top ? '谷の深さ ≥ ATR×1.5' : '山の高さ ≥ ATR×1.5', depth / atr2, P.depthAtr, depth >= P.depthAtr * atr2, Math.min(1, depth / atr2 / P.depthAtr), 25, true),
+                    crit('転換点間隔 2〜30本', Math.max(gap1, gap2), P.maxGap, gap1 >= P.minGap && gap1 <= P.maxGap && gap2 >= P.minGap && gap2 <= P.maxGap, 1, 15, true),
+                    crit(top ? '直前傾向：第1高値が直前20本の最高終値' : '直前傾向：第1安値が直前20本の最安終値', trendPass ? 1 : 0, 1, trendPass, trendPass ? 1 : 0, 10, false),
+                    crit(top ? 'ネックライン終値下抜け' : 'ネックライン終値上抜け', null, mid.price, false, 0, 20, true)];
+        const shapePass = cs[0].pass && cs[1].pass && cs[2].pass;
+        if (!shapePass) continue;
+        const neck = mid.price, limit = Math.min(bars.length - 1, p2.confirmedIndex + P.expireBars);
+        let outcome = null;
+        for (let j = p2.confirmedIndex + 1; j <= limit; j++) {
+          if (top ? closes[j] > Math.max(p1.price, p2.price) : closes[j] < Math.min(p1.price, p2.price)) { outcome = { kind: 'expired', index: j }; break; }
+          if (top ? closes[j] < neck : closes[j] > neck) { outcome = { kind: 'break', index: j }; break; }
+        }
+        const base = { direction: top ? 'bearish-traditional' : 'bullish-traditional', startIndex: p1.index, endIndex: p2.index, overlays: [{ type: 'neckline', price: neck, from: mid.index, to: outcome ? outcome.index : limit }, { type: 'pivots', points: [p1, mid, p2] }] };
+        if (outcome && outcome.kind === 'break') {
+          cs[4] = crit(cs[4].name, closes[outcome.index], neck, true, 1, 20, true);
+          ev.push(makeEvent(this, { ...base, state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: p2.confirmedIndex }, { state: 'confirmed', index: outcome.index }], explanation: `${name}が成立。第1${top ? '高値' : '安値'} ${fmt(p1.price)}円・第2${top ? '高値' : '安値'} ${fmt(p2.price)}円（差はATRの${fmt(prox / atr2, 2)}倍）、ネックライン ${fmt(neck)}円を終値で${top ? '下抜け' : '上抜け'}。` }));
+        } else if (outcome && outcome.kind === 'expired') {
+          ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: p2.confirmedIndex, criteria: cs, history: [{ state: 'forming', index: p2.confirmedIndex }, { state: 'expired', index: outcome.index }], explanation: `${name}の候補は形状破壊により失効した（成立には至らなかった）。` }));
+        } else {
+          ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: p2.confirmedIndex, criteria: cs, explanation: `${name}を形成中。2極値は確認済みで、ネックライン ${fmt(neck)}円の${top ? '下抜け' : '上抜け'}待ち（未成立）。` }));
+        }
+      }
+      return ev;
+    }
+  };
+}
+registerRule(doubleRule('double-top', 'ダブルトップ', true));
+registerRule(doubleRule('double-bottom', 'ダブルボトム', false));
+
+function runDetector(bars, options = {}) {
+  const F = computeFeatures(bars);
+  const zigzags = { 1: zigzag(bars, F, 1), 2: zigzag(bars, F, 2), 3: zigzag(bars, F, 3) };
+  const ctx = { bars, F, zigzags };
+  const enabled = options.enabled ? new Set(options.enabled) : null;
+  const events = [];
+  for (const rule of RULES) {
+    if (enabled && !enabled.has(rule.id)) continue;
+    for (const e of rule.evaluate(ctx)) events.push(e);
+  }
+  events.sort((a, b) => a.detectedIndex - b.detectedIndex || a.ruleId.localeCompare(b.ruleId));
+  return { events, features: F, zigzags };
+}
+function ruleCatalog() {
+  return RULES.map(r => ({ id: r.id, version: r.version, name: r.name, category: r.category, family: r.family, lookback: r.lookback, parameters: r.parameters }));
+}
+
+/* ===== UI層（検出器coreとは分離。ルール追加でここ以外は不変） ===== */
+var $ = function (id) { return document.getElementById(id); };
+var CAT_LABEL = { candlestick: 'ローソク足', trend: 'トレンド', oscillator: 'オシレーター', pattern: '波形パターン' };
+var STATE_LABEL = { confirmed: '成立', forming: '形成中', approximate: '近似', expired: '失効', observation: '観察', rejected: '不成立', unavailable: '判定不能' };
+var ANCHOR = { total: 310, byRule: { 'bullish-engulfing': 101, 'doji': 86, 'long-lower-shadow': 75, 'sma-cross-bullish': 18, 'sma-cross-bearish': 17, 'rsi-overbought': 5, 'rsi-oversold': 4, 'three-soldiers': 2, 'double-top': 1, 'double-bottom': 1 } };
+
+var state = {
+  master: true,
+  sourceKind: 'builtin-ext', // 'builtin-ext' | 'builtin-gbm' | 'file'
+  sourceLabel: '拡張モデル seed 42',
+  rawBars: null, meta: {},
+  bars: null, volumeMissing: false,
+  sliderPos: 0,           // prefix length used for detection
+  chartFocus: 0,          // right-edge bar index of chart window
+  result: null,           // runDetector output for current prefix
+  enabled: {},            // ruleId -> bool (execution switch)
+  selectedId: null,
+  internalColsNote: ''
+};
+ruleCatalog().forEach(function (r) { state.enabled[r.id] = true; });
+
+function timeLabel(minute) {
+  if (minute == null) return '--:--';
+  var h = Math.floor(minute / 60), m = minute % 60;
+  return h + ':' + (m < 10 ? '0' : '') + m;
+}
+function dayLabel(day) { return day === 0 ? '当日' : '過去' + Math.abs(day) + '日'; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function fmtN(x, d) { return x == null || !isFinite(x) ? '—' : (+x).toFixed(d == null ? 2 : d); }
+
+/* ---------- データ読み込み ---------- */
+function setData(rawBars, meta, kind, label, internalNote) {
+  $('dataError').textContent = '';
+  var adapted;
+  try {
+    adapted = adaptBars(rawBars, meta || {});
+  } catch (e) {
+    $('dataError').textContent = '入力エラー：' + e.message + '（このファイルは読み込めませんでした）';
+    return;
+  }
+  state.rawBars = rawBars; state.meta = meta || {};
+  state.bars = adapted.bars; state.volumeMissing = adapted.volumeMissing;
+  state.sourceKind = kind; state.sourceLabel = label;
+  state.internalColsNote = internalNote || '';
+  state.sliderPos = state.bars.length;
+  state.chartFocus = state.bars.length - 1;
+  state.selectedId = null;
+  var slider = $('timeSlider');
+  slider.max = state.bars.length; slider.value = state.bars.length;
+  var days = {};
+  state.bars.forEach(function (b) { days[b.day] = true; });
+  $('dataInfo').textContent = label + ' ／ 全' + state.bars.length + '本（' + Object.keys(days).length + '日分、当日＝day 0）' +
+    (state.volumeMissing ? ' ／ 出来高は欠測扱い（ゼロと区別）' : '');
+  $('internalNote').textContent = state.internalColsNote;
+  runDetection();
+}
+
+function loadBuiltin(kind) {
+  if (kind === 'ext') {
+    var s1 = generate(42, {});
+    setData(s1.bars, { seed: s1.seed, config: s1.config }, 'builtin-ext', '組み込みサンプル：拡張モデル seed 42（' + s1.bars.length + '本）', '生成器の出力に含まれる variance / jumps は、アダプターの段階で落としており判定器には渡していません。');
+  } else {
+    var s2 = generate(7, { base: 0.3, regimes: false, season: false, jumps: false });
+    setData(s2.bars, { seed: s2.seed, config: s2.config }, 'builtin-gbm', '組み込みサンプル：純GBM seed 7（' + s2.bars.length + '本）', '生成器の出力に含まれる variance / jumps は、アダプターの段階で落としており判定器には渡していません。');
+  }
+  $('btnSampleExt').classList.toggle('primary', kind === 'ext');
+  $('btnSampleGbm').classList.toggle('primary', kind === 'gbm');
+}
+
+function parseCSV(text) {
+  var lines = text.replace(/\r\n?/g, '\n').split('\n').filter(function (l) { return l.trim() !== ''; });
+  if (lines.length < 2) throw new Error('CSVに行が不足しています');
+  var head = lines[0].split(',').map(function (h) { return h.trim(); });
+  var need = ['day', 'minute', 'open', 'high', 'low', 'close', 'volume'];
+  var idx = {};
+  need.forEach(function (k) { idx[k] = head.indexOf(k); });
+  var missing = need.filter(function (k) { return idx[k] < 0; });
+  if (missing.length) throw new Error('CSVヘッダーに必要な列がありません：' + missing.join(', '));
+  var ci = head.indexOf('complete');
+  var bars = [];
+  for (var i = 1; i < lines.length; i++) {
+    var c = lines[i].split(',');
+    var b = { day: +c[idx.day], minute: +c[idx.minute], open: +c[idx.open], high: +c[idx.high], low: +c[idx.low], close: +c[idx.close], volume: +c[idx.volume] };
+    if (ci >= 0) b.complete = String(c[ci]).trim() !== 'false';
+    bars.push(b);
+  }
+  var internal = ['variance', 'jumps', 'jumps_count'].filter(function (k) { return head.indexOf(k) >= 0; });
+  return { bars: bars, internal: internal };
+}
+
+function onFile(ev) {
+  var f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    var text = String(reader.result || '');
+    try {
+      if (/\.json$/i.test(f.name) || text.trim().charAt(0) === '{' || text.trim().charAt(0) === '[') {
+        var obj = JSON.parse(text);
+        var bars, meta = {};
+        if (Array.isArray(obj)) bars = obj;
+        else if (obj && Array.isArray(obj.bars)) { bars = obj.bars; meta = { seed: obj.seed, config: obj.config }; }
+        else throw new Error('JSONに bars 配列がありません');
+        var hasInternal = bars.length && ('variance' in bars[0] || 'jumps' in bars[0]);
+        setData(bars, meta, 'file', 'ファイル：' + f.name,
+          hasInternal ? 'このファイルには生成器の内部情報（variance / jumps）の列が含まれていますが、アダプターの段階で落としており判定には使っていません。' : '');
+      } else {
+        var parsed = parseCSV(text);
+        setData(parsed.bars, {}, 'file', 'ファイル：' + f.name,
+          parsed.internal.length ? 'このファイルには生成器の内部情報（' + parsed.internal.join(' / ') + '）の列が含まれていますが、アダプターの段階で落としており判定には使っていません。' : '');
+      }
+    } catch (e) {
+      $('dataError').textContent = '読み込みエラー：' + e.message;
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(f);
+}
+
+/* ---------- 検出（マスターOFF時は実行自体をしない） ---------- */
+function enabledList() { return ruleCatalog().filter(function (r) { return state.enabled[r.id]; }).map(function (r) { return r.id; }); }
+
+function runDetection() {
+  document.body.classList.toggle('engine-off', !state.master);
+  $('masterState').textContent = state.master ? '接続中：検出を実行します' : '切断中：検出は実行されません';
+  $('masterState').className = 'master-state ' + (state.master ? 'on' : 'off');
+  if (!state.bars) return;
+  if (!state.master) {
+    state.result = null;
+    renderSummary(); renderList(); renderDetail(null); drawChart();
+    return;
+  }
+  var prefix = state.bars.slice(0, state.sliderPos);
+  state.result = runDetector(prefix, { enabled: enabledList() });
+  renderSummary(); renderList(); drawChart();
+  var sel = findEvent(state.selectedId);
+  renderDetail(sel);
+  $('sliderLabel').textContent = '現在時点：' + state.sliderPos + '本目 ／ 全' + state.bars.length + '本' +
+    (state.bars[state.sliderPos - 1] ? '（' + dayLabel(state.bars[state.sliderPos - 1].day) + ' ' + timeLabel(state.bars[state.sliderPos - 1].minute) + ' まで）' : '');
+}
+
+function findEvent(id) {
+  if (!id || !state.result) return null;
+  for (var i = 0; i < state.result.events.length; i++) if (state.result.events[i].eventId === id) return state.result.events[i];
+  return null;
+}
+function ruleName(id) {
+  var c = ruleCatalog();
+  for (var i = 0; i < c.length; i++) if (c[i].id === id) return c[i].name;
+  return id;
+}
+function countsByRule(events) {
+  var m = {};
+  events.forEach(function (e) { m[e.ruleId] = (m[e.ruleId] || 0) + 1; });
+  return m;
+}
+
+function renderSummary() {
+  var box = $('anchorSummary');
+  if (!state.master || !state.result) {
+    box.innerHTML = '<span class="count-chip">検出エンジン切断中のため集計していません</span>';
+    $('anchorCheck').textContent = '';
+    updateRuleCounts({});
+    return;
+  }
+  var ev = state.result.events, by = countsByRule(ev);
+  var html = '<span class="count-chip">総数 <b>' + ev.length + '</b> 件</span>';
+  ruleCatalog().forEach(function (r) {
+    html += '<span class="count-chip">' + esc(r.name) + ' <b>' + (by[r.id] || 0) + '</b></span>';
+  });
+  box.innerHTML = html;
+  updateRuleCounts(by);
+  var check = '';
+  if (state.sourceKind === 'builtin-ext' && state.sliderPos === state.bars.length && enabledList().length === 10) {
+    var okTotal = ev.length === ANCHOR.total;
+    var okRules = Object.keys(ANCHOR.byRule).every(function (k) { return (by[k] || 0) === ANCHOR.byRule[k]; });
+    check = (okTotal && okRules)
+      ? '検証アンカー：総数310件・ルール別件数ともに正本実測と一致 ✓'
+      : '検証アンカー：不一致（総数 ' + ev.length + ' / 期待 310）';
+    $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
+  } else {
+    $('anchorCheck').className = 'mono';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON」のときに表示されます。';
+  }
+  $('anchorCheck').textContent = check;
+}
+
+function updateRuleCounts(by) {
+  ruleCatalog().forEach(function (r) {
+    var el = document.querySelector('[data-count-for="' + r.id + '"]');
+    if (el) el.textContent = state.master && state.result ? '（現在 ' + (by[r.id] || 0) + '件）' : '';
+  });
+}
+
+/* ---------- ルールON/OFFパネル ---------- */
+function buildRulePanel() {
+  var cats = [];
+  ruleCatalog().forEach(function (r) { if (cats.indexOf(r.category) < 0) cats.push(r.category); });
+  var html = '';
+  cats.forEach(function (cat) {
+    html += '<div class="cat-block"><div class="cat-head"><span class="cat-name">' + esc(CAT_LABEL[cat] || cat) + '</span>' +
+      '<span><button data-cat-on="' + cat + '">カテゴリ全ON</button> <button data-cat-off="' + cat + '">カテゴリ全OFF</button></span></div><div class="rule-grid">';
+    ruleCatalog().filter(function (r) { return r.category === cat; }).forEach(function (r) {
+      html += '<label class="chk"><input type="checkbox" class="rule-toggle" data-rule="' + r.id + '" checked /> ' + esc(r.name) + ' <span class="cnt" data-count-for="' + r.id + '"></span></label>';
+    });
+    html += '</div></div>';
+  });
+  $('rulePanel').innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll('.rule-toggle'), function (cb) {
+    cb.addEventListener('change', function () { state.enabled[cb.getAttribute('data-rule')] = cb.checked; runDetection(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-cat-on],[data-cat-off]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var cat = btn.getAttribute('data-cat-on') || btn.getAttribute('data-cat-off');
+      var on = btn.hasAttribute('data-cat-on');
+      ruleCatalog().filter(function (r) { return r.category === cat; }).forEach(function (r) {
+        state.enabled[r.id] = on;
+        var cb = document.querySelector('.rule-toggle[data-rule="' + r.id + '"]');
+        if (cb) cb.checked = on;
+      });
+      runDetection();
+    });
+  });
+}
+
+function stateFilterSet() {
+  var s = {};
+  Array.prototype.forEach.call(document.querySelectorAll('.state-filter'), function (cb) { if (cb.checked) s[cb.value] = true; });
+  return s;
+}
+function visibleEvents() {
+  if (!state.result) return [];
+  var f = stateFilterSet();
+  return state.result.events.filter(function (e) { return f[e.state]; });
+}
+
+/* ---------- イベント一覧 ---------- */
+function renderList() {
+  var list = $('eventList');
+  if (!state.master) { $('eventCount').textContent = '検出エンジン切断中'; list.innerHTML = ''; return; }
+  if (!state.result) { $('eventCount').textContent = '—'; list.innerHTML = ''; return; }
+  var ev = visibleEvents();
+  $('eventCount').textContent = '表示 ' + ev.length + ' 件 ／ 検出総数 ' + state.result.events.length + ' 件（状態フィルタ適用後）';
+  if (!ev.length) { list.innerHTML = '<p class="sub">条件に合うイベントはありません。</p>'; return; }
+  list.innerHTML = ev.map(function (e) {
+    var b = state.bars[e.detectedIndex];
+    var t = b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : 'index ' + e.detectedIndex;
+    return '<button class="ev-row' + (e.eventId === state.selectedId ? ' selected' : '') + '" data-ev="' + esc(e.eventId) + '">' +
+      '<span class="ev-time mono">' + esc(t) + '（' + (e.detectedIndex + 1) + '本目）</span>' +
+      '<span class="ev-name">' + esc(ruleName(e.ruleId)) + '</span>' +
+      '<span class="badge b-' + esc(e.state) + '">' + esc(STATE_LABEL[e.state] || e.state) + '</span>' +
+      '<span class="score num">適合度 ' + (e.score == null ? '—' : e.score) + '</span></button>';
+  }).join('');
+  Array.prototype.forEach.call(list.querySelectorAll('[data-ev]'), function (btn) {
+    btn.addEventListener('click', function () {
+      state.selectedId = btn.getAttribute('data-ev');
+      var e = findEvent(state.selectedId);
+      if (e) state.chartFocus = e.detectedIndex;
+      renderList(); renderDetail(e); drawChart();
+    });
+  });
+}
+
+/* ---------- 詳細 ---------- */
+function renderDetail(e) {
+  var p = $('detailPanel');
+  if (!state.master) { p.innerHTML = '<p class="sub">検出エンジン切断中は詳細を表示しません。</p>'; return; }
+  if (!e) { p.innerHTML = '<p class="sub">一覧の行を選ぶと、条件ごとの実測値・閾値・合否・一致度・重み、未成立の必須条件、解説、状態遷移履歴を表示します。ダブル系を選ぶとチャートにネックラインと3転換点も描きます。</p>'; return; }
+  var b = state.bars[e.detectedIndex];
+  var rows = e.criteria.map(function (c) {
+    return '<tr><td>' + esc(c.name) + '</td><td class="num">' + fmtN(c.measured, 3) + '</td><td class="num">' + esc(String(c.threshold)) + '</td>' +
+      '<td class="' + (c.pass ? 'pass' : 'fail') + '">' + (c.pass ? '合' : '否') + '</td><td class="num">' + fmtN(c.match, 2) + '</td><td class="num">' + c.weight + '</td><td>' + (c.mandatory ? '必須' : '加点') + '</td></tr>';
+  }).join('');
+  var miss = e.missingCriteria.length
+    ? e.missingCriteria.map(function (m) { return '<span class="miss-chip">' + esc(m) + '</span>'; }).join('')
+    : '<span class="sub">なし（必須条件はすべて成立）</span>';
+  var hist = e.history.map(function (h) {
+    var hb = state.bars[h.index];
+    return esc(STATE_LABEL[h.state] || h.state) + '（' + (h.index + 1) + '本目' + (hb ? '・' + dayLabel(hb.day) + ' ' + timeLabel(hb.minute) : '') + '）';
+  }).join(' → ');
+  p.innerHTML =
+    '<h3 style="margin-top:0;">' + esc(ruleName(e.ruleId)) + ' <span class="badge b-' + esc(e.state) + '">' + esc(STATE_LABEL[e.state] || e.state) + '</span></h3>' +
+    '<p class="mono">検出時点：' + (b ? dayLabel(b.day) + ' ' + timeLabel(b.minute) : '') + '（' + (e.detectedIndex + 1) + '本目）／ 対象：' + (e.startIndex + 1) + '〜' + (e.endIndex + 1) + '本目 ／ 適合度：' + (e.score == null ? '評価不能' : e.score) + ' ／ 方向（伝統的解釈）：' + esc(e.direction || 'なし') + ' ／ ルール版：' + esc(e.ruleVersion) + '</p>' +
+    '<p>' + esc(e.explanation) + '</p>' +
+    '<h3>未成立の必須条件</h3><p>' + miss + '</p>' +
+    '<h3>条件の内訳</h3><div class="table-scroll"><table><thead><tr><th>条件</th><th class="num">実測値</th><th class="num">閾値</th><th>合否</th><th class="num">一致度</th><th class="num">重み</th><th>種別</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<h3>状態遷移履歴</h3><p class="mono">' + hist + '</p>' +
+    '<p class="sub">パラメータ：<span class="mono">' + esc(JSON.stringify(e.parameters)) + '</span></p>';
+}
+
+/* ---------- チャート ---------- */
+function drawChart() {
+  var cv = $('chart');
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  var ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  ctx.clearRect(0, 0, W, H);
+  if (!state.bars) return;
+  var end = Math.min(state.chartFocus, state.sliderPos - 1);
+  var start = Math.max(0, end - 199);
+  var n = end - start + 1;
+  if (n <= 0) return;
+  var padR = 64, padL = 6, padT = 10, volH = Math.round(H * 0.16), priceH = H - volH - 34;
+  var plotW = W - padL - padR;
+  var bw = plotW / n;
+  var hi = -Infinity, lo = Infinity, vmax = 0;
+  for (var i = start; i <= end; i++) {
+    var b = state.bars[i];
+    hi = Math.max(hi, b.high); lo = Math.min(lo, b.low);
+    if (b.volume != null) vmax = Math.max(vmax, b.volume);
+  }
+  if (!(hi > lo)) { hi = lo + 1; }
+  var pad = (hi - lo) * 0.06; hi += pad; lo -= pad;
+  var X = function (i) { return padL + (i - start + 0.5) * bw; };
+  var Y = function (v) { return padT + (hi - v) / (hi - lo) * priceH; };
+  /* 過去足の帯 */
+  ctx.fillStyle = dark ? 'rgba(255,255,255,0.045)' : 'rgba(90,75,30,0.07)';
+  for (var j = start; j <= end; j++) {
+    if (state.bars[j].day < 0) ctx.fillRect(padL + (j - start) * bw, padT, bw + 0.5, priceH + volH);
+  }
+  /* 価格グリッドとラベル */
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillStyle = dark ? '#a39c8b' : '#6f695c';
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.08)' : 'rgba(60,50,20,0.10)';
+  for (var g = 0; g <= 4; g++) {
+    var v = lo + (hi - lo) * g / 4, y = Y(v);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    ctx.fillText(Math.round(v).toLocaleString('ja-JP'), padL + plotW + 6, y + 4);
+  }
+  /* SMA */
+  function drawLine(arr, color) {
+    if (!state.result) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.beginPath();
+    var started = false;
+    for (var i2 = start; i2 <= end; i2++) {
+      var val = arr[i2];
+      if (val == null) { started = false; continue; }
+      if (!started) { ctx.moveTo(X(i2), Y(val)); started = true; } else ctx.lineTo(X(i2), Y(val));
+    }
+    ctx.stroke(); ctx.lineWidth = 1;
+  }
+  if (state.master && state.result) {
+    drawLine(state.result.features.sma5, '#d9a441');
+    drawLine(state.result.features.sma20, '#8a7f63');
+  }
+  /* ローソク足 */
+  for (var k = start; k <= end; k++) {
+    var bb = state.bars[k];
+    var up = bb.close >= bb.open;
+    var col = up ? (dark ? '#e0684e' : '#cf4b32') : (dark ? '#5b93d6' : '#2f6db3');
+    ctx.strokeStyle = col; ctx.fillStyle = col;
+    var x = X(k);
+    ctx.beginPath(); ctx.moveTo(x, Y(bb.high)); ctx.lineTo(x, Y(bb.low)); ctx.stroke();
+    var yO = Y(bb.open), yC = Y(bb.close);
+    var top = Math.min(yO, yC), hgt = Math.max(1, Math.abs(yC - yO));
+    ctx.fillRect(x - Math.max(0.6, bw * 0.32), top, Math.max(1.2, bw * 0.64), hgt);
+  }
+  /* 出来高 */
+  var volTop = padT + priceH + 8;
+  if (!state.volumeMissing && vmax > 0) {
+    for (var q = start; q <= end; q++) {
+      var vb = state.bars[q];
+      if (vb.volume == null) continue;
+      ctx.fillStyle = vb.close >= vb.open ? (dark ? 'rgba(224,104,78,.6)' : 'rgba(207,75,50,.55)') : (dark ? 'rgba(91,147,214,.6)' : 'rgba(47,109,179,.55)');
+      var vh = vb.volume / vmax * (volH - 10);
+      ctx.fillRect(X(q) - Math.max(0.6, bw * 0.32), volTop + (volH - 10) - vh, Math.max(1.2, bw * 0.64), vh);
+    }
+  } else {
+    ctx.fillStyle = dark ? '#a39c8b' : '#6f695c';
+    ctx.fillText('出来高は欠測扱い（表示なし）', padL + 4, volTop + 14);
+  }
+  /* ZigZag */
+  if (state.master && state.result && $('zzShow').checked) {
+    var scale = $('zzScale').value;
+    var zz = state.result.zigzags[scale];
+    if (zz) {
+      var pts = zz.pivots.filter(function (p) { return p.index >= start && p.index <= end; });
+      ctx.strokeStyle = dark ? '#3d9c8d' : '#17615a'; ctx.lineWidth = 1.6; ctx.beginPath();
+      pts.forEach(function (p, pi) { if (pi === 0) ctx.moveTo(X(p.index), Y(p.price)); else ctx.lineTo(X(p.index), Y(p.price)); });
+      if (zz.candidate && zz.candidate.index >= start && zz.candidate.index <= end && pts.length) {
+        var last = pts[pts.length - 1];
+        ctx.lineTo(X(zz.candidate.index), Y(zz.candidate.price));
+      }
+      ctx.stroke();
+      pts.forEach(function (p) {
+        ctx.fillStyle = dark ? '#3d9c8d' : '#17615a';
+        ctx.beginPath(); ctx.arc(X(p.index), Y(p.price), 3, 0, Math.PI * 2); ctx.fill();
+      });
+      if (zz.candidate && zz.candidate.index >= start && zz.candidate.index <= end) {
+        ctx.strokeStyle = '#d9a441'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(X(zz.candidate.index), Y(zz.candidate.price), 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]); ctx.lineWidth = 1;
+      }
+    }
+  }
+  /* イベントマーカー */
+  if (state.master && state.result) {
+    visibleEvents().forEach(function (e) {
+      if (e.detectedIndex < start || e.detectedIndex > end) return;
+      var eb = state.bars[e.detectedIndex];
+      var sel = e.eventId === state.selectedId;
+      ctx.fillStyle = sel ? '#d9a441' : (dark ? 'rgba(233,229,217,.75)' : 'rgba(38,35,29,.65)');
+      var mx = X(e.detectedIndex), my = Y(eb.high) - 6;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx - 4.5, my - 7); ctx.lineTo(mx + 4.5, my - 7); ctx.closePath(); ctx.fill();
+    });
+    /* 選択中イベントのオーバーレイ（ネックライン・転換点） */
+    var selEv = findEvent(state.selectedId);
+    if (selEv) {
+      selEv.overlays.forEach(function (ov) {
+        if (ov.type === 'neckline') {
+          var f = Math.max(start, ov.from), t = Math.min(end, ov.to);
+          if (t > f) {
+            ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 1.8; ctx.setLineDash([7, 4]);
+            ctx.beginPath(); ctx.moveTo(X(f), Y(ov.price)); ctx.lineTo(X(t), Y(ov.price)); ctx.stroke();
+            ctx.setLineDash([]); ctx.lineWidth = 1;
+            ctx.fillStyle = '#d9a441'; ctx.fillText('ネックライン ' + Math.round(ov.price).toLocaleString('ja-JP') + '円', X(f) + 4, Y(ov.price) - 5);
+          }
+        }
+        if (ov.type === 'pivots') {
+          ov.points.forEach(function (p) {
+            if (p.index < start || p.index > end) return;
+            ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(X(p.index), Y(p.price), 6.5, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+          });
+        }
+      });
+      if (selEv.startIndex >= start && selEv.endIndex <= end) {
+        ctx.fillStyle = dark ? 'rgba(217,164,65,.10)' : 'rgba(217,164,65,.13)';
+        ctx.fillRect(padL + (selEv.startIndex - start) * bw, padT, (selEv.endIndex - selEv.startIndex + 1) * bw, priceH);
+      }
+    }
+  }
+  /* 時刻ラベル */
+  ctx.fillStyle = dark ? '#a39c8b' : '#6f695c';
+  var stepLbl = Math.max(1, Math.floor(n / 6));
+  for (var s2 = start; s2 <= end; s2 += stepLbl) {
+    ctx.fillText(timeLabel(state.bars[s2].minute), X(s2) - 12, H - 6);
+  }
+}
+
+/* ---------- 書き出し ---------- */
+function download(name, text, type) {
+  var blob = new Blob([text], { type: type });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+}
+function exportJSON() {
+  if (!state.result) return;
+  var out = {
+    app: 'technical-lab', version: '0.1', source: state.sourceLabel, sliderPosition: state.sliderPos,
+    note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
+    events: visibleEvents().map(function (e) {
+      var b = state.bars[e.detectedIndex];
+      return { eventId: e.eventId, ruleId: e.ruleId, ruleName: ruleName(e.ruleId), ruleVersion: e.ruleVersion, state: e.state, score: e.score, direction: e.direction, day: b ? b.day : null, time: b ? timeLabel(b.minute) : null, startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex, criteria: e.criteria, missingCriteria: e.missingCriteria, explanation: e.explanation, history: e.history, parameters: e.parameters };
+    })
+  };
+  download('technical-events.json', JSON.stringify(out, null, 2), 'application/json');
+}
+function exportCSV() {
+  if (!state.result) return;
+  var head = 'eventId,ruleId,ruleName,state,score,direction,day,time,startIndex,endIndex,detectedIndex,missingCriteria,explanation';
+  var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var lines = [head];
+  visibleEvents().forEach(function (e) {
+    var b = state.bars[e.detectedIndex];
+    lines.push([e.eventId, e.ruleId, ruleName(e.ruleId), e.state, e.score == null ? '' : e.score, e.direction || '', b ? b.day : '', b ? timeLabel(b.minute) : '', e.startIndex, e.endIndex, e.detectedIndex, e.missingCriteria.join(' / '), e.explanation].map(q).join(','));
+  });
+  download('technical-events.csv', lines.join('\n') + '\n', 'text/csv');
+}
+
+/* ---------- アプリ内チェック ---------- */
+function runChecks() {
+  var box = $('checkResults');
+  if (!state.bars) { box.innerHTML = '<p class="error">データがありません。</p>'; return; }
+  var prefix = state.bars.slice(0, state.sliderPos);
+  var before = JSON.stringify(prefix);
+  var r1 = runDetector(prefix, { enabled: enabledList() });
+  var r2 = runDetector(prefix, { enabled: enabledList() });
+  var after = JSON.stringify(prefix);
+  var repro = JSON.stringify(r1.events) === JSON.stringify(r2.events);
+  var immut = before === after;
+  box.innerHTML =
+    '<p>① 再現性（同一入力・同一設定で2回実行しイベントが完全一致）：<b class="' + (repro ? 'pass' : 'fail') + '">' + (repro ? '合格' : '不合格') + '</b>（イベント ' + r1.events.length + ' 件）</p>' +
+    '<p>② 入力不変（検出の前後で入力データが変化しない）：<b class="' + (immut ? 'pass' : 'fail') + '">' + (immut ? '合格' : '不合格') + '</b>（対象 ' + prefix.length + ' 本）</p>' +
+    '<p class="sub">このチェックはマスタースイッチの状態によらず、検証のために検出器を直接実行します（画面の検出結果は変更しません）。</p>';
+}
+
+/* ---------- イベント配線 ---------- */
+$('btnSampleExt').addEventListener('click', function () { loadBuiltin('ext'); });
+$('btnSampleGbm').addEventListener('click', function () { loadBuiltin('gbm'); });
+$('fileInput').addEventListener('change', onFile);
+$('masterToggle').addEventListener('change', function () { state.master = this.checked; runDetection(); });
+$('timeSlider').addEventListener('input', function () {
+  state.sliderPos = +this.value;
+  state.chartFocus = state.sliderPos - 1;
+  runDetection();
+});
+$('btnFullRange').addEventListener('click', function () {
+  if (!state.bars) return;
+  state.sliderPos = state.bars.length; state.chartFocus = state.bars.length - 1;
+  $('timeSlider').value = state.bars.length;
+  runDetection();
+});
+$('zzScale').addEventListener('change', drawChart);
+$('zzShow').addEventListener('change', drawChart);
+Array.prototype.forEach.call(document.querySelectorAll('.state-filter'), function (cb) {
+  cb.addEventListener('change', function () { renderList(); drawChart(); });
+});
+$('btnExportJson').addEventListener('click', exportJSON);
+$('btnExportCsv').addEventListener('click', exportCSV);
+$('btnRunChecks').addEventListener('click', runChecks);
+window.addEventListener('resize', drawChart);
+
+buildRulePanel();
+loadBuiltin('ext');
+
+if ('serviceWorker' in navigator) {
+  try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
+}
+    </script>
+  </body>
+</html>
