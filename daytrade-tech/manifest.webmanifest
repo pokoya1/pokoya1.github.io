@@ -1,0 +1,37 @@
+{
+  "background_color": "#f6f3ec",
+  "description": "生成済み株価サンプルに対してテクニカル抽出だけを行う実験環境（デイトレゲーム工程2〜4）。価格生成と判定は分離し、生成器の内部情報は判定に使わない。",
+  "display": "standalone",
+  "icons": [
+    {
+      "purpose": "any",
+      "sizes": "192x192",
+      "src": "icon-192.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
+      "sizes": "512x512",
+      "src": "icon-512.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "maskable",
+      "sizes": "512x512",
+      "src": "icon-512.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
+      "sizes": "180x180",
+      "src": "icon-180.png",
+      "type": "image/png"
+    }
+  ],
+  "lang": "ja",
+  "name": "テクニカル抽出実験室",
+  "scope": "./",
+  "short_name": "テクニカル抽出",
+  "start_url": "./",
+  "theme_color": "#182a26"
+}
