@@ -294,8 +294,8 @@ footer.note{color:var(--muted);font-size:.78rem;margin-top:22px;line-height:1.7}
    数量は売買単位で切り捨て、実購入額＝数量×想定価格（円）。予算を一切超えない。
    ============================================================ */
 var DATA_VERSION = 3;
-var APP_VERSION = "2.2";
-var SW_CACHE_NAME = "nanpin-planner-v21";
+var APP_VERSION = "2.3";
+var SW_CACHE_NAME = "nanpin-planner-v22";
 var DEFAULT_RELAY_URL = "https://nanpin-price-relay.moppy4728.workers.dev";
 var uidSeq = 100;
 function uid(p){ return p + "_" + (++uidSeq) + "_" + Math.random().toString(36).slice(2,7); }
@@ -349,7 +349,11 @@ function sampleState(){
                 /* 表示モード（ステップ4・v2.2）：UI設定として保存する任意項目（形式は v3 のまま）。
                    簡易（simple）／詳細（detailed）の切替は表示と導線だけで、データと計算は共有する。
                    項目のない旧データ・旧JSONは「詳細」として読み込む（既存利用者の見た目を変えない） */
-                viewMode: "detailed" }
+                viewMode: "detailed",
+                /* 信用コストの概算（ステップ5・v2.3）：形式v3のまま追加する任意項目。
+                   初期値は無効で、無効のときは表示・計算とも従来と完全に同一になる。
+                   買方金利の初期値 2.80% はSBI証券の制度信用・一般信用（無期限）の買方金利の公表値 */
+                costLayer: { enabled: false, ratePct: 2.80, days: 180, includeAdmin: false } }
   };
 }
 
@@ -474,7 +478,18 @@ function sanitizeState(s){
     })(),
     /* 表示モード（ステップ4・v2.2）：任意項目。旧データ・旧JSONに項目がなければ「詳細（detailed）」で
        補完し、不正な値は「詳細」に倒す。モードは表示・導線だけに効き、計算には一切影響しない */
-    viewMode: st.viewMode === "simple" ? "simple" : "detailed"
+    viewMode: st.viewMode === "simple" ? "simple" : "detailed",
+    /* 信用コストの概算（ステップ5・v2.3）：任意項目。旧データ・旧JSONに項目がなければ
+       「無効・初期値（金利2.80%／保有180日／管理費なし）」で補完し、そのまま従来どおり読み込める。
+       null・空欄は初期値に倒し（num(null) が 0 を返すため明示的に判定する）、範囲外は丸める */
+    costLayer: (function(){
+      var c = (st.costLayer && typeof st.costLayer === "object" && !Array.isArray(st.costLayer)) ? st.costLayer : {};
+      function defNum(v, fb, lo, hi){ if (v === null || v === "" || v === undefined) return fb; var n = num(v, NaN); return isFinite(n) ? clamp(n, lo, hi) : fb; }
+      return { enabled: !!c.enabled,
+               ratePct: defNum(c.ratePct, 2.8, 0, 100),
+               days: Math.round(defNum(c.days, 180, 0, 36500)),
+               includeAdmin: !!c.includeAdmin };
+    })()
   };
   out.version = DATA_VERSION;
   return out;
@@ -559,6 +574,41 @@ var MarginSim = (function(){
     if (v === null || v === "" || v === undefined) return 0;
     var n = num(v, NaN);
     return isFinite(n) ? n : 0;
+  }
+  /* ---------- 信用コストの概算レイヤー（ステップ5・v2.3） ----------
+     買い建玉の金利（と任意で管理費）の概算を、通常の維持率とは別枠で差し引く参考値レイヤー。
+     通常の維持率・到達・実購入予定額の計算には一切影響しない（費用込みは参考値の位置づけで、
+     管理・追証基準への到達判定は通常の維持率が正本）。無効のときは費用0として扱い、表示も行わない。
+     金利の概算式：建代金合計 × 買方金利（年率）× 想定保有日数 ÷ 365（建代金は約定金額ベース）。
+     時間仮定：段階ごとの発動時期を暦日へ換算する根拠はないため比例配分はせず、経路の各評価点では
+     「その時点の建代金合計に対する想定保有日数分の金利」を差し引く保守的な上限概算とする。
+     管理費の概算：建玉件数 × 経過月数（想定保有日数 ÷ 30）× 110円（1建玉あたりの下限）。
+     建玉件数 ＝ 既存建玉の件数（建代金のある計画銘柄以外の建玉＋保有のある計画銘柄）＋
+     その評価時点で購入済みの計画段階数（現在値では未実行段階は数えない）。
+     売り建玉の貸株料・逆日歩、名義書換料、配当落調整金は前提依存のため概算に含めない */
+  function costLayerOf(state){
+    var c = state && state.settings ? state.settings.costLayer : null;
+    if (!c || !c.enabled) return null;
+    return { ratePct: clamp(num(c.ratePct, 2.8), 0, 100),
+             days: clamp(Math.round(num(c.days, 180)), 0, 36500),
+             includeAdmin: !!c.includeAdmin };
+  }
+  function basePositionCount(state){
+    var n = 0;
+    (state.positions || []).forEach(function(p){ if (p.principal > 0) n++; });
+    (state.instruments || []).forEach(function(ins){ if (ins.holding && ins.holding.qty > 0) n++; });
+    return n;
+  }
+  /* 建玉件数（posCount）は呼び出し側が評価時点に応じて数える：現在値＝basePositionCount、
+     経路の評価点＝basePositionCount＋その時点で購入済みの段階数、計画全体＝basePositionCount＋未実行段階数 */
+  function costParts(state, totalPrincipal, posCount){
+    var cl = costLayerOf(state);
+    if (!cl) return { enabled: false, interest: 0, admin: 0, total: 0, count: 0, ratePct: 0, days: 0, includeAdmin: false };
+    var interest = Math.max(0, num(totalPrincipal, 0)) * (cl.ratePct / 100) * (cl.days / 365);
+    var cnt = Math.max(0, Math.round(num(posCount, 0)));
+    var admin = cl.includeAdmin ? cnt * (cl.days / 30) * 110 : 0;
+    return { enabled: true, interest: interest, admin: admin, total: interest + admin, count: cnt,
+             ratePct: cl.ratePct, days: cl.days, includeAdmin: cl.includeAdmin };
   }
   /* 既存建玉の評価損益：現在値（建代金＋現在評価損益）が下落率ぶん変動する近似。pnl 未入力は 0 として概算し approx を立てる */
   function existingPnlAt(positions, dropPct){
@@ -711,7 +761,11 @@ var MarginSim = (function(){
     var totalPnl = exP.pnl + hdP.pnl + newPnl;
     var balance = collateral + state.account.cash + adjPnl(totalPnl, st) - st.fees + unsettledAmount(state);
     var totalPrincipal = existingPrincipal + hdP.principal + newPrincipal;
-    return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal };
+    /* 費用込み維持率（概算・参考値）：この評価点の建代金合計と建玉件数（既存＋購入済み段階）から
+       概算費用を求め、実質保証金から差し引く。通常の rate・balance は変更しない */
+    var cp = costParts(state, totalPrincipal, basePositionCount(state) + executed.length);
+    return { rate: totalPrincipal > 0 ? (balance / totalPrincipal) * 100 : null, balance: balance, totalPrincipal: totalPrincipal,
+             cost: cp.total, costRate: totalPrincipal > 0 ? ((balance - cp.total) / totalPrincipal) * 100 : null };
   }
   /* 経路評価：下落率0%から targetDrop までの全評価点（0.1%刻み＋購入段階の直前・直後。到達計算と同じ評価点）を
      1回の走査で評価し、経路上の最低維持率とその下落率・目標下落率時点の維持率・経路上の最小の実質保証金を返す。
@@ -731,8 +785,10 @@ var MarginSim = (function(){
     triggerDrops.forEach(function(td){ if (td <= target + 1e-9) addC(td); });
     cands.sort(function(a, b){ return a - b; });
     var minRate = null, minRateDrop = null, minBalance = null, rateAtTarget = null;
+    var minCostRate = null, minCostRateDrop = null, costAtMin = null;
     function visit(pt, dropVal){
       if (pt.rate !== null && (minRate === null || pt.rate < minRate)){ minRate = pt.rate; minRateDrop = dropVal; }
+      if (pt.costRate !== null && pt.costRate !== undefined && (minCostRate === null || pt.costRate < minCostRate)){ minCostRate = pt.costRate; minCostRateDrop = dropVal; costAtMin = pt.cost; }
       if (minBalance === null || pt.balance < minBalance) minBalance = pt.balance;
     }
     for (var i = 0; i < cands.length; i++){
@@ -743,7 +799,8 @@ var MarginSim = (function(){
       visit(after, cd);
       if (Math.abs(cd - target) < 1e-9) rateAtTarget = after.rate;
     }
-    return { stageRes: stageRes, minRate: minRate, minRateDrop: minRateDrop, rateAtTarget: rateAtTarget, minBalance: minBalance, targetDrop: target };
+    return { stageRes: stageRes, minRate: minRate, minRateDrop: minRateDrop, rateAtTarget: rateAtTarget, minBalance: minBalance, targetDrop: target,
+             minCostRate: minCostRate, minCostRateDrop: minCostRateDrop, costAtMin: costAtMin };
   }
 
   function simulate(state){
@@ -797,9 +854,15 @@ var MarginSim = (function(){
     var currentPrincipal = existingPrincipal + hdNow.principal;
     var currentPnl = exNow.pnl + hdNow.pnl;
     var balanceNow = state.account.collateral + state.account.cash + adjPnl(currentPnl, st) - st.fees + unsettledAmount(state);
+    /* 費用込みの現在維持率（概算・参考値）：現在の建代金合計に対する概算費用を差し引く。
+       建玉件数は既存建玉のみ（未実行の計画段階はまだ建玉ではないため数えない）。
+       通常の rate・balance・到達判定には影響しない */
+    var cpNow = costParts(state, currentPrincipal, basePositionCount(state));
     var current = { principal: currentPrincipal, pnl: currentPnl, pnlApprox: exNow.approx || hdNow.approx,
                     holdingsPrincipal: hdNow.principal, holdingsPnl: hdNow.pnl,
                     balance: balanceNow, rate: currentPrincipal > 0 ? (balanceNow / currentPrincipal) * 100 : null,
+                    cost: cpNow.total, costRate: currentPrincipal > 0 ? ((balanceNow - cpNow.total) / currentPrincipal) * 100 : null,
+                    costParts: cpNow,
                     belowMinMargin: balanceNow < st.minMargin };
     /* 計画合計（未実行の段階のみ。実行済みは実績として数えない） */
     var planBudget = 0, planCost = 0;
@@ -870,6 +933,7 @@ var MarginSim = (function(){
              firstInfeasible: firstInfeasible, minPnl: minPnl, factor: factor };
   }
   return { collateralFactor: collateralFactor, stagePrice: stagePrice, qtyFor: qtyFor, unsettledAmount: unsettledAmount,
+           costLayerOf: costLayerOf, basePositionCount: basePositionCount, costParts: costParts,
            existingPnlAt: existingPnlAt, collateralAt: collateralAt, evaluateStages: evaluateStages, simulate: simulate,
            pointAt: pointAt, pathEvaluate: pathEvaluate,
            scenarioDetailed: scenarioDetailed, endpointFor: endpointFor, dropFor: dropFor,
@@ -962,7 +1026,10 @@ function dashboardSummary(st){
   return { rate: r.current.rate, balance: r.current.balance, principal: r.current.principal,
            planCost: r.planCost, planBudget: r.planBudget,
            firstMgmt: r.firstMgmtPrecise, firstCall: r.firstCallPrecise,
-           minRate: path.minRate, minRateDrop: path.minRateDrop, minPnl: r.minPnl };
+           minRate: path.minRate, minRateDrop: path.minRateDrop, minPnl: r.minPnl,
+           /* 費用込み（概算・参考値）：費用レイヤー有効時のみ意味を持つ。通常値とは別枠で保持する */
+           costEnabled: !!MarginSim.costLayerOf(st), costNow: r.current.cost, costRate: r.current.costRate,
+           costMinRate: path.minCostRate, costMinRateDrop: path.minCostRateDrop, costAtMin: path.costAtMin };
 }
 /* 結果コメント：要約値から定型で組み立てる。断定的な助言にはせず、想定である旨と証券会社での確認を添える */
 function resultCommentText(){
@@ -2052,6 +2119,10 @@ function renderDashboard(){
   var callMarginYen = cur.principal > 0 ? cur.balance - cur.principal * st.marginCall / 100 : null;
   var status = rateStatus(cur.rate);
   var detailed = isDetailedScenario(state);
+  /* 費用込み（概算・参考値）：費用レイヤー有効時のみ、経路評価を追加で1回だけ行う。
+     到達表示・ヒーローは従来どおり通常の維持率が正本で、費用込みの到達は表示しない */
+  var costOn = !!MarginSim.costLayerOf(state);
+  var pathCost = costOn ? MarginSim.pathEvaluate(state, st.maxDrop) : null;
   var heroCls = sim.firstCallPrecise !== null ? "danger" : (sim.firstMgmtPrecise !== null ? "caution" : "");
   var heroMain, heroSub;
   if (sim.firstMgmtPrecise !== null){
@@ -2105,6 +2176,7 @@ function renderDashboard(){
 
   html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
     + kpi(dispRateLabel, dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
+    + (costOn ? kpi("費用込みの現在維持率（概算）", cur.costRate === null ? "対象外" : fmtPct(cur.costRate), "概算費用 " + fmtYen(cur.cost) + "（金利 " + fmtYen(cur.costParts.interest) + (cur.costParts.includeAdmin ? "＋管理費 " + fmtYen(cur.costParts.admin) : "") + "）を差し引いた参考値。貸株料・逆日歩・名義書換料・配当落調整金は含みません。到達判定は通常の維持率が正本です", "") : "")
     + kpi("自主管理基準（" + st.management + "%）までの余裕", mgmtMarginPt === null ? "—" : (mgmtMarginPt >= 0 ? "+" : "−") + Math.abs(mgmtMarginPt).toFixed(1) + "<small> pt</small>", mgmtMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(mgmtMarginYen), mgmtMarginPt !== null && mgmtMarginPt < 0 ? "alert" : "")
     + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginYen === null ? "建玉なし" : "金額換算 " + fmtSignedYen(callMarginYen), callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
     + kpi("現在の信用建玉総額（実績）", fmtYen(cur.principal), "銘柄別保有＋計画銘柄以外の既存建玉の建代金合計（実績）", "")
@@ -2113,6 +2185,7 @@ function renderDashboard(){
     + "</div>"
     + '<h2 class="grouphead">将来の見通し<span class="gh-tag">推計（未実行の計画を実行した場合のシミュレーション）</span></h2><div class="kpis">'
     + kpi("未実行の購入予定総額（推計）", fmtYen(sim.planCost), "未実行段階の予算合計 " + fmtYen(sim.planBudget) + "（売買単位で丸めた実購入額）", "")
+    + (costOn ? kpi("費用込みの経路上の最低維持率（概算）", pathCost.minCostRate === null ? "対象外" : fmtPct(pathCost.minCostRate), pathCost.minCostRate === null ? "建玉がないため対象外です" : ((detailed ? reachText(pathCost.minCostRateDrop) : "下落率 −" + pathCost.minCostRateDrop + "%") + " 時点・その時点の概算費用 " + fmtYen(pathCost.costAtMin) + " を差し引いた参考値（通常の経路最低維持率とは別表示。到達判定は通常の維持率が正本）"), "") : "")
     + kpi("想定最大評価損", fmtSignedYen(sim.minPnl), "想定範囲内で最も大きい評価損（既存＋計画建玉）", sim.minPnl < 0 ? "caution" : "")
     + kpi(detailed ? "管理基準に到達する想定進行度（推計）" : "管理基準に到達する想定下落率（推計・0.1%精度）", sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) : "到達せず", sim.firstMgmtPrecise !== null ? (detailed ? reachText(sim.firstMgmtPrecise) + " 時点で到達（最初の到達点・購入段階の直前・直後も評価）。以後は詳細表で確認" : "最初の到達点（購入段階の直前・直後も評価）。以後は詳細表で確認") : (detailed ? "進行度100%の範囲内では到達しません" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません"), sim.firstMgmtPrecise !== null ? "caution" : "")
     + kpi(detailed ? "追証基準に到達する想定進行度（推計）" : "追証基準に到達する想定下落率（推計・0.1%精度）", sim.firstCallPrecise !== null ? reachShort(sim.firstCallPrecise) : "到達せず", sim.firstCallPrecise !== null ? (detailed ? reachText(sim.firstCallPrecise) + " 時点で到達（最初の到達点・購入段階の直前・直後も評価）" : "最初の到達点（購入段階の直前・直後も評価）") : (detailed ? "進行度100%の範囲内では到達しません" : "最大下落率 −" + st.maxDrop + "% の範囲内では到達しません"), sim.firstCallPrecise !== null ? "alert" : "")
@@ -2185,6 +2258,9 @@ function renderDashboard(){
       + " ・ 追証基準到達（0.1%精度）：" + (sim.firstCallPrecise !== null ? "<strong>−" + sim.firstCallPrecise.toFixed(1) + "%</strong>" : "最大下落率の範囲内では到達しません")
       + (sim.firstMinMarginPrecise !== null ? " ・ 最低保証金を下回る下落率：<strong>−" + sim.firstMinMarginPrecise.toFixed(1) + "%</strong>" : "")
       + (ui.selectedDrop !== null ? " ・ 選択中：<strong>−" + ui.selectedDrop + "%</strong>" : "");
+  if (costOn && pathCost && pathCost.minCostRate !== null){
+    detailMeta += " ・ 費用込みの経路上の最低維持率（概算）：<strong>" + fmtPct(pathCost.minCostRate) + "</strong>（" + (detailed ? reachShort(pathCost.minCostRateDrop) : "−" + pathCost.minCostRateDrop + "%") + "時点・概算費用 " + fmtYen(pathCost.costAtMin) + " を差し引いた参考値）";
+  }
   html += '<details class="card detail-card" id="dropDetail"' + (ui.detailOpen ? " open" : "") + '><summary aria-label="下落率別の詳細を開閉する"><div class="detail-summary-in"><div class="detail-summary-main"><h2>' + (detailed ? "進行度別の詳細（シミュレーション）" : "下落率別の詳細（シミュレーション）") + '</h2><div class="detail-summary-meta">' + detailMeta + ' — タップで表を開きます</div></div><span class="detail-toggle"><span class="label-open">詳細を開く</span><span class="label-close">閉じる</span><span class="chev" aria-hidden="true">▼</span></span></div></summary><div class="detail-body"><p class="sub">実口座の現在値ではなく、各下落率まで相場が下落し、到達した購入段階をすべて実行した場合の推計です。新規建余力は概算です。行を選ぶとグラフ上に位置を示します。<br>下落率の起点の区別：この表とグラフの下落率は<strong>各銘柄の計画基準価格を起点</strong>とする下落率です。一方、代用有価証券の連動設定（設定画面）は<strong>現在の代用評価額に対する変動の想定</strong>で、起点が異なります。基準への到達下落率は表の刻みより細かい0.1%精度（購入段階の直前・直後も評価）で別途算出し、上の要約とKPIに表示しています。維持率の分子では評価損は差し引き、評価益は算入しません（SBI証券公式ルール準拠）。' + (detailed ? '<br>詳細シナリオでは、表とグラフの横軸は<strong>進行度</strong>で、各銘柄の下落率は「その銘柄の終点下落率×進行度」です。担保と計画銘柄以外の既存建玉は基準パス（想定最大下落率への比例）で変動します。' : "") + '</p><div class="tblwrap"><table class="dt"><thead><tr>'
     + "<th>" + (detailed ? "進行度（銘柄別下落率）" : "下落率") + "</th><th>累計購入額</th><th>建玉総額</th><th>評価損益</th><th>代用評価額</th><th>実質保証金</th><th>維持率</th><th>新規建余力（概算）</th><th>状態</th></tr></thead><tbody>";
   sim.rows.forEach(function(r){
@@ -2249,6 +2325,7 @@ function simpleDashboardHtml(cur, st){
   var html = '<div class="card"><h2>結果コメント</h2><p class="sub" style="margin-bottom:0">' + esc(resultCommentText()) + "</p></div>";
   html += '<h2 class="grouphead">現在の状況<span class="gh-tag">実績（登録済みの口座・保有情報）</span></h2><div class="kpis">'
     + kpi(brokerRate !== null ? "証券会社表示の維持率（実績）" : "現在の保証金維持率（実績から推計）", dispRate === null ? "対象外" : fmtPct(dispRate), dispRate === null ? "建玉がないため維持率は対象外です" : (brokerRate !== null ? "口座画面で入力した証券会社表示値" : "現在の保有＋既存建玉での推計" + (cur.pnlApprox ? "（評価損益未入力分は概算）" : "")), cur.rate !== null && cur.rate < st.marginCall ? "alert" : (cur.rate !== null && cur.rate < st.management ? "caution" : ""))
+    + (st.costLayer && st.costLayer.enabled ? kpi("費用込みの現在維持率（概算）", cur.costRate === null ? "対象外" : fmtPct(cur.costRate), "概算費用 " + fmtYen(cur.cost) + " を差し引いた参考値。貸株料・逆日歩・名義書換料・配当落調整金は含みません。到達判定は通常の維持率が正本です", "") : "")
     + kpi("自主管理基準（" + st.management + "%）までの余裕", mgmtMarginPt === null ? "—" : (mgmtMarginPt >= 0 ? "+" : "−") + Math.abs(mgmtMarginPt).toFixed(1) + "<small> pt</small>", mgmtMarginPt === null ? "建玉なし" : "現在の維持率と管理基準の差", mgmtMarginPt !== null && mgmtMarginPt < 0 ? "alert" : "")
     + kpi("追証基準（" + st.marginCall + "%）までの余裕", callMarginPt === null ? "—" : (callMarginPt >= 0 ? "+" : "−") + Math.abs(callMarginPt).toFixed(1) + "<small> pt</small>", callMarginPt === null ? "建玉なし" : "現在の維持率と追証基準の差", callMarginPt !== null && callMarginPt < 0 ? "alert" : "")
     + kpi("現在の信用建玉総額（実績）", fmtYen(cur.principal), "銘柄別保有＋計画銘柄以外の既存建玉の建代金合計（実績）", "")
@@ -2355,7 +2432,16 @@ function currentInstrument(){
 }
 function renderPlan(){
   var el = document.getElementById("view-plan");
-  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) + (isDetailedScenario(state) ? "" : "（0.1%精度）") : (isDetailedScenario(state) ? "なし（進行度100%まで）" : "なし（−" + state.settings.maxDrop + "%まで）")) + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span></div>";
+  var html = '<div class="minibar"><span>計画購入総額（実購入） <b class="num">' + fmtYen(sim.planCost) + '</b></span><span>予算合計 <b class="num">' + fmtYen(sim.planBudget) + '</b></span><span>管理基準の最初の到達 <b>' + (sim.firstMgmtPrecise !== null ? reachShort(sim.firstMgmtPrecise) + (isDetailedScenario(state) ? "" : "（0.1%精度）") : (isDetailedScenario(state) ? "なし（進行度100%まで）" : "なし（−" + state.settings.maxDrop + "%まで）")) + '</b></span><span>想定最大評価損 <b class="num">' + fmtSignedYen(sim.minPnl) + "</b></span>";
+  /* 費用込みの経路上の最低維持率（概算・参考値）：費用レイヤー有効時のみ、通常の経路最低維持率とは別枠で表示する。
+     到達表示は従来どおり通常の維持率が正本で、費用込みの到達は表示しない */
+  if (MarginSim.costLayerOf(state)){
+    var pcPlan = MarginSim.pathEvaluate(state, state.settings.maxDrop);
+    html += '<span>費用込みの経路上の最低維持率（概算） <b class="num">' + (pcPlan.minCostRate === null ? "対象外" : fmtPct(pcPlan.minCostRate)) + "</b>"
+      + (pcPlan.minCostRate === null ? "" : "（" + (isDetailedScenario(state) ? reachShort(pcPlan.minCostRateDrop) : "−" + pcPlan.minCostRateDrop + "%") + "時点・概算費用 " + fmtYen(pcPlan.costAtMin) + " を差し引いた参考値。通常の経路最低維持率 " + (pcPlan.minRate === null ? "対象外" : fmtPct(pcPlan.minRate)) + " とは別表示で、到達判定は通常の維持率が正本です）")
+      + "</span>";
+  }
+  html += "</div>";
   html += scenarioSummaryHtml();
   html += '<div class="chips" role="listbox" aria-label="銘柄一覧">';
   state.instruments.forEach(function(ins){
@@ -3266,6 +3352,8 @@ function renderAccount(){
 function renderSettings(){
   var el = document.getElementById("view-settings"), s = state.settings;
   var simple = viewMode() === "simple";
+  /* 信用コストの概算設定（旧データでも sanitizeState が必ず補完するが、念のため防御する） */
+  var cl = s.costLayer || (s.costLayer = { enabled: false, ratePct: 2.8, days: 180, includeAdmin: false });
   var html = '<div class="grid2 wide"><div>'
     + modeSwitchHtml()
     + scenarioSummaryHtml()
@@ -3298,6 +3386,19 @@ function renderSettings(){
     + '<p class="hint">銘柄名・区分・売買単位は中継では取得できません（登録情報または手入力を使ってください）。</p>'
     + '<p class="hint">初期値：' + esc(DEFAULT_RELAY_URL) + '。https:// で始まるURLだけを保存できます。それ以外を入力した場合は除去され、中継は無効になります。</p></div>')
 
+    + (simple ? "" : '<div class="card"><h2>信用コストの概算（任意）</h2>'
+    + '<p class="sub">買い建玉の金利（と任意で管理費）の概算を、通常の維持率とは<strong>別枠</strong>の「費用込み維持率（概算）」として表示するための任意設定です。有効にしても通常の維持率・管理／追証基準への到達・実購入予定額は変わりません（費用込みは参考値で、到達判定は通常の維持率が正本です）。無効のときは表示・計算とも従来と完全に同一です。</p>'
+    + '<label class="switchlabel"><input type="checkbox" id="c_enabled" ' + (cl.enabled ? "checked" : "") + '> 信用コストの概算を有効にする</label>'
+    + '<div class="formgrid">'
+    + fld("買方金利（年率%）", '<input type="number" id="c_rate" min="0" max="100" step="0.01" value="' + cl.ratePct + '">')
+    + fld("想定保有日数（日）", '<input type="number" id="c_days" min="0" max="36500" step="1" value="' + cl.days + '">')
+    + "</div>"
+    + '<label class="switchlabel"><input type="checkbox" id="c_admin" ' + (cl.includeAdmin ? "checked" : "") + '> 管理費も概算に含める</label>'
+    + '<p class="hint"><strong>買方金利の初期値 2.80% について：</strong>SBI証券の制度信用・一般信用（無期限）の買方金利の公表値です（金利 ＝ 新規建約定金額 × 金利 × 日数 ÷ 365）。料率は変更されることがあるため、利用する証券会社の最新の公表値に合わせて変更してください。</p>'
+    + '<p class="hint"><strong>概算の方法：</strong>金利 ＝ 建代金合計 × 買方金利（年率）× 想定保有日数 ÷ 365（建代金は約定金額ベース）。段階ごとの発動時期を暦日へ換算する根拠はないため比例配分はせず、経路の各評価点では「その時点の建代金合計に対する想定保有日数分の金利」を差し引く<strong>保守的な上限概算</strong>としています。管理費を含める場合は、建玉件数（既存建玉の件数＋その時点で購入済みの計画段階数）× 経過月数（想定保有日数 ÷ 30・概算）× 110円（1建玉あたりの下限）で概算します。実際の管理費は建玉ごとに1か月経過ごとに1株11銭（税込）で、1建玉あたり下限110円／上限1,100円です。</p>'
+    + '<p class="hint"><strong>概算に含めていないもの：</strong>売り建玉の貸株料・逆日歩、名義書換料、配当落調整金（買いでは受取り側）は、金額や時期が前提に依存するため概算には含めていません。</p>'
+    + '<p class="hint"><strong>控除費用との関係（二重計上しない）：</strong>この概算費用は「将来の想定保有期間に対する未確定分」として、上のシミュレーション設定にある控除費用（実績・確定分）とは別枠で差し引きます。控除費用に計上済みの金額を、この概算側で重ねて数えないようご注意ください。</p></div>')
+
     + '<div class="card"><h2>データ管理</h2><p class="sub">入力したデータは、この端末のブラウザ内（IndexedDB）に形式バージョン付きで自動保存され、再起動後も自動で復元されます。保存先はこの端末・このブラウザ内のみで、他の端末とは同期されません。機種変更やブラウザのデータ消去に備えて、JSONバックアップも併用してください。</p>'
     + '<p class="hint" id="persistInfo">' + esc(persistInfoText()) + "</p>"
     + '<p class="hint">アプリのバージョン：アプリ v' + APP_VERSION + '（基本バージョン）／データ形式バージョン：v' + DATA_VERSION + '／Service Workerキャッシュ名：' + SW_CACHE_NAME + '。</p>'
@@ -3324,6 +3425,7 @@ function renderSettings(){
     + "<li>最低保証金：制度上、新規建てには委託保証金が最低保証金額（初期値300,000円）以上必要です。実質保証金（現金＋代用評価額−評価損−控除費用）がこれを下回る場合、現在値とシミュレーション各行で文字による警告を表示します。</li>"
     + "<li>下落率の起点の区別：シミュレーションの下落率は各銘柄の<strong>計画基準価格を起点</strong>とする下落率です。代用有価証券の連動設定は<strong>現在の代用評価額に対する変動の想定</strong>であり、両者は起点が異なります（計算方法自体は従来どおりです）。</li>"
     + "<li>新規建て条件（新規建保証金率）を満たせなくなる段階がある場合、その段階を詳細表で「新規建て条件を満たさない可能性」と文字でマークし、「購入可能な段階までで止めた場合の最終維持率」を補助指標として、本体のシミュレーション結果（購入可能な段階をすべて実行した場合）と区別して表示します。</li>"
+    + "<li>信用コストの概算（任意・初期値は無効）：有効にすると、買い建玉の金利（建代金合計×買方金利×想定保有日数÷365）と任意で管理費（建玉件数×経過月数×110円の下限概算）を差し引いた「費用込み維持率（概算）」を、通常の維持率とは別枠の参考値として表示します。経路の各評価点ではその時点の建代金合計に対する想定保有日数分の金利を差し引く保守的な上限概算で、段階の発動時期に応じた比例配分はしません。売り建玉の貸株料・逆日歩、名義書換料、配当落調整金は含めていません。費用込みの値で管理・追証基準への到達は判定しません（到達判定は通常の維持率が正本）。</li>"
     + "<li>維持率が追証基準に到達することと、実際に追証が発生することは同一ではありません。</li>"
     + "<li>金額は円単位、数量は売買単位で一貫して切り捨てます。浮動小数点誤差を避けるため、価格・数量は整数化してから金額を計算します。</li>"
     + "</ul></div>"
@@ -3355,6 +3457,13 @@ function renderSettings(){
       ? "終点下落率が連動割合の上限（300%）を超えるため、連動割合300%（終点 −" + res.endpoint + "%）で保存しました。"
       : "担保の終点下落率 −" + res.endpoint + "% を連動割合 " + s.collateralCustom + "% へ換算して保存しました。");
   });
+  /* 信用コストの概算（ステップ5）：有効・無効と各項目の変更をその場で反映する */
+  var cEnabled = el.querySelector("#c_enabled");
+  if (cEnabled) cEnabled.addEventListener("change", function(){ cl.enabled = cEnabled.checked; recalc(); renderSettings(); toast(cl.enabled ? "信用コストの概算を有効にしました（費用込み維持率は参考値です）。" : "信用コストの概算を無効にしました（表示・計算は従来どおりです）。"); });
+  var cAdmin = el.querySelector("#c_admin");
+  if (cAdmin) cAdmin.addEventListener("change", function(){ cl.includeAdmin = cAdmin.checked; recalc(); renderSettings(); toast("管理費の概算設定を反映しました。"); });
+  on("#c_rate", function(n){ cl.ratePct = clamp(num(n.value, 2.8), 0, 100); });
+  on("#c_days", function(n){ cl.days = clamp(Math.round(num(n.value, 180)), 0, 36500); });
   var relayInput = el.querySelector("#relay_url");
   if (relayInput) relayInput.addEventListener("change", function(){
     var raw = relayInput.value.trim();
@@ -3817,8 +3926,8 @@ function runSelfTests(){
   var goodKept41 = sanitizeState(good41).settings.relayUrl === "https://example.workers.dev";
   var round41 = unpackState(packState(sanitizeState(good41)));
   t("中継URLが初期値補完・検証・JSON往復できる", mig41.settings.relayUrl === DEFAULT_RELAY_URL && emptyKept41 && badRemoved41 && goodKept41
-    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21",
-    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.2／SW v21");
+    && round41.ok && round41.state.settings.relayUrl === "https://example.workers.dev" && APP_VERSION === "2.3" && SW_CACHE_NAME === "nanpin-planner-v22",
+    "旧データ（relayUrl なし）は初期値で補完され移行ブロックしない。空欄は無効として保持、http は除去、https は末尾スラッシュを除いて保持し、JSON書き出し／読み込みでも往復する。アプリ v2.3／SW v22");
   /* 42 想定価格の浮動小数点誤差の補正（70,000円・下落55% → ちょうど31,500円）と下流への一貫性 */
   var s42 = { version: 3, meta: { isSample: false, updatedAt: "" },
     account: { broker: "", collateral: 2000000, collateralBasis: "after", cash: 100000, brokerRate: null }, positions: [],
@@ -4224,26 +4333,26 @@ function runSelfTests(){
     && Math.abs(r78.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r78.firstCallPrecise - 77.6) < 0.051
     && Array.isArray(s78.instruments[0].slots) && s78.instruments[0].slots.length === 0,
     "サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変。サンプルのスロットは空で、既存の計算結果に影響しない");
-  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1。版は v2.2／SW v21）。
-     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
+  /* 79 Service Workerのページ取得がキャッシュ再検証（cache: "no-cache"）を指定している（v2.0.1・修正1。版は v2.3／SW v22）。
+     生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIyIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJCiAgICAgdjIuM++8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjIg44G45pu05paw77yI5L+h55So44Kz44K544OI44Gu5qaC566X44Os44Kk44Ok44O86L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= を読み取れる環境では実ファイルの内容まで確認し、読み取れない環境
      （埋め込み表示など）ではバージョン定数の一致をもって可能な範囲の確認とする */
-  var sw79ok = APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21";
+  var sw79ok = APP_VERSION === "2.3" && SW_CACHE_NAME === "nanpin-planner-v22";
   var sw79src = "";
   try {
     var xhr79 = new XMLHttpRequest();
-    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
+    xhr79.open("GET", "data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIyIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJCiAgICAgdjIuM++8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjIg44G45pu05paw77yI5L+h55So44Kz44K544OI44Gu5qaC566X44Os44Kk44Ok44O86L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo=", false);
     xhr79.send(null);
     if ((xhr79.status === 200 || xhr79.status === 0) && xhr79.responseText) sw79src = String(xhr79.responseText);
   } catch (e79) { sw79src = ""; }
   var sw79fileChecked = !!sw79src;
   if (sw79fileChecked){
-    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v21") >= 0
+    sw79ok = sw79ok && sw79src.indexOf("nanpin-planner-v22") >= 0
       && /new Request\(e\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw79src)
       && sw79src.indexOf("isNavigation") >= 0;
   }
   t("Service Workerのページ取得がキャッシュ再検証を指定する", sw79ok,
-    "アプリ v2.2／SWキャッシュ名 nanpin-planner-v21" + (sw79fileChecked
-      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIxIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v21"
+    "アプリ v2.3／SWキャッシュ名 nanpin-planner-v22" + (sw79fileChecked
+      ? "。生成物 data:application/javascript;base64,Lyog5L+h55So44OK44Oz44OU44Oz6KiI55S744O744Oq44K544Kv566h55CGIFNlcnZpY2UgV29ya2Vy77yI44Kq44OV44Op44Kk44Oz55So44Kt44Oj44OD44K344Ol77yJCiAgIEdpdEh1YiBQYWdlcyDnrYnjgavljZjni6zphY3nva7jgZfjgZ/loLTlkIjjgavmnInlirnjgIJNdXNlIOOBruWfi+OCgei+vOOBv+ihqOekuuOBp+OBr+eZu+mMsuOBp+OBjeOBquOBhOOBk+OBqOOBjOOBguOCiuOBvuOBmeOAgiAqLwp2YXIgQ0FDSEUgPSAibmFucGluLXBsYW5uZXItdjIyIjsKdmFyIENPUkUgPSBbIi4uL2luZGV4Lmh0bWwiLCAiLi9tYW5pZmVzdC53ZWJtYW5pZmVzdCIsICIuL2ljb24tMTkyLnBuZyIsICIuL2ljb24tNTEyLnBuZyJdOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGZ1bmN0aW9uIChjKSB7IHJldHVybiBjLmFkZEFsbChDT1JFKTsgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLnNraXBXYWl0aW5nKCk7IH0pKTsKfSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcigiYWN0aXZhdGUiLCBmdW5jdGlvbiAoZSkgewogIGUud2FpdFVudGlsKGNhY2hlcy5rZXlzKCkudGhlbihmdW5jdGlvbiAoa2V5cykgewogICAgcmV0dXJuIFByb21pc2UuYWxsKGtleXMuZmlsdGVyKGZ1bmN0aW9uIChrKSB7IHJldHVybiBrICE9PSBDQUNIRTsgfSkubWFwKGZ1bmN0aW9uIChrKSB7IHJldHVybiBjYWNoZXMuZGVsZXRlKGspOyB9KSk7CiAgfSkudGhlbihmdW5jdGlvbiAoKSB7IHJldHVybiBzZWxmLmNsaWVudHMuY2xhaW0oKTsgfSkpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCJmZXRjaCIsIGZ1bmN0aW9uIChlKSB7CiAgaWYgKGUucmVxdWVzdC5tZXRob2QgIT09ICJHRVQiKSByZXR1cm47CiAgaWYgKGUucmVxdWVzdC51cmwuaW5kZXhPZigicHJpY2VzLmpzb24iKSA+PSAwKSB7CiAgICAvKiDntYLlgKTjg4fjg7zjgr/jga/prq7luqblhKrlhYjvvJrjg43jg4Pjg4jjg6/jg7zjgq/jgpLlhYjjgavoqabjgZfjgIHlpLHmlZfjgZfjgZ/jgajjgY3jgaDjgZHjgq3jg6Pjg4Pjgrfjg6XjgpLov5TjgZkgKi8KICAgIGUucmVzcG9uZFdpdGgoZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KTsgfSkpOwogICAgcmV0dXJuOwogIH0KICAvKiDjg5rjg7zjgrjmnKzkvZPvvIjjg4rjg5PjgrLjg7zjgrfjg6fjg7PvvI9pbmRleOaWh+abuO+8ieOBr+ODjeODg+ODiOODr+ODvOOCr+WEquWFiO+8iHYxLjkuMu+8ie+8mgogICAgIOOCquODs+ODqeOCpOODs+aZguOBr+mAmuW4uOOBruWGjeiqreOBv+i+vOOBv+OBp+acgOaWsOeJiOOBjOihqOekuuOBleOCjOOCi+OCiOOBhuOBq+OBl+OAgeODjeODg+ODiOODr+ODvOOCr+OBjAogICAgIOS9v+OBiOOBquOBhOWgtOWQiOOBq+mZkOOCiuOCreODo+ODg+OCt+ODpeOBi+OCiei/lOOBme+8iOOCquODleODqeOCpOODs+i1t+WLleOBr+W+k+adpeOBqeOBiuOCiue2reaMgeOBmeOCi++8ieOAggogICAgIOWPluW+l+OBp+OBjeOBn+W/nOetlOOBr+OCreODo+ODg+OCt+ODpeOCguabtOaWsOOBl+OBpuOBiuOBjeOAgeasoeWbnuOBruOCquODleODqeOCpOODs+i1t+WLleOBq+WCmeOBiOOCi+OAggogICAgIHYyLjAuMe+8muWPluW+l+OBr+OCreODo+ODg+OCt+ODpeWGjeaknOiovO+8iGNhY2hlOiAibm8tY2FjaGUi77yJ44KS5oyH5a6a44GX44CB44OW44Op44Km44K244GuSFRUUOOCreODo+ODg+OCt+ODpeOBjAogICAgIOWPpOOBhOaWh+abuOOCkui/lOOBmeOBk+OBqOOCkumYsuOBkOOAguWGjeaknOiovOOBp+WkieabtOOBjOOBquOBkeOCjOOBsOOCteODvOODkOODvOOBriAzMDQg5b+c562U44Gn5riI44KA44Gf44KB6Lui6YCB6YeP44Gv5aKX44GI44Gq44GE44CCCiAgICAgdjIuMu+8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjEg44G45pu05paw77yI57Ch5piT77yP6Kmz57Sw44Oi44O844OJ44Go5YmN5o+Q44K144Oe44Oq44O844Gu5oqY44KK44Gf44Gf44G/6L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJCiAgICAgdjIuM++8muOCreODo+ODg+OCt+ODpeWQjeOCkiBuYW5waW4tcGxhbm5lci12MjIg44G45pu05paw77yI5L+h55So44Kz44K544OI44Gu5qaC566X44Os44Kk44Ok44O86L+95Yqg44Gr5Ly044GG54mI5LiK44GS77yJICovCiAgdmFyIGlzTmF2aWdhdGlvbiA9IGUucmVxdWVzdC5tb2RlID09PSAibmF2aWdhdGUiOwogIHZhciBpc0luZGV4RG9jdW1lbnQgPSAvKF58XC8paW5kZXhcLmh0bWwoWz8jXXwkKS8udGVzdChlLnJlcXVlc3QudXJsKSB8fCAvXC8kLy50ZXN0KG5ldyBVUkwoZS5yZXF1ZXN0LnVybCkucGF0aG5hbWUpOwogIGlmIChpc05hdmlnYXRpb24gfHwgaXNJbmRleERvY3VtZW50KSB7CiAgICB2YXIgcmV2YWxpZGF0ZVJlcXVlc3QgPSBuZXcgUmVxdWVzdChlLnJlcXVlc3QsIHsgY2FjaGU6ICJuby1jYWNoZSIgfSk7CiAgICBlLnJlc3BvbmRXaXRoKGZldGNoKHJldmFsaWRhdGVSZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7CiAgICAgIHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgICAgICByZXR1cm4gaGl0IHx8IGNhY2hlcy5tYXRjaCgiLi4vaW5kZXguaHRtbCIsIHsgaWdub3JlU2VhcmNoOiB0cnVlIH0pOwogICAgICB9KTsKICAgIH0pKTsKICAgIHJldHVybjsKICB9CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChoaXQpIHsKICAgIHJldHVybiBoaXQgfHwgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KTsKICB9KSk7Cn0pOwo= の実内容も確認済み：ナビゲーション／index文書の取得はリクエストを作り直して cache: \"no-cache\"（再検証）を指定し、キャッシュ名も v22"
       : "。この環境では生成物ファイルを読めないため、バージョン定数の一致で確認（実ファイルの内容確認は公開版で行う）"));
   /* 80 計画比較セクションの注記が現在の想定最大下落率を動的に表示する（v2.0.1・修正2） */
   var s80 = sanitizeState(sampleState());
@@ -4410,11 +4519,77 @@ function runSelfTests(){
     && cmt92.indexOf("4,493,550円") >= 0 && cmt92.indexOf("想定です") >= 0
     && cmt92.indexOf("実際の可否は証券会社の表示で確認してください") >= 0,
     "コメントは新しい計算を作らず、現在の維持率・到達・経路上の最低維持率・実購入予定額（サンプルでは 4,493,550円）など既存エンジンの結果から定型で組み立てる。断定的な助言にはせず「〜の想定です」とし、「実際の可否は証券会社の表示で確認してください」の注意を必ず含む");
-  /* 93 バージョン v2.2／SW v21 と既存サンプルの回帰値（ステップ4でも計算エンジン・サンプルは無変更） */
+  /* 93 バージョン v2.3／SW v22 と既存サンプルの回帰値（ステップ5は費用レイヤーの追加のみで、費用レイヤー無効時の計算エンジン・サンプルは無変更） */
   var r93 = MarginSim.simulate(sanitizeState(sampleState()));
-  t("アプリ v2.2／SW nanpin-planner-v21 で回帰値が不変", APP_VERSION === "2.2" && SW_CACHE_NAME === "nanpin-planner-v21"
+  t("アプリ v2.3／SW nanpin-planner-v22 で回帰値が不変", APP_VERSION === "2.3" && SW_CACHE_NAME === "nanpin-planner-v22"
     && r93.planCost === 4493550 && Math.abs(r93.firstMgmtPrecise - 76.6) < 0.051 && Math.abs(r93.firstCallPrecise - 77.6) < 0.051,
-    "アプリ v2.2／Service Workerキャッシュ名 nanpin-planner-v21。サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変");
+    "アプリ v2.3／Service Workerキャッシュ名 nanpin-planner-v22。サンプルの実購入予定額 4,493,550円、管理基準到達 −76.6%・追証基準到達 −77.6% は不変");
+  /* 94 金利計算の単位確認（ステップ5）：建代金 1,000,000円 × 年率2.80% × 365日 ＝ 28,000円。
+        管理費は建玉件数 × 経過月数（保有日数÷30）× 110円（下限）で、180日・3件では 3×6×110 ＝ 1,980円 */
+  var s94 = sanitizeState(sampleState());
+  s94.settings.costLayer = { enabled: true, ratePct: 2.8, days: 365, includeAdmin: false };
+  var cp94 = MarginSim.costParts(s94, 1000000, 5);
+  var s94b = sanitizeState(sampleState());
+  s94b.settings.costLayer = { enabled: true, ratePct: 2.8, days: 180, includeAdmin: true };
+  var cp94b = MarginSim.costParts(s94b, 1000000, 3);
+  t("金利概算の単位計算と管理費概算が手計算と一致する", Math.abs(cp94.interest - 28000) < 0.01 && cp94.admin === 0 && Math.abs(cp94.total - 28000) < 0.01
+    && Math.abs(cp94b.interest - 1000000 * 0.028 * 180 / 365) < 0.01 && cp94b.admin === 1980 && Math.abs(cp94b.total - (cp94b.interest + 1980)) < 0.01,
+    "建代金1,000,000円・年率2.80%・365日で金利は 28,000円（＝約定金額×金利×日数÷365）。管理費あり・180日・建玉3件では経過月数6か月×110円×3件 ＝ 1,980円が加わる");
+  /* 95 既存サンプルで費用レイヤー有効（2.80%・365日・管理費なし）にすると、費用込みの経路最低維持率が
+        通常の経路最低維持率を下回り、手計算と一致する。仕様の手計算（最大下落時点の残高 325,683円 −
+        金利概算 127,634円）÷ 建代金合計 4,558,350円 ≒ 4.3%（通常 7.1%）は現金 77,777円の前提での値のため、
+        その前提でも再現を確認する（初期サンプルの現金 70,309円では残高 318,215円・通常 6.98%・費用込み 4.18%） */
+  var s95 = sanitizeState(sampleState());
+  s95.settings.costLayer = { enabled: true, ratePct: 2.8, days: 365, includeAdmin: false };
+  var path95 = MarginSim.pathEvaluate(s95, 80);
+  var pt95 = MarginSim.pointAt(s95, path95.stageRes, 80, 80);
+  var s95b = sanitizeState(sampleState());
+  s95b.account.cash = 77777;
+  s95b.settings.costLayer = { enabled: true, ratePct: 2.8, days: 365, includeAdmin: false };
+  var path95b = MarginSim.pathEvaluate(s95b, 80);
+  var pt95b = MarginSim.pointAt(s95b, path95b.stageRes, 80, 80);
+  var hand95 = (325683 - 127634) / 4558350 * 100;
+  t("費用込みの経路最低維持率が通常を下回り手計算（約4.3%）と一致する", path95.minCostRate !== null && path95.minCostRate < path95.minRate
+    && Math.abs(path95.minCostRate - (path95.minRate - 2.8)) < 0.001 && Math.abs(path95.minCostRate - pt95.costRate) < 0.001
+    && pt95b.totalPrincipal === 4558350 && Math.abs(pt95b.balance - 325683) < 1.5 && Math.abs(pt95b.cost - 127634) < 1.5
+    && Math.abs(path95b.minRate - 7.1) < 0.1 && Math.abs(path95b.minCostRate - 4.3) < 0.1 && Math.abs(pt95b.costRate - hand95) < 0.05,
+    "初期サンプルでは通常の経路最低維持率 " + (path95.minRate === null ? "—" : path95.minRate.toFixed(2)) + "% に対し費用込みは " + (path95.minCostRate === null ? "—" : path95.minCostRate.toFixed(2)) + "%（金利ぶん 2.8pt を差し引いた値と一致）。仕様の手計算の前提（現金77,777円）では最大下落時点の残高 325,683円・建代金合計 4,558,350円・金利概算 127,634円で、通常 " + (path95b.minRate === null ? "—" : path95b.minRate.toFixed(2)) + "% → 費用込み " + (path95b.minCostRate === null ? "—" : path95b.minCostRate.toFixed(2)) + "% となり、手計算（325,683−127,634）÷4,558,350 ≒ 4.3% と一致する");
+  /* 96 費用レイヤーの有効・無効で、通常の維持率・到達・実購入予定額は変わらない（費用は別枠の参考値） */
+  var s96off = sanitizeState(sampleState());
+  var s96on = sanitizeState(sampleState());
+  s96on.settings.costLayer = { enabled: true, ratePct: 2.8, days: 365, includeAdmin: true };
+  var r96off = MarginSim.simulate(s96off), r96on = MarginSim.simulate(s96on);
+  var p96off = MarginSim.pathEvaluate(s96off, 80), p96on = MarginSim.pathEvaluate(s96on, 80);
+  t("費用レイヤーの有効・無効で通常の維持率・到達・実購入予定額が変わらない", r96off.current.rate === r96on.current.rate && r96off.current.balance === r96on.current.balance
+    && r96off.planCost === r96on.planCost && r96off.planBudget === r96on.planBudget
+    && r96off.firstMgmtPrecise === r96on.firstMgmtPrecise && r96off.firstCallPrecise === r96on.firstCallPrecise
+    && p96off.minRate === p96on.minRate && p96off.minRateDrop === p96on.minRateDrop && p96off.minBalance === p96on.minBalance
+    && r96off.current.cost === 0 && r96on.current.cost > 0 && r96on.current.costRate < r96on.current.rate,
+    "有効にしても現在維持率・実質保証金・実購入予定額 4,493,550円・到達 −76.6%/−77.6%・経路最低維持率は無効時と完全一致する。無効時の概算費用は0で、費用込み現在維持率は有効時のみ通常値を下回る参考値として別枠に現れる");
+  /* 97 費用設定がJSON往復で保持され、費用項目のない旧データは「無効・初期値」として読み込める。データ形式は v3 のまま */
+  var s97 = sanitizeState(sampleState());
+  s97.settings.costLayer = { enabled: true, ratePct: 3.25, days: 90, includeAdmin: true };
+  var round97 = unpackState(JSON.parse(JSON.stringify(packState(s97))));
+  var old97 = sampleState(); delete old97.settings.costLayer;
+  var mig97 = sanitizeState(old97);
+  var bad97 = sampleState(); bad97.settings.costLayer = { enabled: "yes", ratePct: -5, days: 99999999, includeAdmin: 1 };
+  var bad97c = sanitizeState(bad97).settings.costLayer;
+  t("費用設定がJSON往復で保持され項目のない旧データは無効として読み込める", round97.ok && round97.state.settings.costLayer.enabled === true
+    && round97.state.settings.costLayer.ratePct === 3.25 && round97.state.settings.costLayer.days === 90 && round97.state.settings.costLayer.includeAdmin === true
+    && mig97.settings.costLayer.enabled === false && mig97.settings.costLayer.ratePct === 2.8 && mig97.settings.costLayer.days === 180 && mig97.settings.costLayer.includeAdmin === false
+    && bad97c.ratePct === 0 && bad97c.days === 36500 && DATA_VERSION === 3,
+    "有効・金利3.25%・90日・管理費ありは封筒に包んだJSON往復で保持される。costLayer 項目のない旧データは無効・初期値（2.80%／180日／管理費なし）で補完され、従来どおり読み込める。範囲外の値は丸められ、データ形式バージョンは3のまま");
+  /* 98 費用込みの現在維持率（概算）は現在の建代金合計に対する概算費用を差し引いた値で、管理費の建玉件数は
+        既存建玉の件数＋未実行段階数（計画全体の概算）ではなく、現在値では既存建玉のみで数える */
+  var s98 = sanitizeState(sampleState());
+  s98.settings.costLayer = { enabled: true, ratePct: 2.8, days: 180, includeAdmin: true };
+  var r98 = MarginSim.simulate(s98);
+  var base98 = MarginSim.basePositionCount(s98);
+  var expect98 = r98.current.principal * 0.028 * 180 / 365 + base98 * 6 * 110;
+  t("費用込みの現在維持率が現在の建代金合計への概算費用で計算される", base98 === 1 && Math.abs(r98.current.cost - expect98) < 0.01
+    && Math.abs(r98.current.costRate - (r98.current.balance - expect98) / r98.current.principal * 100) < 0.001
+    && r98.current.costParts.count === 1,
+    "サンプルの既存建玉は1件（建代金64,800円・保有なし）のため、現在値の管理費は1件×6か月×110円で数える（未実行の計画段階はまだ建玉ではない）。費用込み現在維持率は（実質保証金 − 概算費用 " + fmtYen(r98.current.cost) + "）÷ 現在の建代金合計で計算される");
   return T;
 }
 
