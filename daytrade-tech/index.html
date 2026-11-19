@@ -128,7 +128,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.4 ／ 工程2〜4</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.5 ／ 工程2〜5-C</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -169,7 +169,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全47ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 0.6／defs 0.5-draft）の実測 <b>総数2082件</b> と一致しなければなりません（「極値時点」では2081件）。純GBM seed 7 では、全47ルール有効・ATR基準「現在足」で <b>総数2036件</b> です。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全122ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 1.5／defs 0.14）の実測 <b>総数6850件</b> と一致しなければなりません（「極値時点」では6849件）。純GBM seed 7 では、全122ルール有効・ATR基準「現在足」で <b>総数6607件</b> です。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -254,12 +254,12 @@
         <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。照合は数値を有効数字10桁に丸めて行います。生成器の超越関数計算は実行環境（Node/ブラウザ）により相対1e-12程度の浮動小数点差を生じるためで、実際の判定データの乖離はそれより桁違いに大きく、検出には影響しません。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.4）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.5）</h3>
         <ul class="tight">
-          <li>単体テスト：基本21/21、5-B-1追加9/9、5-B-2試行10/10、5-B-2次バッチ12/12、5-B-2最終バッチ9/9（<b>全61件合格</b>）。</li>
-          <li>因果性テスト：<b>53,890件（全47ルール、prefix因果性の深い等価比較で全一致）</b>。未来足の置換に対する不変性も合格。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数2082件（現在足）／2081件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも2036件。</li>
-          <li>互換確認：旧版アンカーの再現として、旧10ルールで310／309／322／322件（v0.2）、既存16ルールで855／854／857／857件（v0.3）、既存25ルールで1337／1336／1383／1383件（v0.4）、既存39ルールで1947／1946／1898／1898件（v0.5）がそれぞれ完全一致。</li>
+          <li>単体テスト：<b>全テスト群合格（内訳は検証報告書参照）</b>。</li>
+          <li>因果性テスト：<b>166,188件（全122ルール、prefix因果性の深い等価比較で全一致）</b>。未来足の置換に対する不変性も合格。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数6850件（現在足）／6849件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも6607件。</li>
+          <li>互換確認：旧版アンカーの再現として、旧10ルールで310／309／322／322件（v0.2）、既存16ルールで855／854／857／857件（v0.3）、既存25ルールで1337／1336／1383／1383件（v0.4）、既存39ルールで1947／1946／1898／1898件（v0.5）がそれぞれ完全一致。検出器1.5では旧120ルールを新規2件OFFで全項目深さ比較26,851件一致。</li>
         </ul>
         <h3>統計監査（v0.1 バッチの再監査）</h3>
         <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
@@ -282,12 +282,12 @@
 
       <section aria-labelledby="h-report" class="report">
         <h2 id="h-report">実装・検証レポート</h2>
-        <p>現行版は <b>v0.4（検出器 0.6／defs 0.5／全47ルール）</b> です。</p>
+        <p>現行版は <b>v0.5（検出器 1.5／defs 0.14／全122ルール）</b> です。</p>
         <p>経緯・検証報告書はアイデアノートに集約しています：<a href="https://docs.google.com/document/d/1ORdhYxk0DAEL2z7uqryTE7IYHcGDCRSPiF7D61fZRmk/edit" target="_blank" rel="noopener">アイデアノート（Google ドキュメント）</a></p>
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.4 ／ デイトレゲーム工程2〜4。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.5 ／ デイトレゲーム工程2〜5-C。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -340,34 +340,12 @@ function generate(seed=1, options={}) {
   return {seed,config:c,bars:bars.slice(-(c.history+66))};
 }
 
-/* ===== 正本コード2：テクニカル検出器 v0.6（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
-// Technical extraction engine (detector) v0.3
-// v0.3 changes (2026-11-18, Stage 5-B-1): the candle rules are JSON-driven —
-// metadata, parameters and lookback come from defs.generated.mjs (generated
-// one-directionally from defs/catalog.json, defs 0.2); JS keeps the math.
-// Six representative candle rules are added (long-upper-shadow, marubozu,
-// harami, bearish-engulfing, hammer-context, morning-evening-star-windowless).
-// Events gain top-level `variant` (null when the rule has no variants) and
-// `coverage` (evaluable scoring weight / planned scoring weight, section 13);
-// neither field is part of the v0.2 normalized hash field list, so the v0.2
-// canonical hashes remain comparable for the ten pre-existing rules.
-// New rules use critN/scoreOf2: pass=null and match=null mark data-unavailable
-// criteria, and the score renormalizes over evaluable criteria only.
-// The ten pre-existing rules keep their exact v0.2 behaviour (legacy scoring).
-// Technical extraction engine (detector) v0.2
-// Stages 2-3 of the daytrade-game technical plan: adapter, features, causal ZigZag,
-// rule registry and evaluation. Pure JS, no external libraries.
-// The detector NEVER receives generator internals (variance, jumps).
-// v0.2 changes (2026-11-18, per project doc section 08): ZigZag gains an optional
-// pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
-// events/bars carry extension metadata (category, family, timeframe, isSessionStart)
-// that no rule reads, so metadata never changes detection results.
-const DETECTOR_VERSION = '0.6';
+/* ===== 正本コード2：テクニカル検出器 1.5／defs 0.14（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
 // GENERATED from defs/catalog.json by defs/build_detector_defs.py — do not edit by hand.
 // JSON is the source of truth for metadata, parameters and lookback of the
 // JSON-driven candle rules; JS remains the source of truth for the math.
-const DEFS_VERSION = '0.5-draft';
-const DEFS_DIGEST = '1658c629a6546e5b02683fcc2164830c314fa0a1c2978f11b8b81151fa597267';
+const DEFS_VERSION = '0.14';
+const DEFS_DIGEST = '5452558ea151c66b89968ae8961932dcd56e0c4b1ebcce3d98621f90227d14e7';
 const DEFS = {
  "doji": {
   "catalogRuleId": "doji",
@@ -884,8 +862,996 @@ const DEFS = {
   "parameters": {
    "bodyRatioMin": 0.5
   }
+ },
+ "ema-cross": {
+  "catalogRuleId": "ema-cross",
+  "name": "EMAクロス",
+  "nameEn": "EMA Cross",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 26,
+  "parameters": {
+   "fastPeriod": 5,
+   "slowPeriod": 25
+  }
+ },
+ "price-ma-cross": {
+  "catalogRuleId": "price-ma-cross",
+  "name": "価格・MAクロス",
+  "nameEn": "Price / MA Cross",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 21,
+  "parameters": {
+   "maPeriod": 20
+  }
+ },
+ "ma-slope-turn": {
+  "catalogRuleId": "ma-slope-turn",
+  "name": "MA傾き転換",
+  "nameEn": "MA Slope Turn",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 22,
+  "parameters": {
+   "maPeriod": 20,
+   "slopeLag": 1
+  }
+ },
+ "perfect-order": {
+  "catalogRuleId": "perfect-order",
+  "name": "パーフェクトオーダー",
+  "nameEn": "Perfect Order",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 75,
+  "parameters": {
+   "shortPeriod": 5,
+   "midPeriod": 25,
+   "longPeriod": 75
+  }
+ },
+ "macd-signal-cross": {
+  "catalogRuleId": "macd-signal-cross",
+  "name": "MACDシグナルクロス",
+  "nameEn": "MACD Signal Cross",
+  "category": "trend",
+  "family": "macd",
+  "lookback": 35,
+  "parameters": {
+   "fastPeriod": 12,
+   "slowPeriod": 26,
+   "signalPeriod": 9
+  }
+ },
+ "macd-zero-cross": {
+  "catalogRuleId": "macd-zero-cross",
+  "name": "MACDゼロクロス",
+  "nameEn": "MACD Zero Cross",
+  "category": "trend",
+  "family": "macd",
+  "lookback": 27,
+  "parameters": {
+   "fastPeriod": 12,
+   "slowPeriod": 26
+  }
+ },
+ "macd-histogram-turn": {
+  "catalogRuleId": "macd-histogram-turn",
+  "name": "MACDヒストグラム転換",
+  "nameEn": "MACD Histogram Turn",
+  "category": "trend",
+  "family": "macd",
+  "lookback": 36,
+  "parameters": {
+   "fastPeriod": 12,
+   "slowPeriod": 26,
+   "signalPeriod": 9
+  }
+ },
+ "regression-slope": {
+  "catalogRuleId": "regression-slope",
+  "name": "線形回帰傾き",
+  "nameEn": "Linear Regression Slope",
+  "category": "trend",
+  "family": "regression",
+  "lookback": 21,
+  "parameters": {
+   "period": 20
+  }
+ },
+ "trix-cross": {
+  "catalogRuleId": "trix-cross",
+  "name": "TRIXクロス",
+  "nameEn": "TRIX Cross",
+  "category": "oscillator",
+  "family": "trix",
+  "lookback": 53,
+  "parameters": {
+   "period": 15,
+   "signalPeriod": 9
+  }
+ },
+ "bulls-bears-power": {
+  "catalogRuleId": "bulls-bears-power",
+  "name": "ブル・ベアパワー",
+  "nameEn": "Bulls / Bears Power",
+  "category": "oscillator",
+  "family": "elder-power",
+  "lookback": 14,
+  "parameters": {
+   "emaPeriod": 13
+  }
+ },
+ "rsi-center-cross": {
+  "catalogRuleId": "rsi-center-cross",
+  "name": "RSI中心線クロス",
+  "nameEn": "RSI Centerline Cross",
+  "category": "oscillator",
+  "family": "rsi",
+  "lookback": 16,
+  "parameters": {
+   "level": 50
+  }
+ },
+ "rsi-zone-exit": {
+  "catalogRuleId": "rsi-zone-exit",
+  "name": "RSI圏域退出",
+  "nameEn": "RSI Zone Exit",
+  "category": "oscillator",
+  "family": "rsi",
+  "lookback": 16,
+  "parameters": {
+   "oversoldExit": 30,
+   "overboughtExit": 70
+  }
+ },
+ "stochastic-cross": {
+  "catalogRuleId": "stochastic-cross",
+  "name": "ストキャスティクスクロス",
+  "nameEn": "Stochastic Cross",
+  "category": "oscillator",
+  "family": "stochastic",
+  "lookback": 17,
+  "parameters": {
+   "kPeriod": 14,
+   "dPeriod": 3
+  }
+ },
+ "stochastic-zone": {
+  "catalogRuleId": "stochastic-zone",
+  "name": "ストキャスティクス圏域進入",
+  "nameEn": "Stochastic Zone Entry",
+  "category": "oscillator",
+  "family": "stochastic",
+  "lookback": 15,
+  "parameters": {
+   "kPeriod": 14,
+   "oversoldEnter": 20,
+   "overboughtEnter": 80,
+   "oversoldRearm": 25,
+   "overboughtRearm": 75
+  }
+ },
+ "stochastic-rsi-cross": {
+  "catalogRuleId": "stochastic-rsi-cross",
+  "name": "ストキャスティクスRSIクロス",
+  "nameEn": "StochRSI Cross",
+  "category": "oscillator",
+  "family": "stochastic-rsi",
+  "lookback": 33,
+  "parameters": {
+   "rsiPeriod": 14,
+   "stochPeriod": 14,
+   "kSmooth": 3,
+   "dSmooth": 3
+  }
+ },
+ "williams-r-zone": {
+  "catalogRuleId": "williams-r-zone",
+  "name": "ウィリアムズ%R圏域進入",
+  "nameEn": "Williams %R Zone Entry",
+  "category": "oscillator",
+  "family": "williams-r",
+  "lookback": 15,
+  "parameters": {
+   "period": 14,
+   "oversoldEnter": -80,
+   "overboughtEnter": -20,
+   "oversoldRearm": -75,
+   "overboughtRearm": -25
+  }
+ },
+ "imi": {
+  "catalogRuleId": "imi",
+  "name": "IMI（Intraday Momentum Index）",
+  "nameEn": "IMI",
+  "category": "oscillator",
+  "family": "imi",
+  "lookback": 15,
+  "parameters": {
+   "period": 14,
+   "overboughtEnter": 70,
+   "oversoldEnter": 30,
+   "overboughtRearm": 65,
+   "oversoldRearm": 35
+  }
+ },
+ "cmo-zone": {
+  "catalogRuleId": "cmo-zone",
+  "name": "CMO圏域進入",
+  "nameEn": "CMO Zone Entry",
+  "category": "oscillator",
+  "family": "cmo",
+  "lookback": 16,
+  "parameters": {
+   "period": 14,
+   "zone": 50,
+   "rearm": 40
+  }
+ },
+ "qstick": {
+  "catalogRuleId": "qstick",
+  "name": "Qstick",
+  "nameEn": "Qstick",
+  "category": "oscillator",
+  "family": "qstick",
+  "lookback": 9,
+  "parameters": {
+   "period": 8
+  }
+ },
+ "fisher-cross": {
+  "catalogRuleId": "fisher-cross",
+  "name": "フィッシャー変換クロス",
+  "nameEn": "Fisher Transform Cross",
+  "category": "oscillator",
+  "family": "fisher",
+  "lookback": 12,
+  "parameters": {
+   "period": 10
+  }
+ },
+ "cci-zone": {
+  "catalogRuleId": "cci-zone",
+  "name": "CCI圏域進入",
+  "nameEn": "CCI Zone Entry",
+  "category": "oscillator",
+  "family": "cci",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "zone": 100,
+   "rearm": 75
+  }
+ },
+ "cci-zero-cross": {
+  "catalogRuleId": "cci-zero-cross",
+  "name": "CCIゼロクロス",
+  "nameEn": "CCI Zero Cross",
+  "category": "oscillator",
+  "family": "cci",
+  "lookback": 21,
+  "parameters": {
+   "period": 20
+  }
+ },
+ "roc-cross": {
+  "catalogRuleId": "roc-cross",
+  "name": "ROCゼロクロス",
+  "nameEn": "ROC Zero Cross",
+  "category": "oscillator",
+  "family": "roc",
+  "lookback": 14,
+  "parameters": {
+   "period": 12
+  }
+ },
+ "momentum-cross": {
+  "catalogRuleId": "momentum-cross",
+  "name": "モメンタムクロス",
+  "nameEn": "Momentum Cross",
+  "category": "oscillator",
+  "family": "momentum",
+  "lookback": 14,
+  "parameters": {
+   "period": 12
+  }
+ },
+ "ultimate-zone": {
+  "catalogRuleId": "ultimate-zone",
+  "name": "ウルティメット圏域進入",
+  "nameEn": "Ultimate Oscillator Zone",
+  "category": "oscillator",
+  "family": "ultimate",
+  "lookback": 30,
+  "parameters": {
+   "periods": [
+    7,
+    14,
+    28
+   ],
+   "overboughtEnter": 70,
+   "oversoldEnter": 30,
+   "overboughtRearm": 65,
+   "oversoldRearm": 35
+  }
+ },
+ "awesome-cross": {
+  "catalogRuleId": "awesome-cross",
+  "name": "オーサムオシレーター",
+  "nameEn": "Awesome Oscillator",
+  "category": "oscillator",
+  "family": "awesome",
+  "lookback": 35,
+  "parameters": {
+   "fast": 5,
+   "slow": 34
+  }
+ },
+ "tsi-cross": {
+  "catalogRuleId": "tsi-cross",
+  "name": "TSIクロス",
+  "nameEn": "TSI Cross",
+  "category": "oscillator",
+  "family": "tsi",
+  "lookback": 47,
+  "parameters": {
+   "long": 25,
+   "short": 13,
+   "signal": 9
+  }
+ },
+ "demarker-zone": {
+  "catalogRuleId": "demarker-zone",
+  "name": "デマーカー圏域進入",
+  "nameEn": "DeMarker Zone Entry",
+  "category": "oscillator",
+  "family": "demarker",
+  "lookback": 16,
+  "parameters": {
+   "period": 14,
+   "overboughtEnter": 0.7,
+   "oversoldEnter": 0.3,
+   "overboughtRearm": 0.65,
+   "oversoldRearm": 0.35
+  }
+ },
+ "kst-cross": {
+  "catalogRuleId": "kst-cross",
+  "name": "KSTクロス",
+  "nameEn": "KST Cross",
+  "category": "oscillator",
+  "family": "kst",
+  "lookback": 54,
+  "parameters": {
+   "rocPeriods": [
+    10,
+    15,
+    20,
+    30
+   ],
+   "smooth": [
+    10,
+    10,
+    10,
+    15
+   ],
+   "weights": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "signal": 9
+  }
+ },
+ "coppock-cross": {
+  "catalogRuleId": "coppock-cross",
+  "name": "コポッククロス",
+  "nameEn": "Coppock Cross",
+  "category": "oscillator",
+  "family": "coppock",
+  "lookback": 25,
+  "parameters": {
+   "rocLong": 14,
+   "rocShort": 11,
+   "wma": 10
+  }
+ },
+ "connors-rsi-zone": {
+  "catalogRuleId": "connors-rsi-zone",
+  "name": "RSI(2)圏域進入",
+  "nameEn": "RSI(2) Zone Entry",
+  "category": "oscillator",
+  "family": "rsi",
+  "lookback": 4,
+  "parameters": {
+   "period": 2,
+   "oversoldEnter": 5,
+   "overboughtEnter": 95,
+   "oversoldRearm": 10,
+   "overboughtRearm": 90
+  }
+ },
+ "schaff-cross": {
+  "catalogRuleId": "schaff-cross",
+  "name": "シャフ・トレンドサイクル",
+  "nameEn": "Schaff Trend Cycle",
+  "category": "oscillator",
+  "family": "schaff",
+  "lookback": 69,
+  "parameters": {
+   "fast": 23,
+   "slow": 50,
+   "stochPeriod": 10,
+   "factor": 0.5,
+   "upLevel": 25,
+   "downLevel": 75
+  }
+ },
+ "bollinger-break": {
+  "catalogRuleId": "bollinger-break",
+  "name": "ボリンジャーバンド・ブレイク",
+  "nameEn": "Bollinger Band Break",
+  "category": "bands",
+  "family": "bollinger",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "multiplier": 2
+  }
+ },
+ "bollinger-percentb": {
+  "catalogRuleId": "bollinger-percentb",
+  "name": "%bクロス",
+  "nameEn": "Bollinger %b Cross",
+  "category": "bands",
+  "family": "bollinger",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "multiplier": 2,
+   "levels": [
+    0,
+    0.5,
+    1
+   ]
+  }
+ },
+ "bollinger-squeeze": {
+  "catalogRuleId": "bollinger-squeeze",
+  "name": "バンドスクイーズ",
+  "nameEn": "Bollinger Squeeze",
+  "category": "bands",
+  "family": "bollinger",
+  "lookback": 139,
+  "parameters": {
+   "period": 20,
+   "multiplier": 2,
+   "window": 120,
+   "percentile": 20
+  }
+ },
+ "donchian-breakout": {
+  "catalogRuleId": "donchian-breakout",
+  "name": "ドンチアンブレイクアウト",
+  "nameEn": "Donchian Breakout",
+  "category": "bands",
+  "family": "donchian",
+  "lookback": 21,
+  "parameters": {
+   "periods": [
+    20,
+    55
+   ]
+  }
+ },
+ "channel-position": {
+  "catalogRuleId": "channel-position",
+  "name": "チャネル内位置",
+  "nameEn": "Channel Position",
+  "category": "bands",
+  "family": "donchian",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "upperZone": 0.8,
+   "lowerZone": 0.2,
+   "upperRearm": 0.65,
+   "lowerRearm": 0.35
+  }
+ },
+ "keltner-break": {
+  "catalogRuleId": "keltner-break",
+  "name": "ケルトナーブレイク",
+  "nameEn": "Keltner Break",
+  "category": "bands",
+  "family": "keltner",
+  "lookback": 21,
+  "parameters": {
+   "emaPeriod": 20,
+   "atrPeriod": 10,
+   "multiplier": 2
+  }
+ },
+ "atr-regime": {
+  "catalogRuleId": "atr-regime",
+  "name": "ATRレジーム変化",
+  "nameEn": "ATR Regime Change",
+  "category": "bands",
+  "family": "atr",
+  "lookback": 64,
+  "parameters": {
+   "smaPeriod": 50,
+   "expansion": 1.2,
+   "contraction": 0.8,
+   "rearm": 1.0
+  }
+ },
+ "hv-percentile": {
+  "catalogRuleId": "hv-percentile",
+  "name": "HV分位",
+  "nameEn": "Historical Volatility Percentile",
+  "category": "bands",
+  "family": "hv",
+  "lookback": 140,
+  "parameters": {
+   "period": 20,
+   "window": 120,
+   "high": 90,
+   "low": 10,
+   "highRearm": 80,
+   "lowRearm": 20
+  }
+ },
+ "nr-pattern": {
+  "catalogRuleId": "nr-pattern",
+  "name": "狭幅足（NR7/NR4）",
+  "nameEn": "Narrowest Range (NR7/NR4)",
+  "category": "bands",
+  "family": "range",
+  "lookback": 7,
+  "parameters": {
+   "periods": [
+    7,
+    4
+   ]
+  }
+ },
+ "range-expansion": {
+  "catalogRuleId": "range-expansion",
+  "name": "値幅拡大足",
+  "nameEn": "Range Expansion Bar",
+  "category": "bands",
+  "family": "range",
+  "lookback": 15,
+  "parameters": {
+   "multiple": 2
+  }
+ },
+ "inside-bar": {
+  "catalogRuleId": "inside-bar",
+  "name": "インサイドバー",
+  "nameEn": "Inside Bar",
+  "category": "bands",
+  "family": "range",
+  "lookback": 2,
+  "parameters": {}
+ },
+ "outside-bar": {
+  "catalogRuleId": "outside-bar",
+  "name": "アウトサイドバー",
+  "nameEn": "Outside Bar",
+  "category": "bands",
+  "family": "range",
+  "lookback": 2,
+  "parameters": {}
+ },
+ "mass-index-bulge": {
+  "catalogRuleId": "mass-index-bulge",
+  "name": "マスインデックス膨張",
+  "nameEn": "Mass Index Bulge",
+  "category": "bands",
+  "family": "mass-index",
+  "lookback": 41,
+  "parameters": {
+   "emaPeriod": 9,
+   "sumPeriod": 25,
+   "bulgeLevel": 27,
+   "triggerLevel": 26.5
+  }
+ },
+ "chaikin-volatility": {
+  "catalogRuleId": "chaikin-volatility",
+  "name": "チャイキン・ボラティリティ",
+  "nameEn": "Chaikin Volatility",
+  "category": "bands",
+  "family": "chaikin-vol",
+  "lookback": 21,
+  "parameters": {
+   "emaPeriod": 10,
+   "lag": 10
+  }
+ },
+ "volume-spike": {
+  "catalogRuleId": "volume-spike",
+  "name": "出来高急増",
+  "nameEn": "Volume Spike",
+  "category": "volume",
+  "family": "volume",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "multiple": 2
+  }
+ },
+ "volume-dryup": {
+  "catalogRuleId": "volume-dryup",
+  "name": "出来高枯渇",
+  "nameEn": "Volume Dry-up",
+  "category": "volume",
+  "family": "volume",
+  "lookback": 60,
+  "parameters": {
+   "window": 60,
+   "percentile": 10
+  }
+ },
+ "obv-slope-turn": {
+  "catalogRuleId": "obv-slope-turn",
+  "name": "OBV傾き転換",
+  "nameEn": "OBV Slope Turn",
+  "category": "volume",
+  "family": "obv",
+  "lookback": 12,
+  "parameters": {
+   "slopePeriod": 10
+  }
+ },
+ "obv-break": {
+  "catalogRuleId": "obv-break",
+  "name": "OBVブレイク",
+  "nameEn": "OBV Breakout",
+  "category": "volume",
+  "family": "obv",
+  "lookback": 21,
+  "parameters": {
+   "period": 20
+  }
+ },
+ "adl-slope-turn": {
+  "catalogRuleId": "adl-slope-turn",
+  "name": "A/Dライン傾き転換",
+  "nameEn": "Accumulation/Distribution Slope",
+  "category": "volume",
+  "family": "adl",
+  "lookback": 12,
+  "parameters": {
+   "slopePeriod": 10
+  }
+ },
+ "cmf-zone": {
+  "catalogRuleId": "cmf-zone",
+  "name": "CMF圏域進入",
+  "nameEn": "Chaikin Money Flow Zone",
+  "category": "volume",
+  "family": "cmf",
+  "lookback": 21,
+  "parameters": {
+   "period": 20,
+   "zone": 0.1,
+   "rearm": 0
+  }
+ },
+ "updown-volume-ratio": {
+  "catalogRuleId": "updown-volume-ratio",
+  "name": "上昇/下落出来高比率",
+  "nameEn": "Up/Down Volume Ratio",
+  "category": "volume",
+  "family": "volume",
+  "lookback": 12,
+  "parameters": {
+   "period": 10,
+   "upperZone": 2,
+   "lowerZone": 0.5,
+   "rearm": 1
+  }
+ },
+ "elder-force-cross": {
+  "catalogRuleId": "elder-force-cross",
+  "name": "フォース指数クロス",
+  "nameEn": "Force Index Cross",
+  "category": "oscillator",
+  "family": "force",
+  "lookback": 15,
+  "parameters": {
+   "emaPeriod": 13
+  }
+ },
+ "mfi-zone": {
+  "catalogRuleId": "mfi-zone",
+  "name": "MFI圏域進入",
+  "nameEn": "MFI Zone Entry",
+  "category": "volume",
+  "family": "mfi",
+  "lookback": 16,
+  "parameters": {
+   "period": 14,
+   "oversoldEnter": 20,
+   "overboughtEnter": 80,
+   "oversoldRearm": 30,
+   "overboughtRearm": 70
+  }
+ },
+ "eom-cross": {
+  "catalogRuleId": "eom-cross",
+  "name": "EOMクロス",
+  "nameEn": "Ease of Movement Cross",
+  "category": "volume",
+  "family": "eom",
+  "lookback": 16,
+  "parameters": {
+   "emaPeriod": 14
+  }
+ },
+ "vwap-cross": {
+  "catalogRuleId": "vwap-cross",
+  "name": "VWAPクロス",
+  "nameEn": "VWAP Cross",
+  "category": "bands",
+  "family": "vwap",
+  "lookback": 2,
+  "parameters": {}
+ },
+ "vwap-deviation": {
+  "catalogRuleId": "vwap-deviation",
+  "name": "VWAP乖離",
+  "nameEn": "VWAP Deviation",
+  "category": "bands",
+  "family": "vwap",
+  "lookback": 2,
+  "parameters": {
+   "zone": 1,
+   "rearm": 0.5
+  }
+ },
+ "opening-range-break": {
+  "catalogRuleId": "opening-range-break",
+  "name": "寄付きレンジブレイク",
+  "nameEn": "Opening Range Breakout",
+  "category": "bands",
+  "family": "opening-range",
+  "lookback": 7,
+  "parameters": {
+   "rangeBars": 6
+  }
+ },
+ "nvi-pvi-turn": {
+  "catalogRuleId": "nvi-pvi-turn",
+  "name": "NVI/PVI転換",
+  "nameEn": "NVI / PVI Turn",
+  "category": "volume",
+  "family": "nvi-pvi",
+  "lookback": 51,
+  "parameters": {
+   "initial": 100,
+   "maPeriod": 50
+  }
+ },
+ "dmi-cross": {
+  "catalogRuleId": "dmi-cross",
+  "name": "DMIクロス",
+  "nameEn": "DMI Cross",
+  "category": "trend",
+  "family": "dmi",
+  "lookback": 15,
+  "parameters": {
+   "period": 14
+  }
+ },
+ "adx-trend-state": {
+  "catalogRuleId": "adx-trend-state",
+  "name": "ADXトレンド状態",
+  "nameEn": "ADX Trend State",
+  "category": "trend",
+  "family": "dmi",
+  "lookback": 28,
+  "parameters": {
+   "period": 14,
+   "threshold": 25
+  }
+ },
+ "aroon-cross": {
+  "catalogRuleId": "aroon-cross",
+  "name": "アルーンクロス",
+  "nameEn": "Aroon Cross",
+  "category": "trend",
+  "family": "aroon",
+  "lookback": 27,
+  "parameters": {
+   "period": 25
+  }
+ },
+ "vortex-cross": {
+  "catalogRuleId": "vortex-cross",
+  "name": "ボルテックスクロス",
+  "nameEn": "Vortex Cross",
+  "category": "trend",
+  "family": "vortex",
+  "lookback": 16,
+  "parameters": {
+   "period": 14
+  }
+ },
+ "chandelier-flip": {
+  "catalogRuleId": "chandelier-flip",
+  "name": "シャンデリア反転",
+  "nameEn": "Chandelier Exit Flip",
+  "category": "trend",
+  "family": "atr-band",
+  "lookback": 23,
+  "parameters": {
+   "period": 22,
+   "multiplier": 3
+  }
+ },
+ "supertrend-flip": {
+  "catalogRuleId": "supertrend-flip",
+  "name": "スーパートレンド反転",
+  "nameEn": "Supertrend Flip",
+  "category": "trend",
+  "family": "atr-band",
+  "lookback": 11,
+  "parameters": {
+   "period": 10,
+   "multiplier": 3
+  }
+ },
+ "parabolic-sar-flip": {
+  "catalogRuleId": "parabolic-sar-flip",
+  "name": "パラボリック反転",
+  "nameEn": "Parabolic SAR Flip",
+  "category": "trend",
+  "family": "sar",
+  "lookback": 3,
+  "parameters": {
+   "afStep": 0.02,
+   "afMax": 0.2
+  }
+ },
+ "ichimoku-tk-cross": {
+  "catalogRuleId": "ichimoku-tk-cross",
+  "name": "一目・転換基準クロス",
+  "nameEn": "Ichimoku Tenkan/Kijun Cross",
+  "category": "trend",
+  "family": "ichimoku",
+  "lookback": 27,
+  "parameters": {
+   "tenkanPeriod": 9,
+   "kijunPeriod": 26
+  }
+ },
+ "ichimoku-cloud-break": {
+  "catalogRuleId": "ichimoku-cloud-break",
+  "name": "一目・雲ブレイク",
+  "nameEn": "Ichimoku Cloud Break",
+  "category": "trend",
+  "family": "ichimoku",
+  "lookback": 79,
+  "parameters": {
+   "tenkanPeriod": 9,
+   "kijunPeriod": 26,
+   "spanBPeriod": 52,
+   "shift": 26
+  }
+ },
+ "ichimoku-chikou-cross": {
+  "catalogRuleId": "ichimoku-chikou-cross",
+  "name": "一目・遅行スパンクロス",
+  "nameEn": "Ichimoku Chikou Cross",
+  "category": "trend",
+  "family": "ichimoku",
+  "lookback": 28,
+  "parameters": {
+   "shift": 26
+  }
+ },
+ "hull-cross": {
+  "catalogRuleId": "hull-cross",
+  "name": "HMAクロス",
+  "nameEn": "Hull MA Cross",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 12,
+  "parameters": {
+   "period": 9,
+   "halfPeriod": 4,
+   "sqrtPeriod": 3
+  }
+ },
+ "kama-cross": {
+  "catalogRuleId": "kama-cross",
+  "name": "KAMAクロス",
+  "nameEn": "KAMA Cross",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 12,
+  "parameters": {
+   "period": 10,
+   "fastPeriod": 2,
+   "slowPeriod": 30
+  }
+ },
+ "rvi-cross": {
+  "catalogRuleId": "rvi-cross",
+  "name": "RVIクロス",
+  "nameEn": "RVI Cross",
+  "category": "oscillator",
+  "family": "rvi",
+  "lookback": 17,
+  "parameters": {
+   "smoothWeights": [
+    1,
+    2,
+    2,
+    1
+   ],
+   "sumPeriod": 10
+  }
+ },
+ "daily-ma-position": {
+  "catalogRuleId": "daily-ma-position",
+  "name": "日足MA位置",
+  "nameEn": "Daily MA Position",
+  "category": "trend",
+  "family": "daily",
+  "lookback": 1651,
+  "parameters": {
+   "period": 25,
+   "barsPerDay": 66
+  }
+ },
+ "pivot-touch": {
+  "catalogRuleId": "pivot-touch",
+  "name": "ピボット接触",
+  "nameEn": "Pivot Point Touch",
+  "category": "bands",
+  "family": "pivot",
+  "lookback": 67,
+  "parameters": {
+   "levels": [
+    "P",
+    "R1",
+    "S1",
+    "R2",
+    "S2"
+   ]
+  }
  }
 };
+// Technical extraction engine (detector) v0.3
+// v0.3 changes (2026-11-18, Stage 5-B-1): the candle rules are JSON-driven —
+// metadata, parameters and lookback come from defs.generated.mjs (generated
+// one-directionally from defs/catalog.json, defs 0.2); JS keeps the math.
+// Six representative candle rules are added (long-upper-shadow, marubozu,
+// harami, bearish-engulfing, hammer-context, morning-evening-star-windowless).
+// Events gain top-level `variant` (null when the rule has no variants) and
+// `coverage` (evaluable scoring weight / planned scoring weight, section 13);
+// neither field is part of the v0.2 normalized hash field list, so the v0.2
+// canonical hashes remain comparable for the ten pre-existing rules.
+// New rules use critN/scoreOf2: pass=null and match=null mark data-unavailable
+// criteria, and the score renormalizes over evaluable criteria only.
+// The ten pre-existing rules keep their exact v0.2 behaviour (legacy scoring).
+// Technical extraction engine (detector) v0.2
+// Stages 2-3 of the daytrade-game technical plan: adapter, features, causal ZigZag,
+// rule registry and evaluation. Pure JS, no external libraries.
+// The detector NEVER receives generator internals (variance, jumps).
+// v0.2 changes (2026-11-18, per project doc section 08): ZigZag gains an optional
+// pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
+// events/bars carry extension metadata (category, family, timeframe, isSessionStart)
+// that no rule reads, so metadata never changes detection results.
+const DETECTOR_VERSION = '1.5';
 const TIMEFRAME = '5m';
 
 // ---------- Stage 2: input adapter & validation ----------
@@ -940,13 +1906,65 @@ function computeFeatures(bars) {
     tr: new Array(n), atr14: new Array(n).fill(null),
     sma5: new Array(n).fill(null), sma20: new Array(n).fill(null),
     ema12: new Array(n).fill(null), ema26: new Array(n).fill(null),
+    ema5: new Array(n).fill(null), ema13: new Array(n).fill(null), ema20: new Array(n).fill(null),
+    ema25: new Array(n).fill(null), ema75: new Array(n).fill(null),
+    macd: new Array(n).fill(null), macdSignal: new Array(n).fill(null), macdHist: new Array(n).fill(null),
+    trix: new Array(n).fill(null), trixSignal: new Array(n).fill(null),
+    bullsPower: new Array(n).fill(null), bearsPower: new Array(n).fill(null),
+    stochK: new Array(n).fill(null), stochD: new Array(n).fill(null), williamsR: new Array(n).fill(null),
+    stochRsiRaw: new Array(n).fill(null), stochRsiK: new Array(n).fill(null), stochRsiD: new Array(n).fill(null),
+    imi14: new Array(n).fill(null), cmo14: new Array(n).fill(null), qstick8: new Array(n).fill(null),
+    fisher: new Array(n).fill(null),
+    cci20: new Array(n).fill(null), roc12: new Array(n).fill(null), mom12: new Array(n).fill(null),
+    uo: new Array(n).fill(null), ao: new Array(n).fill(null),
+    tsi: new Array(n).fill(null), tsiSignal: new Array(n).fill(null), demarker: new Array(n).fill(null),
+    kst: new Array(n).fill(null), kstSignal: new Array(n).fill(null), coppock: new Array(n).fill(null),
+    rsi2: new Array(n).fill(null), stc: new Array(n).fill(null),
+    bbUpper: new Array(n).fill(null), bbLower: new Array(n).fill(null), percentB: new Array(n).fill(null),
+    bbBw: new Array(n).fill(null), bbPct: new Array(n).fill(null),
+    atr10: new Array(n).fill(null), kcUpper: new Array(n).fill(null), kcLower: new Array(n).fill(null),
+    atrRatio: new Array(n).fill(null), hv20: new Array(n).fill(null), hvPct: new Array(n).fill(null),
+    massIndex: new Array(n).fill(null), chaikinVol: new Array(n).fill(null),
+    obv: new Array(n).fill(null), adl: new Array(n).fill(null), cmf20: new Array(n).fill(null),
+    volPct: new Array(n).fill(null), upDownRatio: new Array(n).fill(null), force13: new Array(n).fill(null),
+    mfi14: new Array(n).fill(null), eom14: new Array(n).fill(null),
+    vwap: new Array(n).fill(null), vwapDev: new Array(n).fill(null),
+    nvi: new Array(n).fill(null), pvi: new Array(n).fill(null), nviEma: new Array(n).fill(null), pviEma: new Array(n).fill(null),
+    plusDI: new Array(n).fill(null), minusDI: new Array(n).fill(null), dx: new Array(n).fill(null), adx: new Array(n).fill(null),
+    aroonUp: new Array(n).fill(null), aroonDown: new Array(n).fill(null), viPlus: new Array(n).fill(null), viMinus: new Array(n).fill(null),
+    atr22: new Array(n).fill(null), chandDir: new Array(n).fill(null), chandStop: new Array(n).fill(null),
+    stDir: new Array(n).fill(null), stValue: new Array(n).fill(null), sar: new Array(n).fill(null), sarDir: new Array(n).fill(null),
+    tenkan: new Array(n).fill(null), kijun: new Array(n).fill(null), senkouA: new Array(n).fill(null), senkouB: new Array(n).fill(null),
+    cloudTop: new Array(n).fill(null), cloudBottom: new Array(n).fill(null), chikouDiff: new Array(n).fill(null),
+    hma9: new Array(n).fill(null), kama: new Array(n).fill(null), rvi: new Array(n).fill(null), rviSignal: new Array(n).fill(null),
+    dailyRefClose: new Array(n).fill(null), dailySma25: new Array(n).fill(null),
+    pivotP: new Array(n).fill(null), pivotR1: new Array(n).fill(null), pivotS1: new Array(n).fill(null), pivotR2: new Array(n).fill(null), pivotS2: new Array(n).fill(null),
     rsi14: new Array(n).fill(null), sd20: new Array(n).fill(null),
     slope20: new Array(n).fill(null), hi20: new Array(n).fill(null), lo20: new Array(n).fill(null),
     isSessionStart: bars.map(b => !!b.isSessionStart),
   };
   const closes = bars.map(b => b.close);
   const sma = (arr, i, p) => { if (i < p - 1) return null; let s = 0; for (let k = i - p + 1; k <= i; k++) s += arr[k]; return s / p; };
-  let ema12 = null, ema26 = null, atr = null, avgGain = null, avgLoss = null;
+  // EMA series seeded by the SMA of the first p values (defs convention,
+  // unchanged since v0.1): first value at index p-1.
+  const emaSeries = (values, p) => {
+    const out = new Array(values.length).fill(null); const k = 2 / (p + 1); let prev = null;
+    for (let i = 0; i < values.length; i++) {
+      if (i === p - 1) { let s = 0; for (let j = 0; j < p; j++) s += values[j]; prev = s / p; }
+      else if (i > p - 1) prev = prev + k * (values[i] - prev);
+      if (i >= p - 1) out[i] = prev;
+    }
+    return out;
+  };
+  // EMA over the non-null tail of a sparse series (values are contiguous
+  // from index `start` on); result written back at the same indices.
+  const emaOfSparse = (series, p, start) => {
+    const vals = []; for (let i = start; i < series.length; i++) vals.push(series[i]);
+    const e = emaSeries(vals, p); const out = new Array(series.length).fill(null);
+    for (let j = 0; j < e.length; j++) out[start + j] = e[j];
+    return out;
+  };
+  let atr = null, avgGain = null, avgLoss = null;
   for (let i = 0; i < n; i++) {
     const b = bars[i];
     F.body[i] = Math.abs(b.close - b.open);
@@ -962,13 +1980,6 @@ function computeFeatures(bars) {
     if (i >= 13) F.atr14[i] = atr;
     F.sma5[i] = sma(closes, i, 5);
     F.sma20[i] = sma(closes, i, 20);
-    // EMA (seeded by SMA)
-    if (i === 11) ema12 = sma(closes, i, 12);
-    else if (i > 11) ema12 = ema12 + (2 / 13) * (closes[i] - ema12);
-    if (i >= 11) F.ema12[i] = ema12;
-    if (i === 25) ema26 = sma(closes, i, 26);
-    else if (i > 25) ema26 = ema26 + (2 / 27) * (closes[i] - ema26);
-    if (i >= 25) F.ema26[i] = ema26;
     // RSI14 Wilder
     if (i >= 1) {
       const d = closes[i] - closes[i - 1], g = Math.max(d, 0), l = Math.max(-d, 0);
@@ -986,6 +1997,416 @@ function computeFeatures(bars) {
       let hi = -Infinity, lo = Infinity; for (let k = i - 19; k <= i; k++) { hi = Math.max(hi, bars[k].high); lo = Math.min(lo, bars[k].low); }
       F.hi20[i] = hi; F.lo20[i] = lo;
     }
+  }
+  // ---- Stage 5-C-1: EMA family and derived indicator features ----
+  // All series use the SMA-seeded EMA convention above and are NOT reset at
+  // session boundaries. Warmup (0-based first-valid index): EMA(p) at p-1;
+  // MACD at 25, signal at 33, histogram at 33; TRIX at 43, its signal at 51.
+  F.ema5 = emaSeries(closes, 5);
+  F.ema12 = emaSeries(closes, 12);
+  F.ema13 = emaSeries(closes, 13);
+  F.ema20 = emaSeries(closes, 20);
+  F.ema25 = emaSeries(closes, 25);
+  F.ema26 = emaSeries(closes, 26);
+  F.ema75 = emaSeries(closes, 75);
+  for (let i = 25; i < n; i++) F.macd[i] = F.ema12[i] - F.ema26[i];
+  F.macdSignal = emaOfSparse(F.macd, 9, 25);
+  for (let i = 33; i < n; i++) if (F.macdSignal[i] != null) F.macdHist[i] = F.macd[i] - F.macdSignal[i];
+  const e1 = emaSeries(closes, 15), e2 = emaOfSparse(e1, 15, 14), e3 = emaOfSparse(e2, 15, 28);
+  for (let i = 43; i < n; i++) if (e3[i] != null && e3[i - 1]) F.trix[i] = (e3[i] - e3[i - 1]) / e3[i - 1] * 100;
+  F.trixSignal = emaOfSparse(F.trix, 9, 43);
+  for (let i = 12; i < n; i++) { F.bullsPower[i] = bars[i].high - F.ema13[i]; F.bearsPower[i] = bars[i].low - F.ema13[i]; }
+  // ---- Stage 5-C-2: stochastics / oscillator features ----
+  // A zero denominator (flat window) makes the value null (unjudgeable);
+  // SMAs over sparse series require a fully non-null window.
+  const smaOfSparse = (series, p) => {
+    const out = new Array(n).fill(null);
+    for (let i = p - 1; i < n; i++) {
+      let s = 0, okAll = true;
+      for (let k = i - p + 1; k <= i; k++) { if (series[k] == null) { okAll = false; break; } s += series[k]; }
+      if (okAll) out[i] = s / p;
+    }
+    return out;
+  };
+  const hhll = (i, p) => { let hi = -Infinity, lo = Infinity; for (let k = i - p + 1; k <= i; k++) { hi = Math.max(hi, bars[k].high); lo = Math.min(lo, bars[k].low); } return [hi, lo]; };
+  for (let i = 13; i < n; i++) {
+    const [hi, lo] = hhll(i, 14);
+    if (hi > lo) { F.stochK[i] = (closes[i] - lo) / (hi - lo) * 100; F.williamsR[i] = F.stochK[i] - 100; }
+  }
+  F.stochD = smaOfSparse(F.stochK, 3);
+  for (let i = 27; i < n; i++) {
+    let mn = Infinity, mx = -Infinity, okAll = true;
+    for (let k = i - 13; k <= i; k++) { const r = F.rsi14[k]; if (r == null) { okAll = false; break; } mn = Math.min(mn, r); mx = Math.max(mx, r); }
+    if (okAll && mx > mn) F.stochRsiRaw[i] = (F.rsi14[i] - mn) / (mx - mn) * 100;
+  }
+  F.stochRsiK = smaOfSparse(F.stochRsiRaw, 3);
+  F.stochRsiD = smaOfSparse(F.stochRsiK, 3);
+  for (let i = 13; i < n; i++) {
+    let g = 0, l = 0;
+    for (let k = i - 13; k <= i; k++) { const d = bars[k].close - bars[k].open; if (d > 0) g += d; else l -= d; }
+    if (g + l > 0) F.imi14[i] = 100 * g / (g + l);
+  }
+  for (let i = 14; i < n; i++) {
+    let up = 0, dn = 0;
+    for (let k = i - 13; k <= i; k++) { const d = closes[k] - closes[k - 1]; if (d > 0) up += d; else dn -= d; }
+    if (up + dn > 0) F.cmo14[i] = (up - dn) / (up + dn) * 100;
+  }
+  F.qstick8 = smaOfSparse(bars.map(b => b.close - b.open), 8);
+  let fv = 0;
+  for (let i = 9; i < n; i++) {
+    const [hi, lo] = hhll(i, 10);
+    const x = hi > lo ? 2 * (closes[i] - lo) / (hi - lo) - 1 : 0;
+    fv = Math.max(-0.999, Math.min(0.999, 0.33 * x + 0.67 * fv));
+    F.fisher[i] = 0.5 * Math.log((1 + fv) / (1 - fv));
+  }
+  // ---- Stage 5-C-2 second half: CCI / ROC / composite oscillators ----
+  const tp = bars.map(b => (b.high + b.low + b.close) / 3);
+  const smaTP = tp.map((_, i) => sma(tp, i, 20));
+  for (let i = 19; i < n; i++) {
+    let mad = 0; for (let k = i - 19; k <= i; k++) mad += Math.abs(tp[k] - smaTP[i]);
+    mad /= 20;
+    if (mad > 0) F.cci20[i] = (tp[i] - smaTP[i]) / (0.015 * mad);
+  }
+  const rocOf = (p) => { const out = new Array(n).fill(null); for (let i = p; i < n; i++) if (closes[i - p] !== 0) out[i] = (closes[i] - closes[i - p]) / closes[i - p] * 100; return out; };
+  F.roc12 = rocOf(12);
+  for (let i = 12; i < n; i++) F.mom12[i] = closes[i] - closes[i - 12];
+  { // Ultimate Oscillator (BP/TR vs the previous close)
+    const bp = new Array(n).fill(0), tr = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) { const pc = closes[i - 1]; bp[i] = closes[i] - Math.min(bars[i].low, pc); tr[i] = Math.max(bars[i].high, pc) - Math.min(bars[i].low, pc); }
+    const pre = (a) => { const o = [0]; for (let i = 0; i < n; i++) o.push(o[i] + a[i]); return o; };
+    const PB = pre(bp), PT = pre(tr);
+    const avg = (i, p) => { const st = PT[i + 1] - PT[i + 1 - p]; return st > 0 ? (PB[i + 1] - PB[i + 1 - p]) / st : null; };
+    for (let i = 28; i < n; i++) { const a7 = avg(i, 7), a14 = avg(i, 14), a28 = avg(i, 28); if (a7 != null && a14 != null && a28 != null) F.uo[i] = 100 * (4 * a7 + 2 * a14 + a28) / 7; }
+  }
+  { const med = bars.map(b => (b.high + b.low) / 2), m5 = med.map((_, i) => sma(med, i, 5)), m34 = med.map((_, i) => sma(med, i, 34));
+    for (let i = 33; i < n; i++) F.ao[i] = m5[i] - m34[i]; }
+  { // TSI (25,13) with an EMA9 signal; denominator zero -> null
+    const pc = new Array(n).fill(null), apc = new Array(n).fill(null);
+    for (let i = 1; i < n; i++) { pc[i] = closes[i] - closes[i - 1]; apc[i] = Math.abs(pc[i]); }
+    const num = emaOfSparse(emaOfSparse(pc, 25, 1), 13, 25);
+    const den = emaOfSparse(emaOfSparse(apc, 25, 1), 13, 25);
+    for (let i = 37; i < n; i++) if (den[i] != null && den[i] > 0) F.tsi[i] = 100 * num[i] / den[i];
+    F.tsiSignal = emaOfSparse(F.tsi, 9, 37).map(v => (typeof v === 'number' && Number.isNaN(v)) ? null : v);
+  }
+  { const demax = new Array(n).fill(null), demin = new Array(n).fill(null);
+    for (let i = 1; i < n; i++) { demax[i] = Math.max(bars[i].high - bars[i - 1].high, 0); demin[i] = Math.max(bars[i - 1].low - bars[i].low, 0); }
+    const sx = smaOfSparse(demax, 14), sn = smaOfSparse(demin, 14);
+    for (let i = 14; i < n; i++) if (sx[i] != null && sn[i] != null && sx[i] + sn[i] > 0) F.demarker[i] = sx[i] / (sx[i] + sn[i]); }
+  { const r1 = smaOfSparse(rocOf(10), 10), r2 = smaOfSparse(rocOf(15), 10), r3 = smaOfSparse(rocOf(20), 10), r4 = smaOfSparse(rocOf(30), 15);
+    for (let i = 44; i < n; i++) if (r1[i] != null && r2[i] != null && r3[i] != null && r4[i] != null) F.kst[i] = r1[i] + 2 * r2[i] + 3 * r3[i] + 4 * r4[i];
+    F.kstSignal = smaOfSparse(F.kst, 9); }
+  { const r14 = rocOf(14), r11 = rocOf(11);
+    for (let i = 23; i < n; i++) { let s = 0, okAll = true; for (let k = 0; k < 10; k++) { const v = r14[i - 9 + k] + r11[i - 9 + k]; if (r14[i - 9 + k] == null || r11[i - 9 + k] == null) { okAll = false; break; } s += (k + 1) * v; } if (okAll) F.coppock[i] = s / 55; } }
+  { // Wilder RSI with period 2 (same seeding/smoothing as rsi14)
+    let ag = null, al = null;
+    for (let i = 1; i < n; i++) {
+      const d = closes[i] - closes[i - 1], g = Math.max(d, 0), l = Math.max(-d, 0);
+      if (i === 2) { let sg = 0, sl = 0; for (let k = 1; k <= 2; k++) { const dd = closes[k] - closes[k - 1]; sg += Math.max(dd, 0); sl += Math.max(-dd, 0); } ag = sg / 2; al = sl / 2; }
+      else if (i > 2) { ag = (ag + g) / 2; al = (al + l) / 2; }
+      if (i >= 2) F.rsi2[i] = (ag === 0 && al === 0) ? 50 : (al === 0 ? 100 : 100 - 100 / (1 + ag / al));
+    }
+  }
+  { // Schaff Trend Cycle: MACD(23,50) -> 10-bar stochastic -> 0.5 smoothing, twice
+    const e23 = emaSeries(closes, 23), e50 = emaSeries(closes, 50);
+    const macdF = new Array(n).fill(null), pf = new Array(n).fill(null);
+    for (let i = 49; i < n; i++) macdF[i] = e23[i] - e50[i];
+    let pfV = null, stcV = null;
+    const stochStep = (S, i, prev) => {
+      let mn = Infinity, mx = -Infinity;
+      for (let k = i - 9; k <= i; k++) { if (S[k] == null) return prev; mn = Math.min(mn, S[k]); mx = Math.max(mx, S[k]); }
+      if (mx <= mn) return prev; // zero range: hold the smoothed value (defs 0.8)
+      const k = (S[i] - mn) / (mx - mn) * 100;
+      return prev == null ? k : prev + 0.5 * (k - prev);
+    };
+    for (let i = 58; i < n; i++) { pfV = stochStep(macdF, i, pfV); pf[i] = pfV; }
+    for (let i = 67; i < n; i++) { stcV = stochStep(pf, i, stcV); F.stc[i] = stcV; }
+  }
+  // ---- Stage 5-C-3: bands / volatility features ----
+  // Percentile convention (defs 0.9): trailing window INCLUDING the current
+  // bar, the full window of valid values required, mid-rank for ties.
+  const pctRank = (series, i, w) => {
+    if (i < w - 1) return null;
+    const cur = series[i]; if (cur == null) return null;
+    let less = 0, equal = 0;
+    for (let k = i - w + 1; k <= i; k++) { const v = series[k]; if (v == null) return null; if (v < cur) less++; else if (v === cur) equal++; }
+    return (less + 0.5 * equal) / w * 100;
+  };
+  for (let i = 19; i < n; i++) {
+    F.bbUpper[i] = F.sma20[i] + 2 * F.sd20[i];
+    F.bbLower[i] = F.sma20[i] - 2 * F.sd20[i];
+    const width = F.bbUpper[i] - F.bbLower[i];
+    if (width > 0) F.percentB[i] = (closes[i] - F.bbLower[i]) / width;
+    if (F.sma20[i] !== 0) F.bbBw[i] = width / F.sma20[i];
+  }
+  for (let i = 0; i < n; i++) F.bbPct[i] = pctRank(F.bbBw, i, 120);
+  { let a10 = null; // Wilder ATR10, seeded like atr14 (mean of tr[0..9])
+    for (let i = 0; i < n; i++) {
+      if (i === 9) { let s = 0; for (let k = 0; k <= 9; k++) s += F.tr[k]; a10 = s / 10; }
+      else if (i > 9) a10 = (9 * a10 + F.tr[i]) / 10;
+      if (i >= 9) F.atr10[i] = a10;
+    }
+    for (let i = 19; i < n; i++) { F.kcUpper[i] = F.ema20[i] + 2 * F.atr10[i]; F.kcLower[i] = F.ema20[i] - 2 * F.atr10[i]; }
+  }
+  { const smaAtr = smaOfSparse(F.atr14, 50);
+    for (let i = 62; i < n; i++) if (smaAtr[i] != null && smaAtr[i] > 0) F.atrRatio[i] = F.atr14[i] / smaAtr[i]; }
+  { const lr = new Array(n).fill(null);
+    for (let i = 1; i < n; i++) lr[i] = Math.log(closes[i] / closes[i - 1]);
+    for (let i = 20; i < n; i++) {
+      let m = 0; for (let k = i - 19; k <= i; k++) m += lr[k];
+      m /= 20;
+      let v = 0; for (let k = i - 19; k <= i; k++) v += (lr[k] - m) ** 2;
+      F.hv20[i] = Math.sqrt(v / 20); // population SD of 20 log returns
+    }
+    for (let i = 0; i < n; i++) F.hvPct[i] = pctRank(F.hv20, i, 120);
+  }
+  // ---- Stage 5-C-3 second half: Mass Index / Chaikin Volatility / volume ----
+  { const e1 = emaSeries(F.range, 9);            // first at index 8
+    const e2 = emaOfSparse(e1, 9, 8);            // first at index 16
+    const ratio = new Array(n).fill(null);
+    for (let i = 16; i < n; i++) if (e2[i] != null && e2[i] > 0) ratio[i] = e1[i] / e2[i];
+    for (let i = 40; i < n; i++) {
+      let s = 0, okAll = true;
+      for (let k = i - 24; k <= i; k++) { if (ratio[k] == null) { okAll = false; break; } s += ratio[k]; }
+      if (okAll) F.massIndex[i] = s;
+    }
+    const e10 = emaSeries(F.range, 10);          // first at index 9
+    for (let i = 19; i < n; i++) if (e10[i - 10] != null && e10[i - 10] > 0) F.chaikinVol[i] = 100 * (e10[i] - e10[i - 10]) / e10[i - 10];
+  }
+  { const vols = bars.map(b => b.volume);
+    const clv = bars.map(b => (b.high > b.low) ? ((b.close - b.low) - (b.high - b.close)) / (b.high - b.low) : 0);
+    let obvOk = true, adlOk = true, obv = 0, adl = 0;
+    for (let i = 0; i < n; i++) {
+      if (i === 0) {
+        F.obv[i] = 0;
+        if (vols[0] == null) adlOk = false; else { adl = clv[0] * vols[0]; F.adl[i] = adl; }
+        continue;
+      }
+      if (vols[i] == null) { obvOk = false; adlOk = false; }
+      if (obvOk) { obv += Math.sign(closes[i] - closes[i - 1]) * vols[i]; F.obv[i] = obv; }
+      if (adlOk) { adl += clv[i] * vols[i]; F.adl[i] = adl; }
+    }
+    for (let i = 19; i < n; i++) {
+      let sv = 0, sm = 0, okAll = true;
+      for (let k = i - 19; k <= i; k++) { if (vols[k] == null) { okAll = false; break; } sv += vols[k]; sm += clv[k] * vols[k]; }
+      if (okAll && sv > 0) F.cmf20[i] = sm / sv;
+    }
+    for (let i = 0; i < n; i++) F.volPct[i] = pctRank(vols, i, 60);
+    for (let i = 10; i < n; i++) {
+      let up = 0, down = 0, okAll = true;
+      for (let k = i - 9; k <= i; k++) {
+        if (vols[k] == null) { okAll = false; break; }
+        const d = closes[k] - closes[k - 1];
+        if (d > 0) up += vols[k]; else if (d < 0) down += vols[k];
+      }
+      if (okAll && down > 0) F.upDownRatio[i] = up / down;
+    }
+    const raw = new Array(n).fill(null);
+    for (let i = 1; i < n; i++) if (vols[i] != null) raw[i] = (closes[i] - closes[i - 1]) * vols[i];
+    const poison = raw.findIndex((v, i) => i >= 1 && v === null);
+    const limit = poison === -1 ? n : poison;
+    if (limit > 1) {
+      const e = emaSeries(raw.slice(1, limit), 13);
+      for (let j = 0; j < e.length; j++) F.force13[1 + j] = e[j];
+    }
+  }
+  // ---- Stage 5-C-4: MFI / EOM / intraday VWAP / NVI-PVI ----
+  { const vols = bars.map(b => b.volume);
+    const tp = bars.map(b => (b.high + b.low + b.close) / 3);
+    for (let i = 14; i < n; i++) {
+      let pos = 0, neg = 0, okAll = true;
+      for (let k = i - 13; k <= i; k++) {
+        if (vols[k] == null) { okAll = false; break; }
+        const mf = tp[k] * vols[k];
+        if (tp[k] > tp[k - 1]) pos += mf; else if (tp[k] < tp[k - 1]) neg += mf;
+      }
+      if (!okAll) continue;
+      if (neg > 0) F.mfi14[i] = 100 - 100 / (1 + pos / neg);
+      else if (pos > 0) F.mfi14[i] = 100;
+    }
+    const rawE = new Array(n).fill(null);
+    for (let i = 1; i < n; i++) {
+      if (vols[i] == null || vols[i] === 0) continue;
+      const mid = (bars[i].high + bars[i].low) / 2, prevMid = (bars[i - 1].high + bars[i - 1].low) / 2;
+      rawE[i] = (mid - prevMid) * (bars[i].high - bars[i].low) / vols[i];
+    }
+    const poisonE = rawE.findIndex((v, i) => i >= 1 && v === null);
+    const limitE = poisonE === -1 ? n : poisonE;
+    if (limitE > 1) {
+      const e = emaSeries(rawE.slice(1, limitE), 14);
+      for (let j = 0; j < e.length; j++) F.eom14[1 + j] = e[j];
+    }
+    let sv = 0, spv = 0, dayOk = true, curDay = null;
+    for (let i = 0; i < n; i++) {
+      if (bars[i].day !== curDay) { curDay = bars[i].day; sv = 0; spv = 0; dayOk = true; }
+      if (vols[i] == null) dayOk = false;
+      if (dayOk) {
+        sv += vols[i]; spv += tp[i] * vols[i];
+        if (sv > 0) { F.vwap[i] = spv / sv; F.vwapDev[i] = 100 * (closes[i] - F.vwap[i]) / F.vwap[i]; }
+      }
+    }
+    let nvi = 100, pvi = 100;
+    for (let i = 0; i < n; i++) {
+      if (i > 0 && vols[i] != null && vols[i - 1] != null) {
+        if (vols[i] < vols[i - 1]) nvi *= closes[i] / closes[i - 1];
+        else if (vols[i] > vols[i - 1]) pvi *= closes[i] / closes[i - 1];
+      }
+      F.nvi[i] = nvi; F.pvi[i] = pvi;
+    }
+    F.nviEma = emaSeries(F.nvi, 50);
+    F.pviEma = emaSeries(F.pvi, 50);
+  }
+  // ---- Stage 5-C-4 batch 1: DMI/ADX, Aroon, Vortex, trailing indicators ----
+  const highs = bars.map(b => b.high), lows = bars.map(b => b.low);
+  { // Wilder DMI: smoothed sums seeded with the 14-bar totals at index 13
+    const dmP = new Array(n).fill(0), dmM = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) {
+      const up = highs[i] - highs[i - 1], dn = lows[i - 1] - lows[i];
+      if (up > dn && up > 0) dmP[i] = up;
+      if (dn > up && dn > 0) dmM[i] = dn;
+    }
+    let sT = 0, sP = 0, sM = 0, run = 0, seedSum = 0, seeded = false;
+    for (let i = 0; i < n; i++) {
+      if (i < 13) continue;
+      if (i === 13) { for (let k = 0; k <= 13; k++) { sT += F.tr[k]; sP += dmP[k]; sM += dmM[k]; } }
+      else { sT = sT - sT / 14 + F.tr[i]; sP = sP - sP / 14 + dmP[i]; sM = sM - sM / 14 + dmM[i]; }
+      if (sT > 0) {
+        F.plusDI[i] = 100 * sP / sT; F.minusDI[i] = 100 * sM / sT;
+        const sum = F.plusDI[i] + F.minusDI[i];
+        F.dx[i] = sum > 0 ? 100 * Math.abs(F.plusDI[i] - F.minusDI[i]) / sum : 0;
+      }
+      if (F.dx[i] != null) {
+        run++; seedSum += F.dx[i];
+        if (!seeded && run === 14) { F.adx[i] = seedSum / 14; seeded = true; }
+        else if (seeded && F.adx[i - 1] != null) F.adx[i] = (F.adx[i - 1] * 13 + F.dx[i]) / 14;
+        else if (seeded) { seeded = false; run = 1; seedSum = F.dx[i]; }
+      } else { run = 0; seedSum = 0; seeded = false; }
+    }
+  }
+  for (let i = 25; i < n; i++) { // Aroon 25: most recent extreme wins ties
+    let dsh = 0, dsl = 0;
+    let mh = -Infinity, ml = Infinity;
+    for (let k = i; k >= i - 25; k--) { if (highs[k] > mh) { mh = highs[k]; dsh = i - k; } if (lows[k] < ml) { ml = lows[k]; dsl = i - k; } }
+    F.aroonUp[i] = (25 - dsh) / 25 * 100; F.aroonDown[i] = (25 - dsl) / 25 * 100;
+  }
+  { const vmP = new Array(n).fill(0), vmM = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) { vmP[i] = Math.abs(highs[i] - lows[i - 1]); vmM[i] = Math.abs(lows[i] - highs[i - 1]); }
+    for (let i = 14; i < n; i++) {
+      let sp = 0, sm = 0, st = 0;
+      for (let k = i - 13; k <= i; k++) { sp += vmP[k]; sm += vmM[k]; st += F.tr[k]; }
+      if (st > 0) { F.viPlus[i] = sp / st; F.viMinus[i] = sm / st; }
+    }
+  }
+  { let a = null; // ATR22 (Wilder, seed = mean of TR[0..21] at index 21)
+    for (let i = 0; i < n; i++) {
+      if (i === 21) { let s = 0; for (let k = 0; k <= 21; k++) s += F.tr[k]; a = s / 22; }
+      else if (i > 21) a = (21 * a + F.tr[i]) / 22;
+      if (a !== null) F.atr22[i] = a;
+    }
+    let dir = null, stop = null; // Chandelier: ratcheting trailing stop, close-based flips
+    for (let i = 21; i < n; i++) {
+      let hh = -Infinity, ll = Infinity;
+      for (let k = i - 21; k <= i; k++) { hh = Math.max(hh, highs[k]); ll = Math.min(ll, lows[k]); }
+      const rawL = hh - 3 * F.atr22[i], rawS = ll + 3 * F.atr22[i];
+      if (dir === null) { dir = 1; stop = rawL; }
+      else if (dir === 1) { stop = Math.max(stop, rawL); if (closes[i] < stop) { dir = -1; stop = rawS; } }
+      else { stop = Math.min(stop, rawS); if (closes[i] > stop) { dir = 1; stop = rawL; } }
+      F.chandDir[i] = dir; F.chandStop[i] = stop;
+    }
+    let fu = null, fl = null, sdir = null; // Supertrend (ATR10 x3, carried bands)
+    for (let i = 9; i < n; i++) {
+      if (F.atr10[i] == null) continue;
+      const mid = (highs[i] + lows[i]) / 2, bu = mid + 3 * F.atr10[i], bl = mid - 3 * F.atr10[i];
+      if (sdir === null) { fu = bu; fl = bl; sdir = 1; }
+      else {
+        fu = (bu < fu || closes[i - 1] > fu) ? bu : fu;
+        fl = (bl > fl || closes[i - 1] < fl) ? bl : fl;
+        sdir = sdir === 1 ? (closes[i] < fl ? -1 : 1) : (closes[i] > fu ? 1 : -1);
+      }
+      F.stDir[i] = sdir; F.stValue[i] = sdir === 1 ? fl : fu;
+    }
+    if (n >= 2) { // Parabolic SAR (Wilder)
+      let sdir2 = closes[1] >= closes[0] ? 1 : -1;
+      let ep = sdir2 === 1 ? Math.max(highs[0], highs[1]) : Math.min(lows[0], lows[1]);
+      let sar = sdir2 === 1 ? lows[0] : highs[0], af = 0.02;
+      F.sar[1] = sar; F.sarDir[1] = sdir2;
+      for (let i = 2; i < n; i++) {
+        sar = sar + af * (ep - sar);
+        sar = sdir2 === 1 ? Math.min(sar, lows[i - 1], lows[i - 2]) : Math.max(sar, highs[i - 1], highs[i - 2]);
+        let flipped = false;
+        if (sdir2 === 1 && lows[i] < sar) { sdir2 = -1; sar = ep; ep = lows[i]; af = 0.02; flipped = true; }
+        else if (sdir2 === -1 && highs[i] > sar) { sdir2 = 1; sar = ep; ep = highs[i]; af = 0.02; flipped = true; }
+        if (!flipped) {
+          if (sdir2 === 1 && highs[i] > ep) { ep = highs[i]; af = Math.min(af + 0.02, 0.2); }
+          if (sdir2 === -1 && lows[i] < ep) { ep = lows[i]; af = Math.min(af + 0.02, 0.2); }
+        }
+        F.sar[i] = sar; F.sarDir[i] = sdir2;
+      }
+    }
+  }
+  // ---- Stage 5-C-4 batch 2: Ichimoku (causal alignment), HMA, KAMA, RVI ----
+  { const mid = (i, p) => { let hh = -Infinity, ll = Infinity; for (let k = i - p + 1; k <= i; k++) { hh = Math.max(hh, highs[k]); ll = Math.min(ll, lows[k]); } return (hh + ll) / 2; };
+    for (let i = 0; i < n; i++) {
+      if (i >= 8) F.tenkan[i] = mid(i, 9);
+      if (i >= 25) { F.kijun[i] = mid(i, 26); F.senkouA[i] = (F.tenkan[i] + F.kijun[i]) / 2; }
+      if (i >= 51) F.senkouB[i] = mid(i, 52);
+      if (i >= 77) { F.cloudTop[i] = Math.max(F.senkouA[i - 26], F.senkouB[i - 26]); F.cloudBottom[i] = Math.min(F.senkouA[i - 26], F.senkouB[i - 26]); }
+      if (i >= 26) F.chikouDiff[i] = closes[i] - closes[i - 26];
+    }
+    const wmaAt = (S, i, p) => { let num = 0, den = 0; for (let k = 0; k < p; k++) { const v = S[i - k]; if (v == null) return null; num += v * (p - k); den += p - k; } return num / den; };
+    const rawH = new Array(n).fill(null);
+    for (let i = 8; i < n; i++) rawH[i] = 2 * wmaAt(closes, i, 4) - wmaAt(closes, i, 9);
+    for (let i = 10; i < n; i++) F.hma9[i] = wmaAt(rawH, i, 3);
+    const fastSC = 2 / 3, slowSC = 2 / 31;
+    for (let i = 10; i < n; i++) {
+      let vol = 0; for (let k = i - 9; k <= i; k++) vol += Math.abs(closes[k] - closes[k - 1]);
+      const er = vol > 0 ? Math.abs(closes[i] - closes[i - 10]) / vol : 0;
+      const sc = (er * (fastSC - slowSC) + slowSC) ** 2;
+      F.kama[i] = i === 10 ? closes[i] : F.kama[i - 1] + sc * (closes[i] - F.kama[i - 1]);
+    }
+    const opens = bars.map(b => b.open);
+    const v1 = closes.map((c, i) => c - opens[i]), v2 = highs.map((h, i) => h - lows[i]);
+    const sm = (S, i) => (S[i] + 2 * S[i - 1] + 2 * S[i - 2] + S[i - 3]) / 6;
+    const s1 = new Array(n).fill(null), s2 = new Array(n).fill(null);
+    for (let i = 3; i < n; i++) { s1[i] = sm(v1, i); s2[i] = sm(v2, i); }
+    for (let i = 12; i < n; i++) {
+      let num = 0, den = 0;
+      for (let k = i - 9; k <= i; k++) { num += s1[k]; den += s2[k]; }
+      if (den > 0) F.rvi[i] = num / den;
+    }
+    for (let i = 15; i < n; i++) {
+      if (F.rvi[i] == null || F.rvi[i - 1] == null || F.rvi[i - 2] == null || F.rvi[i - 3] == null) continue;
+      F.rviSignal[i] = (F.rvi[i] + 2 * F.rvi[i - 1] + 2 * F.rvi[i - 2] + F.rvi[i - 3]) / 6;
+    }
+  }
+  // ---- Stage 5-C-4 final: day aggregation (completed days only) ----
+  { const TEMPLATE = [...Array(30)].map((_, k) => 540 + 5 * k).concat([...Array(36)].map((_, k) => 750 + 5 * k));
+    const groups = [];
+    for (let i = 0; i < n; i++) {
+      if (i === 0 || bars[i].day !== bars[i - 1].day) groups.push({ start: i, end: i + 1 });
+      else groups[groups.length - 1].end = i + 1;
+    }
+    const completed = []; // { close, high, low } of finished full-template days, in order
+    groups.forEach((g, gi) => {
+      const isLast = gi === groups.length - 1;
+      const full = !isLast && (g.end - g.start) === 66 && TEMPLATE.every((m, k) => bars[g.start + k].minute === m);
+      // Reference values for this group's bars come only from days completed before it.
+      const ref = completed.length ? completed[completed.length - 1] : null;
+      let sma25 = null;
+      if (completed.length >= 25) { let s = 0; for (let k = completed.length - 25; k < completed.length; k++) s += completed[k].close; sma25 = s / 25; }
+      if (ref) {
+        const P = (ref.high + ref.low + ref.close) / 3;
+        for (let i = g.start; i < g.end; i++) {
+          F.dailyRefClose[i] = ref.close; F.dailySma25[i] = sma25;
+          F.pivotP[i] = P; F.pivotR1[i] = 2 * P - ref.low; F.pivotS1[i] = 2 * P - ref.high;
+          F.pivotR2[i] = P + (ref.high - ref.low); F.pivotS2[i] = P - (ref.high - ref.low);
+        }
+      }
+      if (full) {
+        let hh = -Infinity, ll = Infinity;
+        for (let i = g.start; i < g.end; i++) { hh = Math.max(hh, bars[i].high); ll = Math.min(ll, bars[i].low); }
+        completed.push({ close: bars[g.end - 1].close, high: hh, low: ll });
+      }
+    });
   }
   return F;
 }
@@ -2238,25 +3659,1307 @@ registerRule(defRule('breakaway-windowless', {
   }
 }));
 
+// ---------- Stage 5-C-1: moving-average / MACD family (v0.7, JSON-driven) ----------
+// Shared conventions (defs 0.6): a cross is a STRICT sign change of the
+// difference series (equality on either side is not a cross); no event while
+// a needed feature is null; features are not reset at session boundaries.
+
+// Generic strict cross of two series a (fast) vs b (slow) at bar i.
+function crossAt(A, B, i) {
+  const a0 = A[i - 1], b0 = B[i - 1], a1 = A[i], b1 = B[i];
+  if (a0 == null || b0 == null || a1 == null || b1 == null) return 0;
+  if (a0 < b0 && a1 > b1) return 1;
+  if (a0 > b0 && a1 < b1) return -1;
+  return 0;
+}
+// Strict zero cross of one series at bar i.
+function zeroCrossAt(S, i) {
+  const s0 = S[i - 1], s1 = S[i];
+  if (s0 == null || s1 == null) return 0;
+  if (s0 < 0 && s1 > 0) return 1;
+  if (s0 > 0 && s1 < 0) return -1;
+  return 0;
+}
+
+registerRule(defRule('ema-cross', {
+  id: 'ema-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.ema5, F.ema25, i);
+      if (!hit) continue;
+      const sep = F.atr14[i] > 0 ? Math.abs(F.ema5[i] - F.ema25[i]) / F.atr14[i] : 0;
+      const cs = [critN(hit > 0 ? '前時点 EMA5 < EMA25' : '前時点 EMA5 > EMA25', F.ema5[i - 1] - F.ema25[i - 1], 0, true, 1, 1, true),
+                  critN('現時点の乖離（ATR比）', sep, 0, true, Math.min(1, sep + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'golden' : 'dead', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `EMA5（${fmt(F.ema5[i])}円）がEMA25（${fmt(F.ema25[i])}円）を${hit > 0 ? '上抜け' : '下抜け'}した${hit > 0 ? 'ゴールデン' : 'デッド'}クロス。伝統的なトレンド転換の解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('price-ma-cross', {
+  id: 'price-ma-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    const closes = bars.map(b => b.close);
+    for (const [variant, S] of [['sma', F.sma20], ['ema', F.ema20]]) {
+      for (let i = 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const hit = crossAt(closes, S, i);
+        if (!hit) continue;
+        const sep = F.atr14[i] > 0 ? Math.abs(closes[i] - S[i]) / F.atr14[i] : 0;
+        const cs = [critN(hit > 0 ? `前時点 終値 < ${variant.toUpperCase()}20` : `前時点 終値 > ${variant.toUpperCase()}20`, closes[i - 1] - S[i - 1], 0, true, 1, 1, true),
+                    critN('現時点の乖離（ATR比）', sep, 0, true, Math.min(1, sep + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant, direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値（${fmt(closes[i])}円）が${variant === 'sma' ? 'SMA20' : 'EMA20'}（${fmt(S[i])}円）を${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('ma-slope-turn', {
+  id: 'ma-slope-turn', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 2; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      if (F.sma20[i] == null || F.sma20[i - 1] == null || F.sma20[i - 2] == null) continue;
+      const s0 = F.sma20[i - 1] - F.sma20[i - 2], s1 = F.sma20[i] - F.sma20[i - 1];
+      const hit = (s0 < 0 && s1 > 0) ? 1 : (s0 > 0 && s1 < 0) ? -1 : 0;
+      if (!hit) continue;
+      const mag = F.atr14[i] > 0 ? Math.abs(s1) * 20 / F.atr14[i] : 0;
+      const cs = [critN(hit > 0 ? '前時点の傾き < 0' : '前時点の傾き > 0', s0, 0, true, 1, 1, true),
+                  critN('現時点の傾きの大きさ（20本換算・ATR比）', mag, 0, true, Math.min(1, mag + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `SMA20の傾きが ${fmt(s0, 2)} → ${fmt(s1, 2)} 円/本 と符号転換した（${hit > 0 ? '下向きから上向き' : '上向きから下向き'}）。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('perfect-order', {
+  id: 'perfect-order', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prev = null; // 'bullish' | 'bearish' | null (evaluated state)
+    for (let i = 0; i < bars.length; i++) {
+      if (F.ema75[i] == null) continue;
+      const c = bars[i].close;
+      const cur = (c > F.ema5[i] && F.ema5[i] > F.ema25[i] && F.ema25[i] > F.ema75[i]) ? 'bullish'
+        : (c < F.ema5[i] && F.ema5[i] < F.ema25[i] && F.ema25[i] < F.ema75[i]) ? 'bearish' : null;
+      if (!bars[i].complete) { prev = cur; continue; }
+      const gaps = [c - F.ema5[i], F.ema5[i] - F.ema25[i], F.ema25[i] - F.ema75[i]];
+      const mkCs = (kind) => [
+        critN(kind === 'bullish' ? '終値 > EMA5' : '終値 < EMA5', gaps[0], 0, kind === 'bullish' ? gaps[0] > 0 : gaps[0] < 0, 1, 1, true),
+        critN(kind === 'bullish' ? 'EMA5 > EMA25' : 'EMA5 < EMA25', gaps[1], 0, kind === 'bullish' ? gaps[1] > 0 : gaps[1] < 0, 1, 1, true),
+        critN(kind === 'bullish' ? 'EMA25 > EMA75' : 'EMA25 < EMA75', gaps[2], 0, kind === 'bullish' ? gaps[2] > 0 : gaps[2] < 0, 1, 1, true)];
+      if (cur !== prev) {
+        if (prev !== null) {
+          const cs = mkCs(prev);
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: prev + '-end', direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${prev === 'bullish' ? '強気' : '弱気'}のパーフェクトオーダーが解消した（整列条件のいずれかが崩れた）。状態の記録であり予測ではない。` }));
+        }
+        if (cur !== null) {
+          const cs = mkCs(cur);
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: cur, direction: cur === 'bullish' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${cur === 'bullish' ? '強気' : '弱気'}のパーフェクトオーダーが成立した（終値とEMA5／25／75が方向に沿って整列）。状態の記録であり予測ではない。` }));
+        }
+      }
+      prev = cur;
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('macd-signal-cross', {
+  id: 'macd-signal-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.macdHist, i);
+      if (!hit) continue;
+      const sep = F.atr14[i] > 0 ? Math.abs(F.macdHist[i]) / F.atr14[i] : 0;
+      const cs = [critN(hit > 0 ? '前時点 ヒストグラム < 0' : '前時点 ヒストグラム > 0', F.macdHist[i - 1], 0, true, 1, 1, true),
+                  critN('現時点のヒストグラム（ATR比）', sep, 0, true, Math.min(1, sep + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `MACD線（${fmt(F.macd[i], 1)}）が信号線（${fmt(F.macdSignal[i], 1)}）を${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('macd-zero-cross', {
+  id: 'macd-zero-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.macd, i);
+      if (!hit) continue;
+      const sep = F.atr14[i] > 0 ? Math.abs(F.macd[i]) / F.atr14[i] : 0;
+      const cs = [critN(hit > 0 ? '前時点 MACD < 0' : '前時点 MACD > 0', F.macd[i - 1], 0, true, 1, 1, true),
+                  critN('現時点のMACD（ATR比）', sep, 0, true, Math.min(1, sep + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `MACD線が ${fmt(F.macd[i - 1], 1)} → ${fmt(F.macd[i], 1)} とゼロを${hit > 0 ? '上抜け' : '下抜け'}した（EMA12とEMA26の関係の反転）。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('macd-histogram-turn', {
+  id: 'macd-histogram-turn', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 2; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const h0 = F.macdHist[i - 2], h1 = F.macdHist[i - 1], h2 = F.macdHist[i];
+      if (h0 == null || h1 == null || h2 == null) continue;
+      const hit = (h1 < h0 && h2 > h1) ? 1 : (h1 > h0 && h2 < h1) ? -1 : 0;
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? 'ヒストグラムが減少していた' : 'ヒストグラムが増加していた', h1 - h0, 0, true, 1, 1, true),
+                  critN(hit > 0 ? 'ヒストグラムが増加へ転じた' : 'ヒストグラムが減少へ転じた', h2 - h1, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `MACDヒストグラムが ${fmt(h0, 1)} → ${fmt(h1, 1)} → ${fmt(h2, 1)} と${hit > 0 ? '減少から増加' : '増加から減少'}へ転じた（極値は1本前）。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('regression-slope', {
+  id: 'regression-slope', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.slope20, i);
+      if (!hit) continue;
+      const mag = F.atr14[i] > 0 ? Math.abs(F.slope20[i]) * 20 / F.atr14[i] : 0;
+      const cs = [critN(hit > 0 ? '前時点の傾き < 0' : '前時点の傾き > 0', F.slope20[i - 1], 0, true, 1, 1, true),
+                  critN('傾きの大きさ（20本換算・ATR比）', mag, 0, true, Math.min(1, mag + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値20本の回帰傾きが ${fmt(F.slope20[i - 1], 2)} → ${fmt(F.slope20[i], 2)} 円/本 と符号転換した。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('trix-cross', {
+  id: 'trix-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.trix, F.trixSignal, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 TRIX < 信号線' : '前時点 TRIX > 信号線', F.trix[i - 1] - F.trixSignal[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 TRIX − 信号線', F.trix[i] - F.trixSignal[i], 0, true, Math.min(1, Math.abs(F.trix[i] - F.trixSignal[i]) * 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `TRIX（${fmt(F.trix[i], 3)}%）が信号線（${fmt(F.trixSignal[i], 3)}%）を${hit > 0 ? '上抜け' : '下抜け'}した。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('bulls-bears-power', {
+  id: 'bulls-bears-power', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (const [variant, S] of [['bulls', F.bullsPower], ['bears', F.bearsPower]]) {
+      for (let i = 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const hit = zeroCrossAt(S, i);
+        if (!hit) continue;
+        const sep = F.atr14[i] > 0 ? Math.abs(S[i]) / F.atr14[i] : 0;
+        const cs = [critN(hit > 0 ? '前時点 パワー < 0' : '前時点 パワー > 0', S[i - 1], 0, true, 1, 1, true),
+                    critN('現時点のパワー（ATR比）', sep, 0, true, Math.min(1, sep + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant, direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${variant === 'bulls' ? 'ブルパワー（高値−EMA13）' : 'ベアパワー（安値−EMA13）'}が ${fmt(S[i - 1], 1)} → ${fmt(S[i], 1)} とゼロを${hit > 0 ? '上抜け' : '下抜け'}した。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-2: RSI / stochastics family (v0.8, JSON-driven) ----------
+// Zone entries share the legacy RSI control flow (armed flag, re-arm check
+// on the current value first, incomplete bars never consume an entry).
+function zoneEntries(bars, S, cfg) {
+  const out = { oversold: [], overbought: [] };
+  for (const side of ['oversold', 'overbought']) {
+    const enter = side === 'oversold' ? cfg.lowEnter : cfg.highEnter;
+    const rearm = side === 'oversold' ? cfg.lowRearm : cfg.highRearm;
+    let armed = true;
+    for (let i = 1; i < bars.length; i++) {
+      const s0 = S[i - 1], s1 = S[i];
+      if (s0 == null || s1 == null) continue;
+      if (!armed) { if (rearm(s1)) armed = true; else continue; }
+      if (!bars[i].complete) continue;
+      if (enter(s0, s1)) { armed = false; out[side].push({ index: i, s0, s1 }); }
+    }
+  }
+  return out;
+}
+
+registerRule(defRule('rsi-center-cross', {
+  id: 'rsi-center-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const r0 = F.rsi14[i - 1], r1 = F.rsi14[i];
+      if (r0 == null || r1 == null) continue;
+      const hit = (r0 < P.level && r1 > P.level) ? 1 : (r0 > P.level && r1 < P.level) ? -1 : 0;
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 RSI < 50' : '前時点 RSI > 50', r0, P.level, true, 1, 1, true),
+                  critN('現時点 RSI の 50 からの距離', Math.abs(r1 - P.level), 0, true, Math.min(1, Math.abs(r1 - P.level) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `RSI14 が ${fmt(r0, 1)} → ${fmt(r1, 1)} と中心線50を${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('rsi-zone-exit', {
+  id: 'rsi-zone-exit', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    const sides = rsiZoneMachine(bars, F);
+    for (const side of ['oversold', 'overbought']) {
+      const oversold = side === 'oversold';
+      for (const { index: i, r0, r1 } of sides[side].exits) {
+        const cs = [critN(oversold ? 'RSI14 が 30 以上へ復帰' : 'RSI14 が 70 以下へ復帰', r1, oversold ? 30 : 70, true, Math.min(1, Math.abs(r1 - (oversold ? 30 : 70)) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `RSI14 が ${fmt(r0, 1)} → ${fmt(r1, 1)} と${oversold ? '売られすぎ圏（30未満）から退出' : '買われすぎ圏（70超）から退出'}した。進入ルールの再発火解除（${oversold ? 35 : 65}）とは別の事象として記録する。伝統的解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('stochastic-cross', {
+  id: 'stochastic-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.stochK, F.stochD, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 %K < %D' : '前時点 %K > %D', F.stochK[i - 1] - F.stochD[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 %K − %D', F.stochK[i] - F.stochD[i], 0, true, Math.min(1, Math.abs(F.stochK[i] - F.stochD[i]) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `ストキャスティクス %K（${fmt(F.stochK[i], 1)}）が %D（${fmt(F.stochD[i], 1)}）を${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('stochastic-zone', {
+  id: 'stochastic-zone', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.stochK, {
+      lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+      highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+    });
+    for (const side of ['oversold', 'overbought']) {
+      const oversold = side === 'oversold', thr = oversold ? P.oversoldEnter : P.overboughtEnter;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(oversold ? '%K が 20 未満へ進入' : '%K が 80 超へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `ストキャスティクス %K が ${fmt(s1, 1)} と${oversold ? '売られすぎ圏（20未満）' : '買われすぎ圏（80超）'}へ進入。再発火は %K が ${oversold ? P.oversoldRearm : P.overboughtRearm} に戻るまで抑止する。伝統的解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('stochastic-rsi-cross', {
+  id: 'stochastic-rsi-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.stochRsiK, F.stochRsiD, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 %K < %D' : '前時点 %K > %D', F.stochRsiK[i - 1] - F.stochRsiD[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 %K − %D', F.stochRsiK[i] - F.stochRsiD[i], 0, true, Math.min(1, Math.abs(F.stochRsiK[i] - F.stochRsiD[i]) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `StochRSI の %K（${fmt(F.stochRsiK[i], 1)}）が %D（${fmt(F.stochRsiD[i], 1)}）を${hit > 0 ? '上抜け' : '下抜け'}した。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('williams-r-zone', {
+  id: 'williams-r-zone', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.williamsR, {
+      lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+      highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+    });
+    for (const side of ['oversold', 'overbought']) {
+      const oversold = side === 'oversold', thr = oversold ? P.oversoldEnter : P.overboughtEnter;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(oversold ? '%R が −80 未満へ進入' : '%R が −20 超へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `ウィリアムズ%R が ${fmt(s1, 1)} と${oversold ? '売られすぎ圏（−80未満）' : '買われすぎ圏（−20超）'}へ進入（%R＝%K−100 のため stochastic-zone の %K 進入と同一事象）。再発火は %R が ${oversold ? P.oversoldRearm : P.overboughtRearm} に戻るまで抑止する。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('imi', {
+  id: 'imi', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.imi14, {
+      lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+      highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+    });
+    for (const side of ['oversold', 'overbought']) {
+      const oversold = side === 'oversold', thr = oversold ? P.oversoldEnter : P.overboughtEnter;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(oversold ? 'IMI が 30 未満へ進入' : 'IMI が 70 超へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `IMI が ${fmt(s1, 1)} と${oversold ? '売られすぎ圏（30未満）' : '買われすぎ圏（70超）'}へ進入。式は一般的な構成による独自確定。再発火は IMI が ${oversold ? P.oversoldRearm : P.overboughtRearm} に戻るまで抑止する。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('cmo-zone', {
+  id: 'cmo-zone', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.cmo14, {
+      lowEnter: (s0, s1) => s0 >= -P.zone && s1 < -P.zone, lowRearm: (s1) => s1 >= -P.rearm,
+      highEnter: (s0, s1) => s0 <= P.zone && s1 > P.zone, highRearm: (s1) => s1 <= P.rearm,
+    });
+    for (const side of ['oversold', 'overbought']) {
+      const oversold = side === 'oversold', thr = oversold ? -P.zone : P.zone;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(oversold ? 'CMO が −50 未満へ進入' : 'CMO が +50 超へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `CMO が ${fmt(s1, 1)} と${oversold ? '売られすぎ圏（−50未満）' : '買われすぎ圏（+50超）'}へ進入。式は一般的な構成による独自確定。再発火は CMO が ±${P.rearm} の内側へ戻るまで抑止する。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('qstick', {
+  id: 'qstick', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.qstick8, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 Qstick < 0' : '前時点 Qstick > 0', F.qstick8[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 Qstick', F.qstick8[i], 0, true, Math.min(1, Math.abs(F.qstick8[i]) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `Qstick（実体のSMA8）が ${fmt(F.qstick8[i - 1], 2)} → ${fmt(F.qstick8[i], 2)} とゼロを${hit > 0 ? '上抜け' : '下抜け'}した。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('fisher-cross', {
+  id: 'fisher-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 2; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const f0 = F.fisher[i - 2], f1 = F.fisher[i - 1], f2 = F.fisher[i];
+      if (f0 == null || f1 == null || f2 == null) continue;
+      const hit = (f1 < f0 && f2 > f1) ? 1 : (f1 > f0 && f2 < f1) ? -1 : 0;
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '変換値が減少していた' : '変換値が増加していた', f1 - f0, 0, true, 1, 1, true),
+                  critN(hit > 0 ? '変換値が増加へ転じた' : '変換値が減少へ転じた', f2 - f1, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i - 2, endIndex: i, detectedIndex: i, criteria: cs, explanation: `フィッシャー変換値が ${fmt(f0, 2)} → ${fmt(f1, 2)} → ${fmt(f2, 2)} と${hit > 0 ? '減少から増加' : '増加から減少'}へ転じた（トリガー線との交差と等価）。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-2 second half: CCI / ROC / composites (v0.9, JSON-driven) ----------
+function zeroCrossRule(id, seriesKey, label) {
+  return defRule(id, {
+    id, version: '0.1',
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [], S = F[seriesKey];
+      for (let i = 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const hit = zeroCrossAt(S, i);
+        if (!hit) continue;
+        const cs = [critN(hit > 0 ? `前時点 ${label} < 0` : `前時点 ${label} > 0`, S[i - 1], 0, true, 1, 1, true),
+                    critN(`現時点 ${label}`, S[i], 0, true, Math.min(1, Math.abs(S[i]) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${label} が ${fmt(S[i - 1], 1)} → ${fmt(S[i], 1)} とゼロを${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+      }
+      return ev;
+    }
+  });
+}
+registerRule(zeroCrossRule('cci-zero-cross', 'cci20', 'CCI(20)'));
+registerRule(zeroCrossRule('roc-cross', 'roc12', 'ROC(12)'));
+registerRule(zeroCrossRule('momentum-cross', 'mom12', 'モメンタム(12)'));
+registerRule(zeroCrossRule('awesome-cross', 'ao', 'オーサム・オシレーター'));
+registerRule(zeroCrossRule('coppock-cross', 'coppock', 'コポック曲線'));
+
+function zoneRule(id, seriesKey, label, cfgOf) {
+  return defRule(id, {
+    id, version: '0.1',
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [], P = this.parameters, cfg = cfgOf(P);
+      const t = zoneEntries(bars, F[seriesKey], cfg);
+      for (const side of ['oversold', 'overbought']) {
+        const oversold = side === 'oversold', thr = oversold ? cfg.lowThr : cfg.highThr, rearm = oversold ? P.oversoldRearm ?? P.rearm : P.overboughtRearm ?? P.rearm;
+        for (const { index: i, s1 } of t[side]) {
+          const cs = [critN(oversold ? cfg.lowName : cfg.highName, s1, thr, true, Math.min(1, Math.abs(s1 - thr) / (cfg.scale ?? 10) + 0.3), 2, true)];
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${label} が ${fmt(s1, cfg.dec ?? 1)} と${oversold ? '売られすぎ圏' : '買われすぎ圏'}へ進入。再発火は ${label} が ${fmt(rearm, cfg.dec ?? 1)} に戻るまで抑止する。伝統的解釈であり予測ではない。` }));
+        }
+      }
+      return ev;
+    }
+  });
+}
+registerRule(zoneRule('cci-zone', 'cci20', 'CCI(20)', (P) => ({
+  lowEnter: (s0, s1) => s0 >= -P.zone && s1 < -P.zone, lowRearm: (s1) => s1 >= -P.rearm,
+  highEnter: (s0, s1) => s0 <= P.zone && s1 > P.zone, highRearm: (s1) => s1 <= P.rearm,
+  lowThr: -P.zone, highThr: P.zone, lowName: 'CCI が −100 未満へ進入', highName: 'CCI が +100 超へ進入',
+})));
+registerRule(zoneRule('ultimate-zone', 'uo', 'ウルティメット・オシレーター', (P) => ({
+  lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+  highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+  lowThr: P.oversoldEnter, highThr: P.overboughtEnter, lowName: 'UO が 30 未満へ進入', highName: 'UO が 70 超へ進入',
+})));
+registerRule(zoneRule('demarker-zone', 'demarker', 'デマーカー', (P) => ({
+  lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+  highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+  lowThr: P.oversoldEnter, highThr: P.overboughtEnter, lowName: 'デマーカー が 0.3 未満へ進入', highName: 'デマーカー が 0.7 超へ進入', scale: 0.1, dec: 2,
+})));
+registerRule(zoneRule('connors-rsi-zone', 'rsi2', 'RSI(2)', (P) => ({
+  lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+  highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+  lowThr: P.oversoldEnter, highThr: P.overboughtEnter, lowName: 'RSI(2) が 5 未満へ進入', highName: 'RSI(2) が 95 超へ進入',
+})));
+
+registerRule(defRule('tsi-cross', {
+  id: 'tsi-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.tsi, F.tsiSignal, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 TSI < シグナル' : '前時点 TSI > シグナル', F.tsi[i - 1] - F.tsiSignal[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 TSI − シグナル', F.tsi[i] - F.tsiSignal[i], 0, true, Math.min(1, Math.abs(F.tsi[i] - F.tsiSignal[i]) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `TSI（${fmt(F.tsi[i], 1)}）がシグナル線（${fmt(F.tsiSignal[i], 1)}）を${hit > 0 ? '上抜け' : '下抜け'}した。式は一般的な構成による独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('kst-cross', {
+  id: 'kst-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F.kst, F.kstSignal, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 KST < シグナル' : '前時点 KST > シグナル', F.kst[i - 1] - F.kstSignal[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 KST − シグナル', F.kst[i] - F.kstSignal[i], 0, true, Math.min(1, Math.abs(F.kst[i] - F.kstSignal[i]) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `KST（${fmt(F.kst[i], 1)}）がシグナル線（${fmt(F.kstSignal[i], 1)}）を${hit > 0 ? '上抜け' : '下抜け'}した。日中足への適用は独自適用。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('schaff-cross', {
+  id: 'schaff-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const s0 = F.stc[i - 1], s1 = F.stc[i];
+      if (s0 == null || s1 == null) continue;
+      const hit = (s0 < P.upLevel && s1 > P.upLevel) ? 1 : (s0 > P.downLevel && s1 < P.downLevel) ? -1 : 0;
+      if (!hit) continue;
+      const lvl = hit > 0 ? P.upLevel : P.downLevel;
+      const cs = [critN(hit > 0 ? 'STC が 25 を上抜け' : 'STC が 75 を下抜け', s1, lvl, true, Math.min(1, Math.abs(s1 - lvl) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'bullish' : 'bearish', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `シャフ・トレンドサイクルが ${fmt(s0, 1)} → ${fmt(s1, 1)} と水準 ${lvl} を${hit > 0 ? '上抜け' : '下抜け'}した。水準と式は独自確定で、日中足への適用は独自適用。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-3: bands / volatility family (v1.0, JSON-driven) ----------
+registerRule(defRule('bollinger-break', {
+  id: 'bollinger-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (const side of ['upper', 'lower']) {
+      let state = null; // 'inside' | 'touch' | 'break'
+      for (let i = 19; i < bars.length; i++) {
+        if (F.bbUpper[i] == null || !bars[i].complete) continue;
+        const b = bars[i];
+        const cur = side === 'upper'
+          ? (b.close > F.bbUpper[i] ? 'break' : (b.high >= F.bbUpper[i] ? 'touch' : 'inside'))
+          : (b.close < F.bbLower[i] ? 'break' : (b.low <= F.bbLower[i] ? 'touch' : 'inside'));
+        if (state === null) { state = cur; continue; }
+        const fire = (cur === 'break' && state !== 'break') || (cur === 'touch' && state === 'inside');
+        if (fire) {
+          const band = side === 'upper' ? F.bbUpper[i] : F.bbLower[i];
+          const beyond = side === 'upper' ? b.close - band : band - b.close;
+          const cs = [critN(cur === 'break' ? '終値がバンド外' : '高安がバンドに到達（終値は内側）', beyond, 0, true, Math.min(1, Math.abs(beyond) / (F.atr14[i] || 1) + 0.3), 2, true)];
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: `${side}-${cur}`, direction: side === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値 ${fmt(b.close)} がボリンジャーバンド${side === 'upper' ? '上限' : '下限'} ${fmt(band)} を${cur === 'break' ? '終値で抜けた' : '一時的に試した（タッチ）'}。伝統的な解釈であり予測ではない。` }));
+        }
+        state = cur;
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('bollinger-percentb', {
+  id: 'bollinger-percentb', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 20; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const p0 = F.percentB[i - 1], p1 = F.percentB[i];
+      if (p0 == null || p1 == null) continue;
+      const strict = P.levels.filter(L => (p0 < L && p1 > L) || (p0 > L && p1 < L));
+      if (!strict.length) continue;
+      const up = p1 > p0;
+      const level = up ? Math.max(...strict) : Math.min(...strict);
+      const cs = [critN(`%b が水準 ${level} を${up ? '上抜け' : '下抜け'}`, p1, level, true, Math.min(1, Math.abs(p1 - level) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: up ? 'up' : 'down', direction: up ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `%b が ${fmt(p0, 2)} → ${fmt(p1, 2)} と水準 ${level} を${up ? '上抜け' : '下抜け'}した（同一足で複数水準を抜けた場合は到達した最も遠い水準を記録）。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('bollinger-squeeze', {
+  id: 'bollinger-squeeze', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let inSq = null;
+    for (let i = 0; i < bars.length; i++) {
+      const pct = F.bbPct[i];
+      if (pct == null || !bars[i].complete) continue;
+      const now = pct <= P.percentile;
+      if (inSq === null) { inSq = now; continue; }
+      if (now === inSq) continue;
+      inSq = now;
+      const cs = [critN(now ? 'バンド幅の分位が 20 以下' : 'バンド幅の分位が 20 を上回った', pct, P.percentile, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: now ? 'squeeze' : 'release', direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `バンド幅率の分位が ${fmt(pct, 1)} となり、スクイーズが${now ? '成立' : '解消'}した（直近120本・当足込み・中順位）。状態の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('donchian-breakout', {
+  id: 'donchian-breakout', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (const p of P.periods) {
+      for (let i = p; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        let hh = -Infinity, ll = Infinity;
+        for (let k = i - p; k < i; k++) { hh = Math.max(hh, bars[k].high); ll = Math.min(ll, bars[k].low); }
+        const c = bars[i].close;
+        const hit = c > hh ? 'upper' : (c < ll ? 'lower' : null);
+        if (!hit) continue;
+        const edge = hit === 'upper' ? hh : ll, beyond = hit === 'upper' ? c - edge : edge - c;
+        const cs = [critN(`終値が直前 ${p} 本の${hit === 'upper' ? '最高値' : '最安値'}を突破`, beyond, 0, true, Math.min(1, beyond / (F.atr14[i] || 1) + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: `${hit}-${p}`, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値 ${fmt(c)} がドンチアンチャネル（${p}本、当足除外）の${hit === 'upper' ? '上限' : '下限'} ${fmt(edge)} を突破した。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('channel-position', {
+  id: 'channel-position', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const pos = new Array(bars.length).fill(null);
+    for (let i = P.period - 1; i < bars.length; i++) {
+      let hh = -Infinity, ll = Infinity;
+      for (let k = i - P.period + 1; k <= i; k++) { hh = Math.max(hh, bars[k].high); ll = Math.min(ll, bars[k].low); }
+      if (hh > ll) pos[i] = (bars[i].close - ll) / (hh - ll);
+    }
+    const t = zoneEntries(bars, pos, {
+      lowEnter: (s0, s1) => s0 > P.lowerZone && s1 <= P.lowerZone, lowRearm: (s1) => s1 >= P.lowerRearm,
+      highEnter: (s0, s1) => s0 < P.upperZone && s1 >= P.upperZone, highRearm: (s1) => s1 <= P.upperRearm,
+    });
+    for (const [side, variant] of [['oversold', 'lower-zone'], ['overbought', 'upper-zone']]) {
+      const lower = side === 'oversold', thr = lower ? P.lowerZone : P.upperZone;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(lower ? 'チャネル内位置が 0.2 以下へ進入' : 'チャネル内位置が 0.8 以上へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant, direction: lower ? 'bearish-traditional' : 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `チャネル内位置（20本・当足込み）が ${fmt(s1, 2)} と${lower ? '下部' : '上部'}圏域へ進入。再発火は位置が ${lower ? P.lowerRearm : P.upperRearm} に戻るまで抑止する。状態の観察であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('keltner-break', {
+  id: 'keltner-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 20; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      if (F.kcUpper[i] == null || F.kcUpper[i - 1] == null) continue;
+      const c0 = bars[i - 1].close, c1 = bars[i].close;
+      const hit = (c0 <= F.kcUpper[i - 1] && c1 > F.kcUpper[i]) ? 'upper' : (c0 >= F.kcLower[i - 1] && c1 < F.kcLower[i]) ? 'lower' : null;
+      if (!hit) continue;
+      const band = hit === 'upper' ? F.kcUpper[i] : F.kcLower[i];
+      const cs = [critN(`終値がケルトナー${hit === 'upper' ? '上限' : '下限'}を突破`, hit === 'upper' ? c1 - band : band - c1, 0, true, Math.min(1, Math.abs(c1 - band) / (F.atr14[i] || 1) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値 ${fmt(c1)} がケルトナーチャネル（EMA20±2×ATR10）の${hit === 'upper' ? '上限' : '下限'} ${fmt(band)} を終値で抜けた。定義は独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('atr-regime', {
+  id: 'atr-regime', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.atrRatio, {
+      lowEnter: (s0, s1) => s0 >= P.contraction && s1 < P.contraction, lowRearm: (s1) => s1 >= P.rearm,
+      highEnter: (s0, s1) => s0 <= P.expansion && s1 > P.expansion, highRearm: (s1) => s1 <= P.rearm,
+    });
+    for (const [side, variant] of [['oversold', 'contraction'], ['overbought', 'expansion']]) {
+      const contraction = side === 'oversold', thr = contraction ? P.contraction : P.expansion;
+      for (const { index: i, s1 } of t[side]) {
+        const atrPct = F.atr14[i] / bars[i].close * 100;
+        const cs = [critN(contraction ? 'ATR比率が 0.8 を下抜け' : 'ATR比率が 1.2 を上抜け', s1, thr, true, Math.min(1, Math.abs(s1 - thr) + 0.3), 2, true),
+                    critN('ATR%（ATR／終値×100、併記）', atrPct, 0, null, null, 0, false)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `ATR比率（ATR14／SMA50）が ${fmt(s1, 2)} となり、ボラティリティの${contraction ? '縮小' : '拡大'}レジームへ入った（ATR% ${fmt(atrPct, 2)}）。再発火は比率が 1.0 に戻るまで抑止する。状態の観察であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('hv-percentile', {
+  id: 'hv-percentile', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.hvPct, {
+      lowEnter: (s0, s1) => s0 > P.low && s1 <= P.low, lowRearm: (s1) => s1 > P.lowRearm,
+      highEnter: (s0, s1) => s0 < P.high && s1 >= P.high, highRearm: (s1) => s1 < P.highRearm,
+    });
+    for (const [side, variant] of [['oversold', 'low'], ['overbought', 'high']]) {
+      const low = side === 'oversold', thr = low ? P.low : P.high;
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(low ? 'HV分位が 10 以下へ進入' : 'HV分位が 90 以上へ進入', s1, thr, true, Math.min(1, Math.abs(s1 - thr) / 10 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `HV（対数収益率20本の標準偏差）の分位が ${fmt(s1, 1)} と${low ? '低' : '高'}ボラティリティ圏域へ進入した（直近120本・当足込み・中順位）。再発火は分位が ${low ? P.lowRearm : P.highRearm} を回復するまで抑止する。状態の観察であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('nr-pattern', {
+  id: 'nr-pattern', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (const p of P.periods) {
+      for (let i = p - 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        let mn = Infinity; for (let k = i - p + 1; k < i; k++) mn = Math.min(mn, F.range[k]);
+        if (!(F.range[i] < mn)) continue; // strict: ties are not NR (defs 0.9)
+        const cs = [critN(`値幅が直近 ${p} 本で厳密に最小`, F.range[i], mn, true, 1, 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: `nr${p}`, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `値幅 ${fmt(F.range[i])} が直近 ${p} 本の中で最小（同値は最小とみなさない）。形状の観察であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('range-expansion', {
+  id: 'range-expansion', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 14; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const ref = F.atr14[i - 1];
+      if (ref == null || !(F.tr[i] >= P.multiple * ref)) continue;
+      const up = bars[i].close >= bars[i].open;
+      const cs = [critN('トゥルーレンジが前足時点 ATR14 の2倍以上', F.tr[i] / ref, P.multiple, true, Math.min(1, F.tr[i] / ref / 4 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: up ? 'up' : 'down', direction: up ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `トゥルーレンジ ${fmt(F.tr[i])} が前足時点の ATR14（${fmt(ref)}）の ${fmt(F.tr[i] / ref, 1)} 倍に達した値幅拡大足。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('inside-bar', {
+  id: 'inside-bar', version: '0.1',
+  evaluate(ctx) {
+    const { bars } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const b = bars[i], p = bars[i - 1];
+      if (!(b.high <= p.high && b.low >= p.low)) continue; // equality counts as inside (defs 0.9)
+      const cs = [critN('高値が前足高値以下・安値が前足安値以上', Math.min(p.high - b.high, b.low - p.low), 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: null, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `高値・安値が前足の範囲内に収まるインサイドバー（等号は包含に含める）。形状の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('outside-bar', {
+  id: 'outside-bar', version: '0.1',
+  evaluate(ctx) {
+    const { bars } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const b = bars[i], p = bars[i - 1];
+      if (!(b.high >= p.high && b.low <= p.low && (b.high > p.high || b.low < p.low))) continue;
+      const variant = b.close > b.open ? 'bullish' : (b.close < b.open ? 'bearish' : null);
+      const cs = [critN('高値・安値が前足の範囲を上下に超過', Math.min(b.high - p.high, p.low - b.low), 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant, direction: variant === 'bullish' ? 'bullish-traditional' : (variant === 'bearish' ? 'bearish-traditional' : null), startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `高値・安値が前足の範囲を上下に超えるアウトサイドバー。形状の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-3 second half: Mass / Chaikin / volume (v1.1, JSON-driven) ----------
+// Volume is the generator's synthetic value in every rule below.
+registerRule(defRule('mass-index-bulge', {
+  id: 'mass-index-bulge', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let seenAbove = false;
+    for (let i = 40; i < bars.length; i++) {
+      const mi = F.massIndex[i];
+      if (mi == null || !bars[i].complete) continue;
+      if (mi > P.bulgeLevel) { seenAbove = true; continue; }
+      if (seenAbove && mi < P.triggerLevel) {
+        seenAbove = false;
+        const cs = [critN('MI が 27 超の履歴の後に 26.5 未満へ低下', mi, P.triggerLevel, true, 1, 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: null, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `マスインデックスが ${fmt(mi, 1)} となり、27超からの低下（bulge）が成立した。非方向性の観察であり予測ではない（5分足への適用は独自適用）。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('chaikin-volatility', {
+  id: 'chaikin-volatility', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 20; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.chaikinVol, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 CV < 0' : '前時点 CV > 0', F.chaikinVol[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 CV', F.chaikinVol[i], 0, true, Math.min(1, Math.abs(F.chaikinVol[i]) / 20 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `チャイキン・ボラティリティが ${fmt(F.chaikinVol[i - 1], 1)} → ${fmt(F.chaikinVol[i], 1)} とゼロを${hit > 0 ? '上抜け' : '下抜け'}した（値幅EMAの変化率、出来高は用いない）。非方向性の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('volume-spike', {
+  id: 'volume-spike', version: '0.1',
+  evaluate(ctx) {
+    const { bars } = ctx, ev = [], P = this.parameters;
+    for (let i = P.period; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const v = bars[i].volume;
+      if (v == null) continue;
+      let s = 0, okAll = true;
+      for (let k = i - P.period; k < i; k++) { if (bars[k].volume == null) { okAll = false; break; } s += bars[k].volume; }
+      if (!okAll) continue;
+      const mean = s / P.period;
+      if (!(mean > 0 && v >= P.multiple * mean)) continue;
+      const cs = [critN('当足出来高が直前20本平均の2倍以上', v / mean, P.multiple, true, Math.min(1, v / mean / 4 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: null, direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `出来高 ${Math.round(v)} が直前20本（当足を含まない）の平均 ${Math.round(mean)} の ${fmt(v / mean, 1)} 倍に達した。出来高は生成器の合成値であり、現実の売買の証拠ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('volume-dryup', {
+  id: 'volume-dryup', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let inDry = null;
+    for (let i = 0; i < bars.length; i++) {
+      const pct = F.volPct[i];
+      if (pct == null || !bars[i].complete) continue;
+      const now = pct <= P.percentile;
+      if (inDry === null) { inDry = now; continue; }
+      if (now === inDry) continue;
+      inDry = now;
+      const cs = [critN(now ? '出来高の分位が 10 以下' : '出来高の分位が 10 を上回った', pct, P.percentile, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: now ? 'dryup' : 'release', direction: null, startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `出来高の分位が ${fmt(pct, 1)} となり、枯渇状態が${now ? '成立' : '解消'}した（直近60本・当足込み・中順位）。出来高は合成値。状態の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+function slopeTurnRule(id, seriesKey, label) {
+  return defRule(id, {
+    id, version: '0.1',
+    evaluate(ctx) {
+      const { bars, F } = ctx, ev = [], S = F[seriesKey], P = this.parameters;
+      for (let i = P.slopePeriod + 1; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const s0 = (S[i - 1] != null && S[i - 1 - P.slopePeriod] != null) ? S[i - 1] - S[i - 1 - P.slopePeriod] : null;
+        const s1 = (S[i] != null && S[i - P.slopePeriod] != null) ? S[i] - S[i - P.slopePeriod] : null;
+        if (s0 == null || s1 == null) continue;
+        const hit = (s0 < 0 && s1 > 0) ? 1 : (s0 > 0 && s1 < 0) ? -1 : 0;
+        if (!hit) continue;
+        const cs = [critN(hit > 0 ? `前時点 ${label}傾き < 0` : `前時点 ${label}傾き > 0`, s0, 0, true, 1, 1, true),
+                    critN(`現時点 ${label}傾き（10本差）`, s1, 0, true, 1, 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${label} の傾き（10本差）が ${Math.round(s0)} → ${Math.round(s1)} と符号を変えた。出来高は生成器の合成値であり、現実の資金流入の証拠ではない。伝統的な解釈であり予測ではない。` }));
+      }
+      return ev;
+    }
+  });
+}
+registerRule(slopeTurnRule('obv-slope-turn', 'obv', 'OBV'));
+registerRule(slopeTurnRule('adl-slope-turn', 'adl', 'A/Dライン'));
+
+registerRule(defRule('obv-break', {
+  id: 'obv-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = P.period; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const cur = F.obv[i];
+      if (cur == null) continue;
+      let hh = -Infinity, ll = Infinity, okAll = true;
+      for (let k = i - P.period; k < i; k++) { if (F.obv[k] == null) { okAll = false; break; } hh = Math.max(hh, F.obv[k]); ll = Math.min(ll, F.obv[k]); }
+      if (!okAll) continue;
+      const hit = cur > hh ? 'upper' : (cur < ll ? 'lower' : null);
+      if (!hit) continue;
+      const cs = [critN(`OBV が直前 ${P.period} 本の${hit === 'upper' ? '最高値' : '最安値'}を更新`, hit === 'upper' ? cur - hh : ll - cur, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `OBV が直前20本（当足除外）の${hit === 'upper' ? '最高値' : '最安値'}を更新した。出来高は生成器の合成値であり、現実の資金流入の証拠ではない。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('cmf-zone', {
+  id: 'cmf-zone', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.cmf20, {
+      lowEnter: (s0, s1) => s0 >= -P.zone && s1 < -P.zone, lowRearm: (s1) => s1 >= P.rearm,
+      highEnter: (s0, s1) => s0 <= P.zone && s1 > P.zone, highRearm: (s1) => s1 <= P.rearm,
+    });
+    for (const [side, variant] of [['oversold', 'negative'], ['overbought', 'positive']]) {
+      const neg = side === 'oversold';
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(neg ? 'CMF が −0.1 未満へ進入' : 'CMF が +0.1 超へ進入', s1, neg ? -P.zone : P.zone, true, Math.min(1, Math.abs(s1) + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant, direction: neg ? 'bearish-traditional' : 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `CMF(20) が ${fmt(s1, 2)} と${neg ? '負' : '正'}の圏域へ進入。再発火は CMF がゼロに戻るまで抑止する。出来高は生成器の合成値であり、現実の資金流入の証拠ではない。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('updown-volume-ratio', {
+  id: 'updown-volume-ratio', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    const t = zoneEntries(bars, F.upDownRatio, {
+      lowEnter: (s0, s1) => s0 > P.lowerZone && s1 <= P.lowerZone, lowRearm: (s1) => s1 >= P.rearm,
+      highEnter: (s0, s1) => s0 < P.upperZone && s1 >= P.upperZone, highRearm: (s1) => s1 <= P.rearm,
+    });
+    for (const [side, variant] of [['oversold', 'down-dominant'], ['overbought', 'up-dominant']]) {
+      const down = side === 'oversold';
+      for (const { index: i, s1 } of t[side]) {
+        const cs = [critN(down ? '比率が 0.5 以下へ進入' : '比率が 2 以上へ進入', s1, down ? P.lowerZone : P.upperZone, true, Math.min(1, Math.abs(Math.log2(s1)) / 2 + 0.3), 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant, direction: down ? 'bearish-traditional' : 'bullish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `上昇／下落出来高比率（10本）が ${fmt(s1, 2)} と${down ? '下落' : '上昇'}優勢圏域へ進入。再発火は比率が 1.0 に戻るまで抑止する。出来高は生成器の合成値であり、現実の売買の証拠ではない。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('elder-force-cross', {
+  id: 'elder-force-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 14; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.force13, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 フォース指数 < 0' : '前時点 フォース指数 > 0', F.force13[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 フォース指数', F.force13[i], 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `フォース指数（価格変化×出来高のEMA13）がゼロを${hit > 0 ? '上抜け' : '下抜け'}した。出来高は生成器の合成値であり、現実の売買圧力の証拠ではない。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-4: volume leftovers / intraday (v1.2, JSON-driven) ----------
+registerRule(zoneRule('mfi-zone', 'mfi14', 'MFI', (P) => ({
+  lowEnter: (s0, s1) => s0 >= P.oversoldEnter && s1 < P.oversoldEnter, lowRearm: (s1) => s1 >= P.oversoldRearm,
+  highEnter: (s0, s1) => s0 <= P.overboughtEnter && s1 > P.overboughtEnter, highRearm: (s1) => s1 <= P.overboughtRearm,
+  lowThr: P.oversoldEnter, highThr: P.overboughtEnter, lowName: 'MFI が 20 未満へ進入', highName: 'MFI が 80 超へ進入',
+})));
+
+registerRule(defRule('eom-cross', {
+  id: 'eom-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 15; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.eom14, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 EOM < 0' : '前時点 EOM > 0', F.eom14[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 EOM', F.eom14[i], 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `EOM（価格移動を出来高で正規化しEMA14で平滑）がゼロを${hit > 0 ? '上抜け' : '下抜け'}した。出来高は生成器の合成値であり、現実の売買の証拠ではない。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('vwap-cross', {
+  id: 'vwap-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      if (bars[i].day !== bars[i - 1].day) continue; // never across days
+      if (F.vwap[i] == null || F.vwap[i - 1] == null) continue;
+      const d0 = bars[i - 1].close - F.vwap[i - 1], d1 = bars[i].close - F.vwap[i];
+      const hit = (d0 < 0 && d1 > 0) ? 1 : (d0 > 0 && d1 < 0) ? -1 : 0;
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前足 終値 < 当日VWAP' : '前足 終値 > 当日VWAP', d0, 0, true, 1, 1, true),
+                  critN('現足 終値 − 当日VWAP', d1, 0, true, Math.min(1, Math.abs(d1) / (F.atr14[i] || 1) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値が当日VWAP（典型価格と合成出来高による近似）を${hit > 0 ? '上抜け' : '下抜け'}した。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('vwap-deviation', {
+  id: 'vwap-deviation', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let armedAbove = true, armedBelow = true, curDay = null;
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].day !== curDay) { curDay = bars[i].day; armedAbove = true; armedBelow = true; }
+      const dev = F.vwapDev[i];
+      if (dev == null || !bars[i].complete) continue;
+      if (Math.abs(dev) < P.rearm) { armedAbove = true; armedBelow = true; }
+      const side = (dev >= P.zone && armedAbove) ? 'above' : (dev <= -P.zone && armedBelow) ? 'below' : null;
+      if (!side) continue;
+      if (side === 'above') armedAbove = false; else armedBelow = false;
+      const cs = [critN(side === 'above' ? 'VWAP乖離率が +1%以上' : 'VWAP乖離率が −1%以下', dev, side === 'above' ? P.zone : -P.zone, true, Math.min(1, Math.abs(dev) / 2 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: side, direction: side === 'above' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `VWAP乖離率が ${fmt(dev, 2)}% と${side === 'above' ? '上方' : '下方'}圏域へ進入。再発火は乖離の絶対値が 0.5% 未満に戻るまで抑止する。当日VWAPは近似値。状態の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('opening-range-break', {
+  id: 'opening-range-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    let gi = 0;
+    while (gi < bars.length) {
+      let gj = gi;
+      while (gj < bars.length && bars[gj].day === bars[gi].day) gj++;
+      // day group = [gi, gj). The opening is known only if the day starts at 09:00.
+      if (bars[gi].minute === 540) {
+        let count = 0, rh = -Infinity, rl = Infinity, firedUp = false, firedDown = false;
+        for (let i = gi; i < gj; i++) {
+          if (!bars[i].complete) continue;
+          count++;
+          if (count <= P.rangeBars) { rh = Math.max(rh, bars[i].high); rl = Math.min(rl, bars[i].low); continue; }
+          const c = bars[i].close;
+          const hit = (c > rh && !firedUp) ? 'upper' : (c < rl && !firedDown) ? 'lower' : null;
+          if (!hit) continue;
+          if (hit === 'upper') firedUp = true; else firedDown = true;
+          const cs = [critN(`終値が寄付きレンジ（6本）の${hit === 'upper' ? '上限' : '下限'}を突破`, hit === 'upper' ? c - rh : rl - c, 0, true, Math.min(1, Math.abs(hit === 'upper' ? c - rh : rl - c) / (F.atr14[i] || 1) + 0.3), 2, true)];
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値 ${fmt(c)} が寄付きレンジ（最初の6本、${fmt(rl)}〜${fmt(rh)}）を${hit === 'upper' ? '上抜け' : '下抜け'}した（同日・同方向は1回まで）。伝統的な解釈であり予測ではない。` }));
+        }
+      }
+      gi = gj;
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('nvi-pvi-turn', {
+  id: 'nvi-pvi-turn', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (const [key, maKey, name] of [['nvi', 'nviEma', 'nvi'], ['pvi', 'pviEma', 'pvi']]) {
+      for (let i = 50; i < bars.length; i++) {
+        if (!bars[i].complete) continue;
+        const hit = crossAt(F[key], F[maKey], i);
+        if (!hit) continue;
+        const cs = [critN(hit > 0 ? `前時点 ${name.toUpperCase()} < MA` : `前時点 ${name.toUpperCase()} > MA`, F[key][i - 1] - F[maKey][i - 1], 0, true, 1, 1, true),
+                    critN(`現時点 ${name.toUpperCase()} − EMA50`, F[key][i] - F[maKey][i], 0, true, 1, 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: `${name}-${hit > 0 ? 'up' : 'down'}`, direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${name.toUpperCase()} がその EMA50 を${hit > 0 ? '上抜け' : '下抜け'}した（5分足への独自適用）。出来高は生成器の合成値であり、現実の資金流入の証拠ではない。伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// ---------- Stage 5-C-4 batch 1: DMI/ADX, trend basics, trailing (v1.3, JSON-driven) ----------
+const diCrossRule = (id, keyA, keyB, startIdx, label, note, upName = 'up', downName = 'down') => defRule(id, {
+  id, version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = startIdx; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = crossAt(F[keyA], F[keyB], i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? `前時点 ${label} 差 < 0` : `前時点 ${label} 差 > 0`, F[keyA][i - 1] - F[keyB][i - 1], 0, true, 1, 1, true),
+                  critN(`現時点 ${label} 差`, F[keyA][i] - F[keyB][i], 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? upName : downName, direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${label} が${hit > 0 ? '上向き' : '下向き'}に交差した。${note}伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+});
+registerRule(diCrossRule('dmi-cross', 'plusDI', 'minusDI', 14, '+DI と −DI', 'Wilder の方向性指数。', 'bullish', 'bearish'));
+registerRule(diCrossRule('aroon-cross', 'aroonUp', 'aroonDown', 26, 'Aroon Up と Down', '同値の極値は最も新しいものを採用する独自確定。'));
+registerRule(diCrossRule('vortex-cross', 'viPlus', 'viMinus', 15, 'VI+ と VI−', ''));
+
+registerRule(defRule('adx-trend-state', {
+  id: 'adx-trend-state', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [], P = this.parameters;
+    for (let i = 27; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const prev = F.adx[i - 1], cur = F.adx[i];
+      if (prev == null || cur == null) continue;
+      const hit = (prev <= P.threshold && cur > P.threshold) ? 'trend-start' : (prev >= P.threshold && cur < P.threshold) ? 'trend-end' : null;
+      if (!hit) continue;
+      const cs = [critN(hit === 'trend-start' ? 'ADX が閾値25を上方通過' : 'ADX が閾値25を下方通過', cur, P.threshold, true, Math.min(1, Math.abs(cur - P.threshold) / 10 + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: hit, direction: 'none', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `ADX が ${fmt(cur, 1)} となり閾値 25 を${hit === 'trend-start' ? '上回った（トレンド状態の開始）' : '下回った（トレンド状態の終了）'}。状態遷移の観察であり、方向の予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+const flipRule = (id, key, startIdx, valueOf, label) => defRule(id, {
+  id, version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = startIdx; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const d0 = F[key][i - 1], d1 = F[key][i];
+      if (d0 == null || d1 == null || d0 === d1) continue;
+      const cs = [critN(`追随指標の方向が ${d1 > 0 ? '上昇' : '下降'} へ反転`, valueOf(F, i), bars[i].close, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: d1 > 0 ? 'up' : 'down', direction: d1 > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `${label}伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+});
+registerRule(flipRule('chandelier-flip', 'chandDir', 22, (F, i) => F.chandStop[i], 'シャンデリア追随ストップ（22本最高値／最安値 ∓ 3×ATR22、終値判定）が反転した。'));
+registerRule(flipRule('supertrend-flip', 'stDir', 10, (F, i) => F.stValue[i], 'スーパートレンド（ATR10×3バンド、終値判定）が反転した。'));
+registerRule(flipRule('parabolic-sar-flip', 'sarDir', 2, (F, i) => F.sar[i], 'パラボリックSAR（Wilder、AF 0.02→0.2）が価格の反対側へ反転した。'));
+
+// ---------- Stage 5-C-4 batch 2: Ichimoku / HMA / KAMA / RVI (v1.4, JSON-driven) ----------
+registerRule(diCrossRule('ichimoku-tk-cross', 'tenkan', 'kijun', 26, '転換線 と 基準線', '期間は5分足の本数として扱う独自適用。'));
+registerRule(diCrossRule('rvi-cross', 'rvi', 'rviSignal', 16, 'RVI と シグナル線', 'RVI は Relative Vigor Index（標準偏差を用いる Relative Volatility Index とは別指標）。'));
+
+registerRule(defRule('ichimoku-cloud-break', {
+  id: 'ichimoku-cloud-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 78; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const c0 = bars[i - 1].close, c1 = bars[i].close;
+      const hit = (c0 <= F.cloudTop[i - 1] && c1 > F.cloudTop[i]) ? 'upper' : (c0 >= F.cloudBottom[i - 1] && c1 < F.cloudBottom[i]) ? 'lower' : null;
+      if (!hit) continue;
+      const edge = hit === 'upper' ? F.cloudTop[i] : F.cloudBottom[i];
+      const cs = [critN(hit === 'upper' ? '終値が雲の上限を上抜け' : '終値が雲の下限を下抜け', hit === 'upper' ? c1 - edge : edge - c1, 0, true, Math.min(1, Math.abs(c1 - edge) / (F.atr14[i] || 1) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値が雲（26本前に計算された先行スパンの上下限）を${hit === 'upper' ? '上抜け' : '下抜け'}した。雲は当該足で知り得る値のみで構成する。期間は5分足の本数として扱う独自適用。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('ichimoku-chikou-cross', {
+  id: 'ichimoku-chikou-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = 27; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      const hit = zeroCrossAt(F.chikouDiff, i);
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? '前時点 遅行差 < 0' : '前時点 遅行差 > 0', F.chikouDiff[i - 1], 0, true, 1, 1, true),
+                  critN('現時点 終値 − 26本前終値', F.chikouDiff[i], 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `遅行スパン（終値を26本遅行表示）が価格線を${hit > 0 ? '上抜け' : '下抜け'}した（現在の終値と26本前の終値の比較で、発生時刻は現在の足）。期間は5分足の本数として扱う独自適用。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+const priceMaCrossRule = (id, key, startIdx, label, note) => defRule(id, {
+  id, version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let i = startIdx; i < bars.length; i++) {
+      if (!bars[i].complete) continue;
+      if (F[key][i] == null || F[key][i - 1] == null) continue;
+      const d0 = bars[i - 1].close - F[key][i - 1], d1 = bars[i].close - F[key][i];
+      const hit = (d0 < 0 && d1 > 0) ? 1 : (d0 > 0 && d1 < 0) ? -1 : 0;
+      if (!hit) continue;
+      const cs = [critN(hit > 0 ? `前時点 終値 < ${label}` : `前時点 終値 > ${label}`, d0, 0, true, 1, 1, true),
+                  critN(`現時点 終値 − ${label}`, d1, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値が ${label} を${hit > 0 ? '上抜け' : '下抜け'}した。${note}伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+});
+registerRule(priceMaCrossRule('hull-cross', 'hma9', 11, 'HMA(9)', '遅延を抑えた移動平均（独自確定の式）。'));
+registerRule(priceMaCrossRule('kama-cross', 'kama', 11, 'KAMA(10,2,30)', '効率比で平滑を適応させる移動平均（独自確定の式）。'));
+
+// ---------- Stage 5-C-4 final: day aggregation rules (v1.5, JSON-driven) ----------
+registerRule(defRule('daily-ma-position', {
+  id: 'daily-ma-position', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let lastPos = null;
+    for (let i = 0; i < bars.length; i++) {
+      if (i > 0 && bars[i].day === bars[i - 1].day) continue; // evaluate once per day, at its first bar
+      if (!bars[i].complete) continue;
+      const sma = F.dailySma25[i], ref = F.dailyRefClose[i];
+      if (sma == null || ref == null || ref === sma) continue;
+      const pos = ref > sma ? 'above' : 'below';
+      if (pos === lastPos) continue;
+      lastPos = pos;
+      const cs = [critN(pos === 'above' ? '最新完全日の終値が日足SMA25より上' : '最新完全日の終値が日足SMA25より下', ref - sma, 0, true, Math.min(1, Math.abs(ref - sma) / (F.atr14[i] || 1) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: pos, direction: pos === 'above' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `最新完全日の終値 ${fmt(ref)} が日足SMA25 ${fmt(sma)} の${pos === 'above' ? '上' : '下'}にある（日足集約は完全日のみで構成し、当日進行中の値は使わない）。位置の観察であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+registerRule(defRule('pivot-touch', {
+  id: 'pivot-touch', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    const LEVELS = [['P', 'pivotP'], ['R1', 'pivotR1'], ['S1', 'pivotS1'], ['R2', 'pivotR2'], ['S2', 'pivotS2']];
+    let fired = new Set(), curDay = null;
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].day !== curDay) { curDay = bars[i].day; fired = new Set(); }
+      if (!bars[i].complete || F.pivotP[i] == null) continue;
+      for (const [name, key] of LEVELS) {
+        if (fired.has(name)) continue;
+        const level = F[key][i];
+        if (bars[i].low <= level && level <= bars[i].high) {
+          fired.add(name);
+          const cs = [critN(`当足の高安がピボット水準 ${name} を含む`, level, bars[i].close, true, 1, 2, true)];
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'observation', score: sc.score, coverage: sc.coverage, variant: name, direction: 'none', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `当足の値幅が前日（直近完全日）フロアピボットの ${name}（${fmt(level)}）に接触した（同日・同水準は1回まで）。足内の接触順序は推定しない。観察であり予測ではない。` }));
+        }
+      }
+    }
+    return ev;
+  }
+}));
+
 registerRule(crossRule('sma-cross-bullish', 'SMA5/20 強気クロス', true));
 registerRule(crossRule('sma-cross-bearish', 'SMA5/20 弱気クロス', false));
 
 // 7/8. RSI14 threshold entries (with re-arm hysteresis)
+// Stage 5-C-2: entry detection now runs on the shared RSI zone state machine
+// below. The machine replicates the legacy loop semantics EXACTLY (re-arm
+// check on the current value before the hit check; incomplete bars never
+// consume an entry); compat-v07 verifies the produced events are deep-equal
+// to the frozen v0.7 output. The machine also tracks zone occupancy and
+// emits the exit transitions consumed by rsi-zone-exit.
+function rsiZoneMachine(bars, F) {
+  const R = F.rsi14;
+  const sides = {};
+  for (const oversold of [true, false]) {
+    const enter = oversold ? 30 : 70, rearm = oversold ? 35 : 65;
+    const entries = [], exits = [];
+    let armed = true, inZone = null;
+    for (let i = 1; i < bars.length; i++) {
+      const r0 = R[i - 1], r1 = R[i];
+      if (r0 == null || r1 == null) continue;
+      if (inZone === null) inZone = oversold ? r0 < enter : r0 > enter;
+      // entry side (legacy-exact)
+      let skipEntry = false;
+      if (!armed) { if (oversold ? r1 >= rearm : r1 <= rearm) armed = true; else skipEntry = true; }
+      if (!skipEntry && bars[i].complete) {
+        const hit = oversold ? (r0 >= enter && r1 < enter) : (r0 <= enter && r1 > enter);
+        if (hit) { armed = false; entries.push({ index: i, r0, r1 }); }
+      }
+      // exit side (independent occupancy tracking; defs 0.7)
+      if (!inZone) { if (oversold ? r1 < enter : r1 > enter) inZone = true; }
+      else if (oversold ? r1 >= enter : r1 <= enter) {
+        if (bars[i].complete) { exits.push({ index: i, r0, r1 }); inZone = false; }
+      }
+    }
+    sides[oversold ? 'oversold' : 'overbought'] = { entries, exits };
+  }
+  return sides;
+}
+
 function rsiRule(id, name, oversold) {
   return {
     id, version: '0.1', name, category: 'oscillator', family: 'rsi', lookback: 15,
     parameters: oversold ? { enter: 30, rearm: 35 } : { enter: 70, rearm: 65 },
     evaluate(ctx) {
       const { bars, F } = ctx, ev = [], P = this.parameters;
-      let armed = true;
-      for (let i = 1; i < bars.length; i++) {
-        const r0 = F.rsi14[i - 1], r1 = F.rsi14[i];
-        if (r0 == null || r1 == null) continue;
-        if (!armed) { if (oversold ? r1 >= P.rearm : r1 <= P.rearm) armed = true; else continue; }
-        if (!bars[i].complete) continue;
-        const hit = oversold ? (r0 >= P.enter && r1 < P.enter) : (r0 <= P.enter && r1 > P.enter);
-        if (!hit) continue;
-        armed = false;
+      const { entries } = rsiZoneMachine(bars, F)[oversold ? 'oversold' : 'overbought'];
+      for (const { index: i, r0, r1 } of entries) {
         const cs = [crit(oversold ? 'RSI14 が 30 未満へ進入' : 'RSI14 が 70 超へ進入', r1, P.enter, true, Math.min(1, Math.abs(r1 - P.enter) / 10 + 0.3), 2, true)];
         ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `RSI14 が ${fmt(r0, 1)} → ${fmt(r1, 1)} と${oversold ? '30未満（売られすぎ圏）' : '70超（買われすぎ圏）'}へ進入。伝統的解釈であり予測ではない。再発火は RSI が ${P.rearm} に戻るまで抑止する。` }));
       }
@@ -2545,7 +5248,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数2081件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数6849件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -2819,7 +5522,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.4', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.5', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -2859,10 +5562,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '284be020a256b91e501bf9ca51ac53857cc5b67dedb3dc790b98d0542af1adc8', expectedCount: 2082 },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: 'd75cbbc2bedcd8327fbddd3a5e7a5aad6ab7d0079b014dee6eb11ef609106d67', expectedCount: 2081 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: 'e4a113135557dc9a16ca998004098967c1909d13b7ce38cb1fa8f445fad57f81', expectedCount: 2036 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: 'dafa57fd4e7039bcee936596d499cfc5214f33964c3706723a7a3c7875c126b4', expectedCount: 2036 }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: 'abc1f1152836ec0454860e6e3ee854c7456720adfc70a7161e18ef0e35ef0807', expectedCount: 6850 },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '73ca648b265b235939d8f3b75f24254739c7affb61b9491c88c71189ea70eade', expectedCount: 6849 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '468d7ba4d5665e523a5568adc91bd4223ce11ce30199d74ad314d08e99d72320', expectedCount: 6607 },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '61bdf06feb3ee130c357a014cab4c477c5ce7d88efef98e0f9d00c5895289554', expectedCount: 6607 }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
