@@ -102,9 +102,11 @@
       .badge { border-radius: 999px; padding: .02rem .55rem; font-size: .78rem; font-weight: 700; }
       .b-confirmed { background: #dcefe2; color: #14532d; } .b-forming { background: #fdf3d8; color: #7a5410; }
       .b-approximate { background: #e8e2f2; color: #4c3a75; } .b-expired { background: #ececec; color: #555; }
+      .b-observation { background: #d9eae6; color: #174a45; }
       @media (prefers-color-scheme: dark) {
         .b-confirmed { background: #173d28; color: #7fe0a8; } .b-forming { background: #3d3413; color: #ecd28a; }
         .b-approximate { background: #2e2748; color: #c3b2ec; } .b-expired { background: #333; color: #bbb; }
+        .b-observation { background: #1d3a37; color: #8fd0c4; }
       }
       .score { margin-left: auto; font-weight: 700; }
       /* detail table */
@@ -128,7 +130,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.5 ／ 工程2〜5-C</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.5.1 ／ 工程2〜5-C</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -222,6 +224,7 @@
           <label class="chk"><input type="checkbox" class="state-filter" value="forming" checked /> 形成中（forming）</label>
           <label class="chk"><input type="checkbox" class="state-filter" value="approximate" /> 近似（approximate）</label>
           <label class="chk"><input type="checkbox" class="state-filter" value="expired" /> 失効（expired）</label>
+          <label class="chk"><input type="checkbox" class="state-filter" value="observation" checked /> 観察（observation）</label>
         </div>
       </section>
 
@@ -251,11 +254,12 @@
         <div class="row"><button id="btnRunChecks" class="primary">チェックを実行</button></div>
         <div id="checkResults"><p class="sub">現在のデータで、①同一入力の2回実行が完全一致すること、②検出の前後で入力データが不変であること、を確認します。</p></div>
         <h3>正本一致ハッシュチェック（その場で実行）</h3>
-        <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列を正規化した文字列の SHA-256 を Node 正本の値と照合します。読み込みデータの場合は、計算したハッシュのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。照合は数値を有効数字10桁に丸めて行います。生成器の超越関数計算は実行環境（Node/ブラウザ）により相対1e-12程度の浮動小数点差を生じるためで、実際の判定データの乖離はそれより桁違いに大きく、検出には影響しません。</p>
+        <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列から構造ダイジェスト・8桁補助ダイジェスト・正本ハッシュ（有効数字10桁）の3種類を計算して Node 正本の期待値と照合します。合否は「件数・構造ダイジェスト・8桁補助ダイジェスト」の一致で判定し、正本ハッシュは参考として実値と期待値を表示します。読み込みデータの場合は、計算したダイジェストのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.5）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.5.1）</h3>
         <ul class="tight">
+          <li>v0.5.1で状態フィルタに観察を追加（初期ON）。ハッシュ照合に構造ダイジェストと8桁補助ダイジェストを追加し、NodeとJavaScriptCoreで4条件とも一致を確認済み（10桁正本ハッシュはNode環境でのみ一致する既知の制約）。</li>
           <li>単体テスト：<b>全テスト群合格（内訳は検証報告書参照）</b>。</li>
           <li>因果性テスト：<b>166,188件（全122ルール、prefix因果性の深い等価比較で全一致）</b>。未来足の置換に対する不変性も合格。</li>
           <li>検証アンカー：拡張モデル seed 42（566本）で総数6850件（現在足）／6849件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも6607件。</li>
@@ -282,12 +286,12 @@
 
       <section aria-labelledby="h-report" class="report">
         <h2 id="h-report">実装・検証レポート</h2>
-        <p>現行版は <b>v0.5（検出器 1.5／defs 0.14／全122ルール）</b> です。</p>
+        <p>現行版は <b>v0.5.1（検出器 1.5／defs 0.14／全122ルール）</b> です。v0.5 からの変更は、状態フィルタへの観察の追加と、ハッシュ照合への構造ダイジェスト／8桁補助ダイジェストの追加のみで、検出器と定義は不変です。</p>
         <p>経緯・検証報告書はアイデアノートに集約しています：<a href="https://docs.google.com/document/d/1ORdhYxk0DAEL2z7uqryTE7IYHcGDCRSPiF7D61fZRmk/edit" target="_blank" rel="noopener">アイデアノート（Google ドキュメント）</a></p>
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.5 ／ デイトレゲーム工程2〜5-C。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.5.1 ／ デイトレゲーム工程2〜5-C。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -5061,6 +5065,38 @@ function normalizeEvents(events) {
     explanation: e.explanation, history: e.history,
   })));
 }
+/* v0.5.1 補助ダイジェスト用（正本の正規化と同じフィールド並び） */
+function pickCanonical(e) {
+  return {
+    eventId: e.eventId, ruleId: e.ruleId, ruleVersion: e.ruleVersion, category: e.category, family: e.family,
+    timeframe: e.timeframe, state: e.state, score: e.score, direction: e.direction,
+    startIndex: e.startIndex, endIndex: e.endIndex, detectedIndex: e.detectedIndex,
+    criteria: e.criteria, missingCriteria: e.missingCriteria, overlays: e.overlays,
+    explanation: e.explanation, history: e.history,
+  };
+}
+function snapStructural(v) {
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) return 0;
+    var r = Math.round(v);
+    return Math.abs(v - r) <= 1e-9 ? r : 0;
+  }
+  if (Array.isArray(v)) return v.map(snapStructural);
+  if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = snapStructural(v[k]); return o; }
+  return v;
+}
+function quantizeP(v, p) {
+  if (typeof v === 'number') return Number.isFinite(v) ? Number(v.toPrecision(p)) : v;
+  if (Array.isArray(v)) return v.map(function (x) { return quantizeP(x, p); });
+  if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = quantizeP(v[k], p); return o; }
+  return v;
+}
+function normalizeStructural(events) {
+  return JSON.stringify(events.map(function (e) { return snapStructural(pickCanonical(e)); }));
+}
+function normalizeAux8(events) {
+  return JSON.stringify(events.map(function (e) { return quantizeP(pickCanonical(e), 8); }));
+}
 function ruleCatalog() {
   return RULES.map(r => ({ id: r.id, version: r.version, name: r.name, category: r.category, family: r.family, lookback: r.lookback, parameters: r.parameters, catalogRuleId: r.catalogRuleId ?? null }));
 }
@@ -5522,7 +5558,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.5', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: '0.5.1', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -5562,10 +5598,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: 'abc1f1152836ec0454860e6e3ee854c7456720adfc70a7161e18ef0e35ef0807', expectedCount: 6850 },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '73ca648b265b235939d8f3b75f24254739c7affb61b9491c88c71189ea70eade', expectedCount: 6849 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '468d7ba4d5665e523a5568adc91bd4223ce11ce30199d74ad314d08e99d72320', expectedCount: 6607 },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '61bdf06feb3ee130c357a014cab4c477c5ce7d88efef98e0f9d00c5895289554', expectedCount: 6607 }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: 'abc1f1152836ec0454860e6e3ee854c7456720adfc70a7161e18ef0e35ef0807', expectedCount: 6850, expectedStructural: 'a73cc62ae4c1f83625f15774d983383129433da37425d3ecb356ba77843fe9d9', expectedAux8: '2cfb9966482bed857863d72e1442ec118bc1339e83e17a7abd21568c1fc9b9c3' },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '73ca648b265b235939d8f3b75f24254739c7affb61b9491c88c71189ea70eade', expectedCount: 6849, expectedStructural: 'b46da2d41b433ce7ad28b9338ef942c65144216ee1860c9c51b4479d5b835ae6', expectedAux8: '20cee42c2b2a5758c82ce0932129111fbb78626b856ad2e550c16c341f3bf5b1' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '468d7ba4d5665e523a5568adc91bd4223ce11ce30199d74ad314d08e99d72320', expectedCount: 6607, expectedStructural: '0825273ff7f0eaa635128751038ac08b71191b0bcd6ad4703e2fde882aa07145', expectedAux8: 'ff3d24cca1c24389f5087acfde620a664297a13f21452f5e4e547dbb61e097dd' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '61bdf06feb3ee130c357a014cab4c477c5ce7d88efef98e0f9d00c5895289554', expectedCount: 6607, expectedStructural: '85a7649b852b9b74d6c8a4966fab56417429ff35097d0e54c5d86fdc4ab32e99', expectedAux8: '33cb0efb40b8dde7479cbf96fb44a309d20692f00d108cc7072cb2a45fbf37c3' }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
@@ -5577,13 +5613,31 @@ function builtinAdaptedBars(kind) {
   var s = kind === 'ext' ? generate(42, {}) : generate(7, { base: 0.3, regimes: false, season: false, jumps: false });
   return adaptBars(s.bars, { seed: s.seed, config: s.config }).bars;
 }
-function hashCheckRow(label, modeLabel, count, actual, expected) {
-  var verdict;
-  if (expected == null) verdict = '<span class="sub">照合先なし</span>';
-  else verdict = actual === expected ? '<b class="pass">一致</b>' : '<b class="fail">不一致</b>';
-  return '<tr><td>' + esc(label) + '</td><td>' + esc(modeLabel) + '</td><td class="num">' + count + '件</td>' +
-    '<td class="mono" style="word-break:break-all;">' + esc(actual) + '</td>' +
-    '<td class="mono" style="word-break:break-all;">' + (expected == null ? '—' : esc(expected)) + '</td><td>' + verdict + '</td></tr>';
+function digestVerdict(actual, expected, isRef) {
+  if (expected == null) return '<span class="sub">照合先なし</span>';
+  if (isRef) return '<span class="sub">参考：' + (actual === expected ? '一致' : '不一致') + '</span>';
+  return actual === expected ? '<b class="pass">一致</b>' : '<b class="fail">不一致</b>';
+}
+function hashCheckRows(o) {
+  var head = '<td rowspan="4">' + esc(o.label) + '</td><td rowspan="4">' + esc(o.modeLabel) + '</td>';
+  var countVerdict = o.expectedCount == null
+    ? '<span class="sub">照合先なし</span>'
+    : (o.count === o.expectedCount ? '<b class="pass">一致</b>' : '<b class="fail">不一致</b>');
+  var r1 = '<tr>' + head + '<td>件数</td><td class="num">' + o.count + '件</td>' +
+    '<td class="num">' + (o.expectedCount == null ? '—' : o.expectedCount + '件') + '</td><td>' + countVerdict + '</td></tr>';
+  var r2 = '<tr><td>構造ダイジェスト</td>' +
+    '<td class="mono" style="word-break:break-all;">' + esc(o.struct) + '</td>' +
+    '<td class="mono" style="word-break:break-all;">' + (o.structExpected == null ? '—' : esc(o.structExpected)) + '</td>' +
+    '<td>' + digestVerdict(o.struct, o.structExpected, false) + '</td></tr>';
+  var r3 = '<tr><td>8桁補助ダイジェスト</td>' +
+    '<td class="mono" style="word-break:break-all;">' + esc(o.aux8) + '</td>' +
+    '<td class="mono" style="word-break:break-all;">' + (o.aux8Expected == null ? '—' : esc(o.aux8Expected)) + '</td>' +
+    '<td>' + digestVerdict(o.aux8, o.aux8Expected, false) + '</td></tr>';
+  var r4 = '<tr><td>正本ハッシュ（10桁・参考）</td>' +
+    '<td class="mono" style="word-break:break-all;">' + esc(o.canon) + '</td>' +
+    '<td class="mono" style="word-break:break-all;">' + (o.canonExpected == null ? '—' : esc(o.canonExpected)) + '</td>' +
+    '<td>' + digestVerdict(o.canon, o.canonExpected, true) + '</td></tr>';
+  return r1 + r2 + r3 + r4;
 }
 function runHashCheck() {
   var box = $('hashResults');
@@ -5591,26 +5645,56 @@ function runHashCheck() {
   box.innerHTML = '<p class="sub">計算中です…</p>';
   var cache = {};
   function barsFor(kind) { if (!cache[kind]) cache[kind] = builtinAdaptedBars(kind); return cache[kind]; }
+  function digestsFor(events) {
+    return Promise.all([
+      sha256Hex(normalizeStructural(events)),
+      sha256Hex(normalizeAux8(events)),
+      sha256Hex(normalizeEvents(events))
+    ]).then(function (hs) { return { struct: hs[0], aux8: hs[1], canon: hs[2] }; });
+  }
   var jobs = CANONICAL_HASHES.map(function (c) {
     var res = runDetector(barsFor(c.kind), { enabled: allIds, zigzagAtrMode: c.mode });
-    return sha256Hex(normalizeEvents(res.events)).then(function (h) {
-      return { html: hashCheckRow(c.label + '（全' + barsFor(c.kind).length + '本・全ルール有効）', c.modeLabel, res.events.length, h, c.expected), match: h === c.expected };
+    return digestsFor(res.events).then(function (d) {
+      var pass = res.events.length === c.expectedCount && d.struct === c.expectedStructural && d.aux8 === c.expectedAux8;
+      return {
+        html: hashCheckRows({
+          label: c.label + '（全' + barsFor(c.kind).length + '本・全ルール有効）', modeLabel: c.modeLabel,
+          count: res.events.length, expectedCount: c.expectedCount,
+          struct: d.struct, structExpected: c.expectedStructural,
+          aux8: d.aux8, aux8Expected: c.expectedAux8,
+          canon: d.canon, canonExpected: c.expected
+        }),
+        pass: pass
+      };
     });
   });
   if (state.sourceKind === 'file' && state.bars) {
     ['current', 'pivot'].forEach(function (mode) {
       var res = runDetector(state.bars, { enabled: allIds, zigzagAtrMode: mode });
-      jobs.push(sha256Hex(normalizeEvents(res.events)).then(function (h) {
-        return { html: hashCheckRow('読み込みデータ：' + state.sourceLabel + '（全' + state.bars.length + '本・全ルール有効）', mode === 'pivot' ? '極値時点' : '現在足', res.events.length, h, null), match: null };
+      jobs.push(digestsFor(res.events).then(function (d) {
+        return {
+          html: hashCheckRows({
+            label: '読み込みデータ：' + state.sourceLabel + '（全' + state.bars.length + '本・全ルール有効）', modeLabel: mode === 'pivot' ? '極値時点' : '現在足',
+            count: res.events.length, expectedCount: null,
+            struct: d.struct, structExpected: null,
+            aux8: d.aux8, aux8Expected: null,
+            canon: d.canon, canonExpected: null
+          }),
+          pass: null
+        };
       }));
     });
   }
   return Promise.all(jobs).then(function (rows) {
-    var allMatch = rows.every(function (r) { return r.match !== false; });
+    var judged = rows.filter(function (r) { return r.pass !== null; });
+    var allPass = judged.every(function (r) { return r.pass; });
     box.innerHTML =
-      '<div class="table-scroll"><table><thead><tr><th>対象</th><th>ATR基準</th><th class="num">件数</th><th>計算ハッシュ（SHA-256）</th><th>Node正本ハッシュ</th><th>判定</th></tr></thead><tbody>' +
+      '<div class="table-scroll"><table><thead><tr><th>対象</th><th>ATR基準</th><th>区分</th><th>計算値</th><th>期待値（Node正本）</th><th>判定</th></tr></thead><tbody>' +
       rows.map(function (r) { return r.html; }).join('') + '</tbody></table></div>' +
-      '<p>組み込みサンプルの照合結果：<b class="' + (allMatch ? 'pass' : 'fail') + '">' + (allMatch ? 'すべて一致' : '不一致があります（合わせ込みはせず、実際の値を表示しています）') + '</b></p>' +
+      '<p>組み込みサンプルの照合結果（件数・構造ダイジェスト・8桁補助ダイジェストの一致で判定）：<b class="' + (allPass ? 'pass' : 'fail') + '">' + (allPass ? 'すべて一致' : '不一致があります（合わせ込みはせず、実際の値を表示しています）') + '</b></p>' +
+      '<p class="sub">構造ダイジェスト：ルール・状態・variant・発生位置・条件の構造など、非数値項目と整数の一致を確認するもの。数値そのものの完全一致を示すものではない</p>' +
+      '<p class="sub">8桁補助ダイジェスト：数値が有効数字8桁の粒度で一致することの確認。数学的な完全一致の証明ではない</p>' +
+      '<p class="sub">正本ハッシュ（有効数字10桁）は Node 正本環境での厳密照合用。ブラウザ等の実行環境では浮動小数点演算の最終桁差異（実測で最大相対差 約1.3e-10）により、量子化境界ぎわいの数値が反転してハッシュが一致しない場合がある既知の制約があり、検出内容の誤りを意味しない</p>' +
       '<p class="sub">定義版：defs ' + esc(DEFS_VERSION) + ' ／ digest：<span class="mono">' + esc(DEFS_DIGEST) + '</span></p>' +
       '<p class="sub">このチェックは画面のルールON/OFF・状態フィルタ・スライダー・ATR基準セレクタの状態には依存しません。検出器バージョン：' + esc(DETECTOR_VERSION) + '。</p>';
   }).catch(function (e) {
