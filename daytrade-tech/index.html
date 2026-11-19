@@ -130,7 +130,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.5.1 ／ 工程2〜5-C</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.6.0 ／ 工程2〜5-D</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -171,7 +171,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全122ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 1.5／defs 0.14）の実測 <b>総数6850件</b> と一致しなければなりません（「極値時点」では6849件）。純GBM seed 7 では、全122ルール有効・ATR基準「現在足」で <b>総数6607件</b> です。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全133ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 1.15／defs 0.24）の実測 <b>総数6973件</b> と一致しなければなりません（「極値時点」では6966件）。純GBM seed 7 では、全133ルール有効・ATR基準「現在足」で <b>総数6761件</b> です。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -257,13 +257,13 @@
         <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列から構造ダイジェスト・8桁補助ダイジェスト・正本ハッシュ（有効数字10桁）の3種類を計算して Node 正本の期待値と照合します。合否は「件数・構造ダイジェスト・8桁補助ダイジェスト」の一致で判定し、正本ハッシュは参考として実値と期待値を表示します。読み込みデータの場合は、計算したダイジェストのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.5.1）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.6.0）</h3>
         <ul class="tight">
-          <li>v0.5.1で状態フィルタに観察を追加（初期ON）。ハッシュ照合に構造ダイジェストと8桁補助ダイジェストを追加し、NodeとJavaScriptCoreで4条件とも一致を確認済み（10桁正本ハッシュはNode環境でのみ一致する既知の制約）。</li>
+          <li>ハッシュ照合は構造ダイジェストと8桁補助ダイジェストで判定し、Node正本の独立計算と4条件とも一致を確認済み（10桁正本ハッシュはNode環境でのみ一致する既知の制約）。状態フィルタは観察を含む5状態（初期ON）。</li>
           <li>単体テスト：<b>全テスト群合格（内訳は検証報告書参照）</b>。</li>
-          <li>因果性テスト：<b>166,188件（全122ルール、prefix因果性の深い等価比較で全一致）</b>。未来足の置換に対する不変性も合格。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数6850件（現在足）／6849件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は両方式とも6607件。</li>
-          <li>互換確認：旧版アンカーの再現として、旧10ルールで310／309／322／322件（v0.2）、既存16ルールで855／854／857／857件（v0.3）、既存25ルールで1337／1336／1383／1383件（v0.4）、既存39ルールで1947／1946／1898／1898件（v0.5）がそれぞれ完全一致。検出器1.5では旧120ルールを新規2件OFFで全項目深さ比較26,851件一致。</li>
+          <li>因果性テスト v3：<b>337,392件（全133ルール、両ATR方式、prefix因果性の履歴込み深い等価比較で全一致）</b>。異常注入テスト21件も全て期待どおりの判定。未来足の置換に対する不変性も合格。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数6973件（現在足）／6966件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は6761件（現在足）／6763件（極値時点）。</li>
+          <li>互換確認：検出器1.15で旧122ルールのみを有効にすると、凍結した検出器1.5の出力と4条件とも全項目が一致する（5-D-5で再検証）。旧版アンカーの再現履歴は v0.5.1 の検証報告書にある。</li>
         </ul>
         <h3>統計監査（v0.1 バッチの再監査）</h3>
         <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
@@ -286,12 +286,12 @@
 
       <section aria-labelledby="h-report" class="report">
         <h2 id="h-report">実装・検証レポート</h2>
-        <p>現行版は <b>v0.5.1（検出器 1.5／defs 0.14／全122ルール）</b> です。v0.5 からの変更は、状態フィルタへの観察の追加と、ハッシュ照合への構造ダイジェスト／8桁補助ダイジェストの追加のみで、検出器と定義は不変です。</p>
+        <p>現行版は <b>v0.6.0（検出器 1.15／defs 0.24／全133ルール）</b> です。前公開版 v0.5.1（検出器 1.5／defs 0.14／全122ルール）からの変更は、工程5-Dの11ルール（swing-break、fib-retracement、triple-top、triple-bottom、head-and-shoulders、triangle、rectangle-break、wedge、trendline-break、flag-pennant、broadening）の追加と定義の版の更新です。定義集は defs 0.24 の正式版を参照します：<a href="https://docs.google.com/document/d/18TYVMloNny0l-5sPpyiy3Hm7RCRSo3UJoD0jir1ZAsk/edit" target="_blank" rel="noopener">テクニカル定義集（defs 0.24）（Google ドキュメント）</a></p>
         <p>経緯・検証報告書はアイデアノートに集約しています：<a href="https://docs.google.com/document/d/1ORdhYxk0DAEL2z7uqryTE7IYHcGDCRSPiF7D61fZRmk/edit" target="_blank" rel="noopener">アイデアノート（Google ドキュメント）</a></p>
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.5.1 ／ デイトレゲーム工程2〜5-C。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.6.0 ／ デイトレゲーム工程2〜5-D。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -344,12 +344,12 @@ function generate(seed=1, options={}) {
   return {seed,config:c,bars:bars.slice(-(c.history+66))};
 }
 
-/* ===== 正本コード2：テクニカル検出器 1.5／defs 0.14（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
+/* ===== 正本コード2：テクニカル検出器 1.15／defs 0.24（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
 // GENERATED from defs/catalog.json by defs/build_detector_defs.py — do not edit by hand.
 // JSON is the source of truth for metadata, parameters and lookback of the
 // JSON-driven candle rules; JS remains the source of truth for the math.
-const DEFS_VERSION = '0.14';
-const DEFS_DIGEST = '5452558ea151c66b89968ae8961932dcd56e0c4b1ebcce3d98621f90227d14e7';
+const DEFS_VERSION = '0.24';
+const DEFS_DIGEST = '2f2f42a9b7b3c077f1480fdb50be3ae6ecc9d4a858ac3031493019f21c8e0950';
 const DEFS = {
  "doji": {
   "catalogRuleId": "doji",
@@ -1832,6 +1832,180 @@ const DEFS = {
     "S2"
    ]
   }
+ },
+ "swing-break": {
+  "catalogRuleId": "swing-break",
+  "name": "スイングブレイク（ダウ理論）",
+  "nameEn": "Swing Break (Dow)",
+  "category": "trend",
+  "family": "swing",
+  "lookback": 15,
+  "parameters": {
+   "zigzagScale": 2
+  }
+ },
+ "fib-retracement": {
+  "catalogRuleId": "fib-retracement",
+  "name": "フィボナッチ押し目",
+  "nameEn": "Fibonacci Retracement Touch",
+  "category": "bands",
+  "family": "fibonacci",
+  "lookback": 15,
+  "parameters": {
+   "zigzagScale": 2,
+   "levels": [
+    0.382,
+    0.5,
+    0.618
+   ]
+  }
+ },
+ "triple-top": {
+  "catalogRuleId": "triple-top",
+  "name": "三山",
+  "nameEn": "Triple Top",
+  "category": "pattern",
+  "family": "triple",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "proxAtr": 0.5,
+   "depthAtr": 1.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30,
+   "trendBars": 20
+  }
+ },
+ "triple-bottom": {
+  "catalogRuleId": "triple-bottom",
+  "name": "三川",
+  "nameEn": "Triple Bottom",
+  "category": "pattern",
+  "family": "triple",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "proxAtr": 0.5,
+   "depthAtr": 1.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30,
+   "trendBars": 20
+  }
+ },
+ "head-and-shoulders": {
+  "catalogRuleId": "head-and-shoulders",
+  "name": "三尊・逆三尊",
+  "nameEn": "Head and Shoulders",
+  "category": "pattern",
+  "family": "hns",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "headAtr": 0.5,
+   "shoulderProxAtr": 0.5,
+   "depthAtr": 1.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30,
+   "trendBars": 20
+  }
+ },
+ "triangle": {
+  "catalogRuleId": "triangle",
+  "name": "三角持ち合い",
+  "nameEn": "Triangle",
+  "category": "pattern",
+  "family": "triangle",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "slopeAtr": 0.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30
+  }
+ },
+ "rectangle-break": {
+  "catalogRuleId": "rectangle-break",
+  "name": "レンジブレイク",
+  "nameEn": "Rectangle Breakout",
+  "category": "pattern",
+  "family": "range",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "touches": 2,
+   "proxAtr": 0.5,
+   "minHeightAtr": 1.0,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30
+  }
+ },
+ "wedge": {
+  "catalogRuleId": "wedge",
+  "name": "ウェッジ",
+  "nameEn": "Wedge",
+  "category": "pattern",
+  "family": "wedge",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "slopeAtr": 0.5,
+   "convergeAtr": 0.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30
+  }
+ },
+ "trendline-break": {
+  "catalogRuleId": "trendline-break",
+  "name": "トレンドライン突破",
+  "nameEn": "Trendline Break",
+  "category": "trend",
+  "family": "trendline",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "minGap": 2
+  }
+ },
+ "flag-pennant": {
+  "catalogRuleId": "flag-pennant",
+  "name": "旗型",
+  "nameEn": "Flag / Pennant",
+  "category": "pattern",
+  "family": "flag",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "poleAtr": 4.0,
+   "poleMaxBars": 20,
+   "retraceMax": 0.5,
+   "convergeAtr": 0.5,
+   "flagTravelMax": 1.0,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30
+  }
+ },
+ "broadening": {
+  "catalogRuleId": "broadening",
+  "name": "拡大型",
+  "nameEn": "Broadening Formation",
+  "category": "pattern",
+  "family": "broadening",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "slopeAtr": 0.5,
+   "widenAtr": 0.5,
+   "minGap": 2,
+   "maxGap": 30,
+   "expireBars": 30
+  }
  }
 };
 // Technical extraction engine (detector) v0.3
@@ -1855,7 +2029,7 @@ const DEFS = {
 // pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
 // events/bars carry extension metadata (category, family, timeframe, isSessionStart)
 // that no rule reads, so metadata never changes detection results.
-const DETECTOR_VERSION = '1.5';
+const DETECTOR_VERSION = '1.15';
 const TIMEFRAME = '5m';
 
 // ---------- Stage 2: input adapter & validation ----------
@@ -2468,6 +2642,78 @@ function zigzag(bars, F, k, atrMode = 'current') {
   if (mode === 'seekHigh') candidate = { ...pub(candHigh), type: 'high' };
   if (mode === 'seekLow') candidate = { ...pub(candLow), type: 'low' };
   return { pivots, candidate };
+}
+
+// ---------- Stage 5-D-0: waveform foundation (read-only Pivot/Swing derivation) ----------
+// A read-only derivation layer over the EXISTING zigzag() output (project doc
+// section 23). It never recomputes, reorders or re-times pivots: the confirmed
+// pivot sequence is referenced exactly as zigzag() produced it, and no rule,
+// event or existing output changes. New pattern rules (5-D-1 onward) build
+// their skeletons from these confirmed pivots only.
+//
+// Pivot: { pivotIndex, confirmedIndex, kind: 'high'|'low', price, atrMode,
+//          scale, key }
+//   - pivotIndex is the bar of the extreme; confirmedIndex is the bar where
+//     the reversal confirmed it. Both are bar indexes (never timestamps).
+//   - Identity: within one run (one bar series, one atrMode, one scale),
+//     pivotIndex alone is unique — pivot indexes are strictly increasing and
+//     each bar appears at most once (verified by test-waveform-5d0). `key`
+//     ('<atrMode>:<scale>:<pivotIndex>') is the cross-run unique form.
+// Swing: { from, to, direction: 'up'|'down', height, heightAtr, barsSpan,
+//          confirmedIndex, crossesSession, crossesDay }
+//   - from/to reference the foundation's own Pivot objects (consecutive pair).
+//   - height is signed (to.price - from.price); direction follows its sign.
+//   - heightAtr = |height| / ATR14 at the END pivot's confirmedIndex (the
+//     volatility scale in force when the swing became known); null when that
+//     ATR is missing or zero (the codebase-wide null = unavailable rule).
+//   - barsSpan counts BARS (to.pivotIndex - from.pivotIndex), never elapsed
+//     time: the lunch break and overnight gaps are not uniform time steps.
+//   - crossesSession: the span crosses the lunch break within one day
+//     (from.minute <= 685 and to.minute >= 750 on the same day).
+//     crossesDay: the two pivots sit on different days. Both are null when
+//     the bars carry no day/minute fields (unavailable, not false).
+//   - confirmedIndex is the end pivot's confirmedIndex: a swing is knowable
+//     only from that bar on, which keeps every derivation causal.
+// provisional: { fromPivot, candidate: { pivotIndex, kind, price } } | null
+//   - The still-unconfirmed standing extreme, exposed ONLY as a reserved
+//     interface for a future preview (decision 5-D①A). It is unstable — its
+//     index/price move as new extremes print — and MUST NOT be used for
+//     event identity, forming events, history or statistics. No rule reads
+//     it in this stage.
+function buildWaveformFoundation(bars, F, zigzagResult, scale, atrMode) {
+  const pivots = zigzagResult.pivots.map(p => ({
+    pivotIndex: p.index,
+    confirmedIndex: p.confirmedIndex,
+    kind: p.type,
+    price: p.price,
+    atrMode,
+    scale,
+    key: `${atrMode}:${scale}:${p.index}`,
+  }));
+  const swings = [];
+  for (let i = 0; i + 1 < pivots.length; i++) {
+    const from = pivots[i], to = pivots[i + 1];
+    const height = to.price - from.price;
+    const atrRef = F.atr14[to.confirmedIndex];
+    const fb = bars[from.pivotIndex], tb = bars[to.pivotIndex];
+    const hasCal = fb && tb && fb.day != null && tb.day != null && fb.minute != null && tb.minute != null;
+    swings.push({
+      from, to,
+      direction: height > 0 ? 'up' : 'down',
+      height,
+      heightAtr: atrRef != null && atrRef > 0 ? Math.abs(height) / atrRef : null,
+      barsSpan: to.pivotIndex - from.pivotIndex,
+      confirmedIndex: to.confirmedIndex,
+      crossesSession: hasCal ? (fb.day === tb.day && fb.minute <= 685 && tb.minute >= 750) : null,
+      crossesDay: hasCal ? (fb.day !== tb.day) : null,
+    });
+  }
+  const cand = zigzagResult.candidate;
+  const provisional = cand && pivots.length > 0 ? {
+    fromPivot: pivots[pivots.length - 1],
+    candidate: { pivotIndex: cand.index, kind: cand.type, price: cand.price },
+  } : null;
+  return { scale, atrMode, pivots, swings, provisional };
 }
 
 // ---------- Stage 3: rule registry & evaluation ----------
@@ -5031,6 +5277,679 @@ function doubleRule(id, name, top) {
 registerRule(doubleRule('double-top', 'ダブルトップ', true));
 registerRule(doubleRule('double-bottom', 'ダブルボトム', false));
 
+// 11. Swing break (Dow) — Stage 5-D-1. Price-break reading of the catalog
+// definition, fixed in defs 0.15: the watched levels are the most recent
+// CONFIRMED swing high / swing low (waveform foundation, zigzagScale=2).
+// A level is usable only on bars strictly AFTER its pivot's confirmedIndex
+// (a pivot confirmed on bar t was not knowable before bar t's close, so it
+// can never be "broken" on bar t itself). The first close strictly beyond
+// the level fires once per pivot; equality is not a break; no tolerance.
+// A newer same-kind pivot supersedes an unconsumed level silently.
+// HH/HL/LH/LL pivot-structure relations are NOT events of this rule — they
+// are observations on the foundation. Provisional pivots are never used.
+// sessionPolicy=continuous: levels persist across lunch and day boundaries.
+registerRule(defRule('swing-break', {
+  id: 'swing-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const pivots = wf.pivots;
+    let pi = 0, hi = null, lo = null; // live levels: { pivot, consumed }
+    for (let t = 0; t < bars.length; t++) {
+      while (pi < pivots.length && pivots[pi].confirmedIndex < t) {
+        const p = pivots[pi++];
+        if (p.kind === 'high') hi = { pivot: p, consumed: false };
+        else lo = { pivot: p, consumed: false };
+      }
+      if (!bars[t].complete) continue;
+      const c = bars[t].close;
+      const live = (hi && !hi.consumed && c > hi.pivot.price) ? { L: hi, up: true }
+        : (lo && !lo.consumed && c < lo.pivot.price) ? { L: lo, up: false } : null;
+      if (!live) continue;
+      live.L.consumed = true;
+      const p = live.L.pivot, level = p.price;
+      const beyond = live.up ? c - level : level - c;
+      const cs = [critN(`終値が直近の確定スイング${live.up ? '高値' : '安値'}を${live.up ? '上抜け' : '下抜け'}`, beyond, 0, true, Math.min(1, beyond / (F.atr14[t] || 1) + 0.3), 2, true)];
+      const sc = scoreOf2(cs);
+      ev.push(makeEvent(this, {
+        state: 'confirmed', score: sc.score, coverage: sc.coverage,
+        variant: live.up ? 'up' : 'down',
+        direction: live.up ? 'bullish-traditional' : 'bearish-traditional',
+        startIndex: p.pivotIndex, endIndex: t, detectedIndex: t, criteria: cs,
+        overlays: [
+          { type: 'swing-level', price: level, from: p.pivotIndex, to: t },
+          { type: 'pivots', points: [{ index: p.pivotIndex, price: level, type: p.kind }] },
+        ],
+        explanation: `終値 ${fmt(c)} が、${p.confirmedIndex} 本目で確定したスイング${live.up ? '高値' : '安値'} ${fmt(level)}（${p.pivotIndex} 本目）を${live.up ? '上抜け' : '下抜け'}した。ダウ理論のスイングブレイクの操作化であり、伝統的な解釈であって予測ではない。`,
+      }));
+    }
+    return ev;
+  }
+}));
+
+// 12. Fibonacci retracement touch (Stage 5-D-1 follow-up, defs 0.16).
+// Only the NEWEST completed swing (both endpoint pivots confirmed, waveform
+// foundation, zigzagScale=2) is watched. Levels are B - r*(B - A) for
+// r in {0.382, 0.5, 0.618} (0.5 is the conventional 50% retracement, NOT a
+// Fibonacci ratio). A level is usable only on bars strictly AFTER the swing
+// end pivot's confirmedIndex; touches on or before the confirmation bar
+// never fire (no retroactive events). A touch is the bar's [low, high]
+// range including the level (equality included) and is an OBSERVATION of
+// possible contact (the pivot-touch state contract): intrabar order,
+// execution and reversal success are NOT asserted, and no reversal
+// confirmation event exists in this rule. At most one fire per
+// (swing, ratio); a newer completed swing retires the old swing's unfired
+// levels. Multiple levels touched on one bar fire in parallel, unordered.
+// sessionPolicy=continuous: day-crossing swings are watched and their
+// crossing attributes are recorded. Provisional pivots are never used.
+registerRule(defRule('fib-retracement', {
+  id: 'fib-retracement', version: '0.1',
+  evaluate(ctx) {
+    const { bars } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const swings = wf.swings;
+    let si = 0, active = null, fired = new Set();
+    for (let t = 0; t < bars.length; t++) {
+      while (si < swings.length && swings[si].confirmedIndex < t) { active = swings[si++]; fired = new Set(); }
+      if (!active || !bars[t].complete) continue;
+      const A = active.from, B = active.to, range = B.price - A.price;
+      for (const r of P.levels) {
+        if (fired.has(r)) continue;
+        const level = B.price - r * range;
+        const bar = bars[t];
+        if (!(bar.low <= level && level <= bar.high)) continue;
+        fired.add(r);
+        const up = active.direction === 'up';
+        const cs = [critN(`当足の高安が ${r === 0.5 ? '50%戻し' : `${r * 100}%`}水準を含む`, level, bar.close, true, 1, 2, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, {
+          state: 'observation', score: sc.score, coverage: sc.coverage,
+          variant: String(r),
+          direction: up ? 'bullish-traditional' : 'bearish-traditional',
+          startIndex: A.pivotIndex, endIndex: t, detectedIndex: t, criteria: cs,
+          overlays: [
+            { type: 'swing-level', price: level, from: B.pivotIndex, to: t },
+            { type: 'pivots', points: [{ index: A.pivotIndex, price: A.price, type: A.kind }, { index: B.pivotIndex, price: B.price, type: B.kind }] },
+          ],
+          explanation: `確定スイング（${A.pivotIndex} 本目の ${fmt(A.price)} から ${B.pivotIndex} 本目の ${fmt(B.price)}、${B.confirmedIndex} 本目で完成）の ${r === 0.5 ? '50%戻し（慣用的な水準で、フィボナッチ比率ではない）' : `${r * 100}%戻し`}水準 ${fmt(level)} に、当足の高安が接触した${active.crossesDay ? '（日跨ぎのスイング）' : ''}。接触した可能性の観察であり、足内の順序・反転の成否は推定しない。予測ではない。`,
+        }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// 13/14. Triple top / triple bottom (Stage 5-D-2 batch 1, defs 0.17).
+// Skeleton: five alternating CONFIRMED pivots from the waveform foundation
+// (zigzagScale=2). Family semantics follow the doubles: proximity and depth
+// are measured on ONE common scale (ATR14 at the final peak's pivot bar),
+// the prior trend is a scored (non-mandatory) criterion, completion is a
+// strict CLOSE break, and invalidation (close beyond the extreme peak) is
+// checked before the break on each watch bar. Differences from the doubles,
+// fixed by the 5-D-2 spec: the neckline is the horizontal line through the
+// FARTHER of the two valleys/peaks (a sloped line is not used), and a
+// candidate whose watch window elapses unresolved is recorded as expired
+// (time expiry), not left as forming. A centre-dominant shape (the H&S
+// region) fails the three-peak spread test by construction, so the two
+// families partition the shapes. Provisional pivots are never used.
+function tripleRule(id, top) {
+  return defRule(id, {
+    id, version: '0.1',
+    evaluate(ctx) {
+      const { bars, F } = ctx, P = this.parameters, ev = [];
+      const wf = ctx.waveforms[P.zigzagScale];
+      if (!wf) return ev;
+      const piv = wf.pivots, closes = bars.map(b => b.close);
+      const t1 = top ? 'high' : 'low', name = this.name;
+      for (let s = 0; s + 4 < piv.length; s++) {
+        const q = piv.slice(s, s + 5);
+        if (!(q[0].kind === t1 && q[2].kind === t1 && q[4].kind === t1 && q[1].kind !== t1 && q[3].kind !== t1)) continue;
+        const [p1, v1, p2, v2, p3] = q;
+        const atrRef = F.atr14[p3.pivotIndex];
+        if (atrRef == null || atrRef <= 0) continue;
+        const peaks = [p1.price, p2.price, p3.price];
+        const spread = Math.max(...peaks) - Math.min(...peaks);
+        const d1 = top ? Math.min(p1.price, p2.price) - v1.price : v1.price - Math.max(p1.price, p2.price);
+        const d2 = top ? Math.min(p2.price, p3.price) - v2.price : v2.price - Math.max(p2.price, p3.price);
+        const depth = Math.min(d1, d2);
+        const gaps = [v1.pivotIndex - p1.pivotIndex, p2.pivotIndex - v1.pivotIndex, v2.pivotIndex - p2.pivotIndex, p3.pivotIndex - v2.pivotIndex];
+        let trendPass = false;
+        if (p1.pivotIndex >= P.trendBars - 1) {
+          let ext = top ? -Infinity : Infinity;
+          for (let k = p1.pivotIndex - P.trendBars + 1; k <= p1.pivotIndex; k++) ext = top ? Math.max(ext, closes[k]) : Math.min(ext, closes[k]);
+          trendPass = Math.abs(ext - p1.price) < 1e-9;
+        }
+        const cs = [crit('3峰の近接（最大最小差 ≤ ATR×0.5）', spread / atrRef, P.proxAtr, spread <= P.proxAtr * atrRef, 1 - Math.min(1, spread / atrRef / P.proxAtr) * 0.5, 30, true),
+                      crit(top ? '2谷の深さ（浅い方） ≥ ATR×1.5' : '2山の高さ（浅い方） ≥ ATR×1.5', depth / atrRef, P.depthAtr, depth >= P.depthAtr * atrRef, Math.min(1, depth / atrRef / P.depthAtr), 25, true),
+                      crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 15, true),
+                      crit(top ? '直前傾向：第1高値が直前20本の最高終値' : '直前傾向：第1安値が直前20本の最安終値', trendPass ? 1 : 0, 1, trendPass, trendPass ? 1 : 0, 10, false),
+                      crit(top ? 'ネックライン終値下抜け' : 'ネックライン終値上抜け', null, top ? Math.min(v1.price, v2.price) : Math.max(v1.price, v2.price), false, 0, 20, true)];
+        if (!(cs[0].pass && cs[1].pass && cs[2].pass)) continue;
+        const neck = top ? Math.min(v1.price, v2.price) : Math.max(v1.price, v2.price);
+        const born = p3.confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+        let outcome = null;
+        for (let j = born + 1; j <= limit; j++) {
+          if (top ? closes[j] > Math.max(...peaks) : closes[j] < Math.min(...peaks)) { outcome = { kind: 'expired', index: j, why: 'destroyed' }; break; }
+          if (top ? closes[j] < neck : closes[j] > neck) { outcome = { kind: 'break', index: j }; break; }
+        }
+        if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars, why: 'timeout' };
+        const base = { direction: top ? 'bearish-traditional' : 'bullish-traditional', startIndex: p1.pivotIndex, endIndex: p3.pivotIndex, overlays: [{ type: 'neckline', price: neck, from: v1.pivotIndex, to: outcome ? outcome.index : limit }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+        if (outcome && outcome.kind === 'break') {
+          cs[4] = crit(cs[4].name, closes[outcome.index], neck, true, 1, 20, true);
+          ev.push(makeEvent(this, { ...base, state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `${name}が成立。3つの${top ? '高値' : '安値'} ${peaks.map(x => fmt(x)).join('／')}（最大最小差はATRの${fmt(spread / atrRef, 2)}倍）、ネックライン ${fmt(neck)}円を終値で${top ? '下抜け' : '上抜け'}。` }));
+        } else if (outcome && outcome.kind === 'expired') {
+          ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: born, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: outcome.why === 'destroyed' ? `${name}の候補は形状破壊により失効した（成立には至らなかった）。` : `${name}の候補は監視窓（${P.expireBars}本）内に成立せず期限切れで失効した。` }));
+        } else {
+          ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `${name}を形成中。5ピボットは確認済みで、ネックライン ${fmt(neck)}円の${top ? '下抜け' : '上抜け'}待ち（未成立）。` }));
+        }
+      }
+      return ev;
+    }
+  });
+}
+registerRule(tripleRule('triple-top', true));
+registerRule(tripleRule('triple-bottom', false));
+
+// 15. Head and shoulders / inverse (Stage 5-D-2 batch 2, defs 0.18).
+// ONE rule, variants 'top' (三尊) and 'bottom' (逆三尊). Skeleton: five
+// alternating CONFIRMED pivots from the waveform foundation (zigzagScale=2).
+// The head must exceed the HIGHER shoulder by strictly more than
+// headAtr x ATRref (equality is not dominance) and the shoulders must lie
+// within shoulderProxAtr x ATRref of each other. The band is the same
+// 0.5 ATR band as the triples' three-peak proximity, so the families
+// partition the three-peak shapes: a skeleton cannot satisfy both, and
+// shapes with far-apart shoulders and a weakly dominant head satisfy
+// neither. ATRref is ATR14 at the final pivot's bar (the triples/doubles
+// common-scale convention). Neckline, close-break completion, watch
+// window, invalidation (close beyond the head) and the time-expiry state
+// convention follow the triple rules. Provisional pivots are never used.
+registerRule(defRule('head-and-shoulders', {
+  id: 'head-and-shoulders', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    for (let s = 0; s + 4 < piv.length; s++) {
+      const q = piv.slice(s, s + 5);
+      const top = q[0].kind === 'high';
+      if (!(q[2].kind === q[0].kind && q[4].kind === q[0].kind && q[1].kind !== q[0].kind && q[3].kind !== q[0].kind)) continue;
+      const [ls, v1, hd, v2, rs] = q;
+      const atrRef = F.atr14[rs.pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const dom = top ? hd.price - Math.max(ls.price, rs.price) : Math.min(ls.price, rs.price) - hd.price;
+      const shDiff = Math.abs(ls.price - rs.price);
+      const d1 = top ? Math.min(ls.price, hd.price) - v1.price : v1.price - Math.max(ls.price, hd.price);
+      const d2 = top ? Math.min(hd.price, rs.price) - v2.price : v2.price - Math.max(hd.price, rs.price);
+      const depth = Math.min(d1, d2);
+      const gaps = [v1.pivotIndex - ls.pivotIndex, hd.pivotIndex - v1.pivotIndex, v2.pivotIndex - hd.pivotIndex, rs.pivotIndex - v2.pivotIndex];
+      let trendPass = false;
+      if (ls.pivotIndex >= P.trendBars - 1) {
+        let ext = top ? -Infinity : Infinity;
+        for (let k = ls.pivotIndex - P.trendBars + 1; k <= ls.pivotIndex; k++) ext = top ? Math.max(ext, closes[k]) : Math.min(ext, closes[k]);
+        trendPass = Math.abs(ext - ls.price) < 1e-9;
+      }
+      const neck = top ? Math.min(v1.price, v2.price) : Math.max(v1.price, v2.price);
+      const cs = [crit('頭の優位（高い方の肩より ATR×0.5 超）', dom / atrRef, P.headAtr, dom > P.headAtr * atrRef, Math.min(1, dom / atrRef / P.headAtr), 25, true),
+                    crit('肩の近接（左右差 ≤ ATR×0.5）', shDiff / atrRef, P.shoulderProxAtr, shDiff <= P.shoulderProxAtr * atrRef, 1 - Math.min(1, shDiff / atrRef / P.shoulderProxAtr) * 0.5, 20, true),
+                    crit(top ? '2谷の深さ（浅い方） ≥ ATR×1.5' : '2山の高さ（浅い方） ≥ ATR×1.5', depth / atrRef, P.depthAtr, depth >= P.depthAtr * atrRef, Math.min(1, depth / atrRef / P.depthAtr), 20, true),
+                    crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 10, true),
+                    crit(top ? '直前傾向：左肩が直前20本の最高終値' : '直前傾向：左底が直前20本の最安終値', trendPass ? 1 : 0, 1, trendPass, trendPass ? 1 : 0, 5, false),
+                    crit(top ? 'ネックライン終値下抜け' : 'ネックライン終値上抜け', null, neck, false, 0, 20, true)];
+      if (!(cs[0].pass && cs[1].pass && cs[2].pass && cs[3].pass)) continue;
+      const born = rs.confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (top ? closes[j] > hd.price : closes[j] < hd.price) { outcome = { kind: 'expired', index: j, why: 'destroyed' }; break; }
+        if (top ? closes[j] < neck : closes[j] > neck) { outcome = { kind: 'break', index: j }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars, why: 'timeout' };
+      const nm = top ? '三尊' : '逆三尊';
+      const base = { variant: top ? 'top' : 'bottom', direction: top ? 'bearish-traditional' : 'bullish-traditional', startIndex: ls.pivotIndex, endIndex: rs.pivotIndex, overlays: [{ type: 'neckline', price: neck, from: v1.pivotIndex, to: outcome ? outcome.index : limit }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      if (outcome && outcome.kind === 'break') {
+        cs[5] = crit(cs[5].name, closes[outcome.index], neck, true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `${nm}が成立。左${top ? '肩' : '底'} ${fmt(ls.price)}円・頭 ${fmt(hd.price)}円・右${top ? '肩' : '底'} ${fmt(rs.price)}円（頭は${top ? '高い' : '低い'}方の${top ? '肩' : '底'}よりATRの${fmt(dom / atrRef, 2)}倍${top ? '高い' : '低い'}）、ネックライン ${fmt(neck)}円を終値で${top ? '下抜け' : '上抜け'}。形状の一致は予測を意味しない。` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: born, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: outcome.why === 'destroyed' ? `${nm}の候補は形状破壊により失効した（成立には至らなかった）。` : `${nm}の候補は監視窓（${P.expireBars}本）内に成立せず期限切れで失効した。` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `${nm}を形成中。5ピボットは確認済みで、ネックライン ${fmt(neck)}円の${top ? '下抜け' : '上抜け'}待ち（未成立）。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// --- Minimal geometric foundation (Stage 5-D-3): ordinary least squares
+// over (barIndex, price) points. a = Sxy / Sxx with Sxy = sum((x-xbar)(y-ybar)),
+// Sxx = sum((x-xbar)^2); b = ybar - a*xbar. Pivot indices strictly increase,
+// so Sxx > 0 for any two or more skeleton points (no zero-variance case).
+// Lines fitted from a candidate's pivots are FIXED at the candidate's birth
+// and are never refit with later bars.
+function fitLine(points) {
+  const n = points.length;
+  const mx = points.reduce((s, p) => s + p.x, 0) / n, my = points.reduce((s, p) => s + p.y, 0) / n;
+  let sxy = 0, sxx = 0;
+  for (const p of points) { sxy += (p.x - mx) * (p.y - my); sxx += (p.x - mx) * (p.x - mx); }
+  const a = sxx > 0 ? sxy / sxx : 0;
+  return { a, b: my - a * mx, at: (x) => a * x + (my - a * mx) };
+}
+
+// 16. Triangle, symmetric type (Stage 5-D-3 batch 1, defs 0.19).
+// Skeleton: five alternating CONFIRMED pivots (either orientation). The
+// upper/lower lines are OLS fits over each side's pivot points only (all-bar
+// highs/lows would import unconfirmed extremes and non-skeleton noise),
+// fixed at the birth (fifth pivot's confirmedIndex) and never refit. Shape
+// gates at birth: each side's total travel over the skeleton span is at
+// least slopeAtr x ATRref with the converging sign (upper down, lower up);
+// every skeleton pivot stays within containAtr x ATRref inside its side's
+// line; the width at the last pivot is positive and narrower than at the
+// first pivot. Horizontal-sided (ascending/descending) types fail the
+// slope-materiality gate by construction and are deferred. Watch: from
+// born+1 for expireBars; on each bar the apex (upper <= lower) expires the
+// candidate BEFORE any break test; a strict close beyond a line confirms
+// with variant up/down; equality is not a break; variant is null while
+// unbroken. x is the bar index (one bar is one step across lunch/day gaps).
+registerRule(defRule('triangle', {
+  id: 'triangle', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    for (let s = 0; s + 4 < piv.length; s++) {
+      const q = piv.slice(s, s + 5);
+      if (!(q[1].kind !== q[0].kind && q[2].kind === q[0].kind && q[3].kind !== q[0].kind && q[4].kind === q[0].kind)) continue;
+      const highs = q.filter(p => p.kind === 'high'), lows = q.filter(p => p.kind === 'low');
+      const atrRef = F.atr14[q[4].pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const U = fitLine(highs.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const Lw = fitLine(lows.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const x1 = q[0].pivotIndex, x5 = q[4].pivotIndex, span = x5 - x1;
+      const upTravel = -U.a * span / atrRef, loTravel = Lw.a * span / atrRef;
+      const wStart = U.at(x1) - Lw.at(x1), wEnd = U.at(x5) - Lw.at(x5);
+      const gaps = [q[1].pivotIndex - q[0].pivotIndex, q[2].pivotIndex - q[1].pivotIndex, q[3].pivotIndex - q[2].pivotIndex, q[4].pivotIndex - q[3].pivotIndex];
+      // No containment gate: the fitted lines are regressions, not envelopes.
+      // A natural triangle whose legs shrink in bar count leaves its middle
+      // pivot above the OLS upper line (measured 0.57 ATR on the reference
+      // synthetic), so requiring pivots to stay inside their line rejects
+      // textbook shapes; residuals are part of the regression definition.
+      const cs = [crit('上辺の下降（区間移動量 ≥ ATR×0.5）', upTravel, P.slopeAtr, upTravel >= P.slopeAtr, Math.min(1, Math.max(0, upTravel) / P.slopeAtr), 25, true),
+                    crit('下辺の上昇（区間移動量 ≥ ATR×0.5）', loTravel, P.slopeAtr, loTravel >= P.slopeAtr, Math.min(1, Math.max(0, loTravel) / P.slopeAtr), 25, true),
+                    crit('収束（終端の幅が始端より狭く正）', wStart > 0 ? wEnd / wStart : null, 1, wEnd > 0 && wEnd < wStart, wStart > 0 ? Math.max(0, 1 - wEnd / wStart) : 0, 20, true),
+                    crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 10, true),
+                    crit('終値の辺ブレイク', null, null, false, 0, 20, true)];
+      if (!(cs[0].pass && cs[1].pass && cs[2].pass && cs[3].pass)) continue;
+      const born = q[4].confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (U.at(j) <= Lw.at(j)) { outcome = { kind: 'expired', index: j, why: 'apex' }; break; }
+        if (closes[j] > U.at(j)) { outcome = { kind: 'break', index: j, dir: 'up' }; break; }
+        if (closes[j] < Lw.at(j)) { outcome = { kind: 'break', index: j, dir: 'down' }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars, why: 'timeout' };
+      const toIdx = outcome ? outcome.index : limit;
+      const base = { startIndex: x1, endIndex: x5, overlays: [{ type: 'trendline', role: 'upper', from: x1, to: toIdx, priceFrom: U.at(x1), priceTo: U.at(toIdx) }, { type: 'trendline', role: 'lower', from: x1, to: toIdx, priceFrom: Lw.at(x1), priceTo: Lw.at(toIdx) }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      if (outcome && outcome.kind === 'break') {
+        const up = outcome.dir === 'up';
+        cs[4] = crit(cs[4].name, closes[outcome.index], up ? U.at(outcome.index) : Lw.at(outcome.index), true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, variant: outcome.dir, direction: up ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `三角持ち合い（対称型）が成立。終値が${up ? '上辺' : '下辺'}を${up ? '上抜け' : '下抜け'}した（上辺の傾き ${fmt(U.a, 2)}円/本、下辺の傾き ${fmt(Lw.a, 2)}円/本、幅は ${fmt(wStart)}円から ${fmt(wEnd)}円へ収束）。形状の一致は予測を意味しない。` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: born, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: outcome.why === 'apex' ? '三角持ち合い（対称型）の候補は、2線の交点（頂点）に達して失効した（ブレイクには至らなかった）。' : `三角持ち合い（対称型）の候補は監視窓（${P.expireBars}本）内にブレイクせず期限切れで失効した。` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: '三角持ち合い（対称型）を形成中。5ピボットは確認済みで、終値の辺ブレイク待ち（未成立）。' }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// 17. Rectangle break (Stage 5-D-3 batch 2, defs 0.20). Skeleton: four
+// alternating CONFIRMED pivots (two highs, two lows; touches=2 per side,
+// adopted from the catalog's provisional value). The band levels are the
+// extremes of the touches (upper = max of the highs, lower = min of the
+// lows) so the band contains its defining pivots by construction; mean or
+// band-center levels would leave a touch pivot outside its own band.
+// Shape gates at birth: each side's spread is within proxAtr x ATRref
+// (equality passes; this also rejects an outlier touch), the height is at
+// least minHeightAtr x ATRref, and each leg spans minGap..maxGap bars.
+// There is no separate invalidation: a close outside the band IS the
+// break. Watch from born+1 for expireBars; a strict close beyond a level
+// confirms with variant up/down; equality is not a break; timeout expires;
+// variant is null while unbroken. Distinct from triangle by construction
+// (horizontal proximity here vs opposing slopes and convergence there);
+// boundary skeletons may satisfy both or neither.
+registerRule(defRule('rectangle-break', {
+  id: 'rectangle-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    for (let s = 0; s + 3 < piv.length; s++) {
+      const q = piv.slice(s, s + 4);
+      if (!(q[1].kind !== q[0].kind && q[2].kind === q[0].kind && q[3].kind !== q[0].kind)) continue;
+      const highs = q.filter(p => p.kind === 'high'), lows = q.filter(p => p.kind === 'low');
+      const atrRef = F.atr14[q[3].pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const upper = Math.max(...highs.map(p => p.price)), lower = Math.min(...lows.map(p => p.price));
+      const spH = (upper - Math.min(...highs.map(p => p.price))) / atrRef;
+      const spL = (Math.max(...lows.map(p => p.price)) - lower) / atrRef;
+      const height = (upper - lower) / atrRef;
+      const gaps = [q[1].pivotIndex - q[0].pivotIndex, q[2].pivotIndex - q[1].pivotIndex, q[3].pivotIndex - q[2].pivotIndex];
+      const cs = [crit('上限の近接（高値の広がり ≤ ATR×0.5）', spH, P.proxAtr, spH <= P.proxAtr, 1 - Math.min(1, spH / P.proxAtr) * 0.5, 20, true),
+                    crit('下限の近接（安値の広がり ≤ ATR×0.5）', spL, P.proxAtr, spL <= P.proxAtr, 1 - Math.min(1, spL / P.proxAtr) * 0.5, 20, true),
+                    crit('レンジの高さ（≥ ATR×1.0）', height, P.minHeightAtr, height >= P.minHeightAtr, Math.min(1, height / P.minHeightAtr), 15, true),
+                    crit('各辺の接触回数（≥ 2回）', Math.min(highs.length, lows.length), P.touches, highs.length >= P.touches && lows.length >= P.touches, 1, 15, true),
+                    crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 10, true),
+                    crit('終値の帯ブレイク', null, null, false, 0, 20, true)];
+      if (!(cs[0].pass && cs[1].pass && cs[2].pass && cs[4].pass)) continue;
+      const born = q[3].confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (closes[j] > upper) { outcome = { kind: 'break', index: j, dir: 'up' }; break; }
+        if (closes[j] < lower) { outcome = { kind: 'break', index: j, dir: 'down' }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars };
+      const legs = wf.swings.filter(w => w.from && w.to && q.some(p => p.key === w.from.key) && q.some(p => p.key === w.to.key));
+      const crossNote = legs.some(w => w.crossesDay) ? '（日跨ぎを含む）' : legs.some(w => w.crossesSession) ? '（昼休み跨ぎを含む）' : '';
+      const base = { startIndex: q[0].pivotIndex, endIndex: q[3].pivotIndex, overlays: [{ type: 'range-band', upper, lower, from: q[0].pivotIndex, to: outcome ? outcome.index : limit }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      if (outcome && outcome.kind === 'break') {
+        const up = outcome.dir === 'up';
+        cs[5] = crit(cs[5].name, closes[outcome.index], up ? upper : lower, true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, variant: outcome.dir, direction: up ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `水平レンジ（上限 ${fmt(upper)}円・下限 ${fmt(lower)}円${crossNote}）を終値が${up ? '上抜け' : '下抜け'}した。各辺2回の接触で範囲が確定していた。形状の一致は予測を意味しない。` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: born, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: `水平レンジ（上限 ${fmt(upper)}円・下限 ${fmt(lower)}円${crossNote}）は監視窓（${P.expireBars}本）内にブレイクせず期限切れで失効した。` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `水平レンジ（上限 ${fmt(upper)}円・下限 ${fmt(lower)}円${crossNote}）を形成中。4ピボットは確認済みで、終値の帯ブレイク待ち（未成立）。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// 18. Wedge (Stage 5-D-3 batch 3, defs 0.21). Skeleton: five alternating
+// CONFIRMED pivots; the two lines are the same fitLine OLS fits over each
+// side's pivot prices as triangle, fixed at the birth and never refit.
+// Both slopes must share a sign (rising: both positive; falling: both
+// negative) with each side's total travel over the span at least slopeAtr
+// x ATRref, and the width must narrow by at least convergeAtr x ATRref
+// with a positive end width: with same-sign slopes a bare wEnd < wStart
+// cannot separate a wedge from a near-parallel channel (triangle needs no
+// explicit floor because its opposing travels imply >= 1 ATR of
+// narrowing). variant is the PATTERN type (rising/falling), fixed at
+// birth; a confirmed event records the ACTUAL break direction (both
+// directions are observable), and the traditional association (rising
+// wedge bearish, falling wedge bullish) is commentary, not a condition.
+// Watch from born+1 for expireBars: the apex check (upper <= lower)
+// expires the candidate before any break test; strict close breaks only;
+// equality is not a break; timeout expires.
+registerRule(defRule('wedge', {
+  id: 'wedge', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    for (let s = 0; s + 4 < piv.length; s++) {
+      const q = piv.slice(s, s + 5);
+      if (!(q[1].kind !== q[0].kind && q[2].kind === q[0].kind && q[3].kind !== q[0].kind && q[4].kind === q[0].kind)) continue;
+      const highs = q.filter(p => p.kind === 'high'), lows = q.filter(p => p.kind === 'low');
+      const atrRef = F.atr14[q[4].pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const U = fitLine(highs.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const Lw = fitLine(lows.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const type = U.a > 0 && Lw.a > 0 ? 'rising' : U.a < 0 && Lw.a < 0 ? 'falling' : null;
+      if (!type) continue;
+      const dir = type === 'rising' ? 1 : -1;
+      const x1 = q[0].pivotIndex, x5 = q[4].pivotIndex, span = x5 - x1;
+      const upTravel = dir * U.a * span / atrRef, loTravel = dir * Lw.a * span / atrRef;
+      const wStart = U.at(x1) - Lw.at(x1), wEnd = U.at(x5) - Lw.at(x5);
+      const narrowing = (wStart - wEnd) / atrRef;
+      const gaps = [q[1].pivotIndex - q[0].pivotIndex, q[2].pivotIndex - q[1].pivotIndex, q[3].pivotIndex - q[2].pivotIndex, q[4].pivotIndex - q[3].pivotIndex];
+      const cs = [crit('上辺の同方向の傾き（区間移動量 ≥ ATR×0.5）', upTravel, P.slopeAtr, upTravel >= P.slopeAtr, Math.min(1, Math.max(0, upTravel) / P.slopeAtr), 25, true),
+                    crit('下辺の同方向の傾き（区間移動量 ≥ ATR×0.5）', loTravel, P.slopeAtr, loTravel >= P.slopeAtr, Math.min(1, Math.max(0, loTravel) / P.slopeAtr), 25, true),
+                    crit('収束（幅の縮小 ≥ ATR×0.5・終端の幅が正）', narrowing, P.convergeAtr, wEnd > 0 && narrowing >= P.convergeAtr, Math.min(1, Math.max(0, narrowing) / P.convergeAtr), 20, true),
+                    crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 10, true),
+                    crit('終値の辺ブレイク', null, null, false, 0, 20, true)];
+      if (!(cs[0].pass && cs[1].pass && cs[2].pass && cs[3].pass)) continue;
+      const born = q[4].confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (U.at(j) <= Lw.at(j)) { outcome = { kind: 'expired', index: j, why: 'apex' }; break; }
+        if (closes[j] > U.at(j)) { outcome = { kind: 'break', index: j, dir: 'up' }; break; }
+        if (closes[j] < Lw.at(j)) { outcome = { kind: 'break', index: j, dir: 'down' }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars, why: 'timeout' };
+      const toIdx = outcome ? outcome.index : limit;
+      const nm = type === 'rising' ? '上昇ウェッジ' : '下降ウェッジ';
+      const base = { variant: type, startIndex: x1, endIndex: x5, overlays: [{ type: 'trendline', role: 'upper', from: x1, to: toIdx, priceFrom: U.at(x1), priceTo: U.at(toIdx) }, { type: 'trendline', role: 'lower', from: x1, to: toIdx, priceFrom: Lw.at(x1), priceTo: Lw.at(toIdx) }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      if (outcome && outcome.kind === 'break') {
+        const up = outcome.dir === 'up';
+        cs[4] = crit(cs[4].name, closes[outcome.index], up ? U.at(outcome.index) : Lw.at(outcome.index), true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, direction: up ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `${nm}が成立。終値が${up ? '上辺' : '下辺'}を${up ? '上抜け' : '下抜け'}した（上辺の傾き ${fmt(U.a, 2)}円/本、下辺の傾き ${fmt(Lw.a, 2)}円/本、幅は ${fmt(wStart)}円から ${fmt(wEnd)}円へ収束）。ブレイク方向は実際に起きた方向であり、形状の一致は予測を意味しない。` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: born, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: outcome.why === 'apex' ? `${nm}の候補は、2線の交点（頂点）に達して失効した（ブレイクには至らなかった）。` : `${nm}の候補は監視窓（${P.expireBars}本）内にブレイクせず期限切れで失効した。` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `${nm}を形成中。5ピボットは確認済みで、終値の辺ブレイク待ち（未成立）。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// ---------- trendline-break (Stage 5-D-3 batch 4, defs 0.22) ----------
+// Lines through the two most recent confirmed same-kind pivots (support
+// from lows, resistance from highs), fixed at the second pivot's
+// confirmation. A break is a CROSSING after birth: the previous close on
+// the inner side and the current close strictly beyond the line — a
+// candidate born with the price already outside its line cannot fire
+// until the price returns inside and crosses again. Candidates live
+// until broken or superseded by a newer same-kind pivot. Because this
+// rule emits forming events for its candidates, a superseded candidate
+// must still leave an event (the detector-wide causality contract: a
+// prefix forming event must persist in the full run), so supersession
+// ends the candidate as expired — unlike swing-break, whose levels never
+// appear as events at all. Overlaps with the geometric rules are not
+// suppressed.
+registerRule(defRule('trendline-break', {
+  id: 'trendline-break', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    const crossesDay = (from, to) => { for (let j = from + 1; j <= to; j++) if (bars[j] && bars[from] && bars[j].day !== bars[from].day) return true; return false; };
+    for (let i = 0; i + 2 < piv.length; i++) {
+      const p1 = piv[i], mid = piv[i + 1], p2 = piv[i + 2];
+      if (p2.kind !== p1.kind || mid.kind === p1.kind) continue;
+      const leg1 = mid.pivotIndex - p1.pivotIndex, leg2 = p2.pivotIndex - mid.pivotIndex;
+      if (leg1 < P.minGap || leg2 < P.minGap) continue;
+      const isRes = p1.kind === 'high';
+      const line = fitLine([{ x: p1.pivotIndex, y: p1.price }, { x: p2.pivotIndex, y: p2.price }]);
+      const born = p2.confirmedIndex;
+      const sup = i + 4 < piv.length ? piv[i + 4].confirmedIndex : Infinity;
+      const limit = Math.min(bars.length - 1, sup);
+      let brk = null;
+      for (let j = born + 1; j <= limit; j++) {
+        const prevIn = isRes ? closes[j - 1] <= line.at(j - 1) : closes[j - 1] >= line.at(j - 1);
+        const nowOut = isRes ? closes[j] > line.at(j) : closes[j] < line.at(j);
+        if (prevIn && nowOut) { brk = j; break; }
+      }
+      const superseded = !brk && sup !== Infinity;
+      const variant = isRes ? 'resistance' : 'support';
+      const nm = isRes ? '抵抗線' : '支持線';
+      const toIdx = brk !== null ? brk : limit;
+      const cs = [crit('同種確定ピボット2点による直線', 2, 2, true, 1, 30, true),
+                    crit('構成脚の間隔（各脚 ≥ 2本）', Math.min(leg1, leg2), P.minGap, true, 1, 20, true),
+                    crit('終値の交差ブレイク', brk !== null ? closes[brk] : null, brk !== null ? line.at(brk) : null, brk !== null, brk !== null ? 1 : 0, 50, true)];
+      const base = { variant, startIndex: p1.pivotIndex, endIndex: p2.pivotIndex, overlays: [{ type: 'trendline', role: variant, from: p1.pivotIndex, to: toIdx, priceFrom: line.at(p1.pivotIndex), priceTo: line.at(toIdx) }, { type: 'pivots', points: [p1, p2].map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      const dayNote = crossesDay(p1.pivotIndex, toIdx) ? '直線の区間は日を跨ぐ。' : '';
+      if (brk !== null) {
+        ev.push(makeEvent(this, { ...base, direction: isRes ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: brk, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: brk }], explanation: `${nm}（確定${isRes ? '高値' : '安値'}2点を結ぶ直線、傾き ${fmt(line.a, 2)}円/本）を終値が${isRes ? '上抜け' : '下抜け'}した（前足は線の内側）。トレンドラインの突破は線の定義に依存する価格事象であり、トレンド転換の証明ではない。${dayNote}` }));
+      } else if (superseded) {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: sup, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: sup }], explanation: `${nm}（確定${isRes ? '高値' : '安値'}2点を結ぶ直線、傾き ${fmt(line.a, 2)}円/本）は、より新しい同種ピボットが確定して直線が置き換わり、ブレイクなく失効した。${dayNote}` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `${nm}（確定${isRes ? '高値' : '安値'}2点を結ぶ直線、傾き ${fmt(line.a, 2)}円/本）が存続中。終値の交差ブレイクはまだ起きていない（未成立）。${dayNote}` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// ---------- flag-pennant (Stage 5-D-3 batch 5, defs 0.23) ----------
+// Pole = a completed foundation swing that is large (>= poleAtr x ATR14
+// at the pole-end pivot) and fast (<= poleMaxBars). The consolidation
+// skeleton is the pole-end pivot plus the next four confirmed pivots;
+// its lines are fitted once at birth and never refit. pennant = material
+// convergence with opposing/flat slopes; flag = width roughly maintained
+// with mild slopes; same-sign material convergence (wedge territory)
+// and material broadening form no candidate. A counter-direction break
+// ends the candidate as expired (a failed continuation, kept in
+// history). detectedIndex is the bar the recorded outcome was
+// determined, per the trendline-break lesson.
+registerRule(defRule('flag-pennant', {
+  id: 'flag-pennant', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    const crossesDay = (from, to) => { for (let j = from + 1; j <= to; j++) if (bars[j] && bars[from] && bars[j].day !== bars[from].day) return true; return false; };
+    for (let i = 1; i + 4 < piv.length; i++) {
+      const A = piv[i - 1], B = piv[i];
+      const atrRef = F.atr14[B.pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const poleH = Math.abs(B.price - A.price), poleBars = B.pivotIndex - A.pivotIndex;
+      if (!(poleH >= P.poleAtr * atrRef && poleBars <= P.poleMaxBars)) continue;
+      const up = B.price > A.price;
+      const q = piv.slice(i, i + 5);
+      const gaps = [q[1].pivotIndex - q[0].pivotIndex, q[2].pivotIndex - q[1].pivotIndex, q[3].pivotIndex - q[2].pivotIndex, q[4].pivotIndex - q[3].pivotIndex];
+      if (!gaps.every(g => g >= P.minGap && g <= P.maxGap)) continue;
+      const x1 = B.pivotIndex, x5 = q[4].pivotIndex, span = x5 - x1;
+      const counter = q.filter(p => up ? p.kind === 'low' : p.kind === 'high');
+      const deepest = up ? Math.min(...counter.map(p => p.price)) : Math.max(...counter.map(p => p.price));
+      const retrace = (up ? B.price - deepest : deepest - B.price) / poleH;
+      if (!(retrace <= P.retraceMax)) continue;
+      const highs = q.filter(p => p.kind === 'high'), lows = q.filter(p => p.kind === 'low');
+      const U = fitLine(highs.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const Lw = fitLine(lows.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const wStart = U.at(x1) - Lw.at(x1), wEnd = U.at(x5) - Lw.at(x5);
+      const narrowing = (wStart - wEnd) / atrRef;
+      const upTravel = U.a * span / atrRef, loTravel = Lw.a * span / atrRef;
+      let type = null;
+      if (wEnd > 0 && narrowing >= P.convergeAtr && U.a <= 0 && Lw.a >= 0) type = 'pennant';
+      else if (Math.abs(narrowing) < P.convergeAtr && Math.abs(upTravel) <= P.flagTravelMax && Math.abs(loTravel) <= P.flagTravelMax) type = 'flag';
+      if (!type) continue;
+      const born = q[4].confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (U.at(j) <= Lw.at(j)) { outcome = { kind: 'expired', index: j, why: 'apex' }; break; }
+        if (up ? closes[j] > U.at(j) : closes[j] < Lw.at(j)) { outcome = { kind: 'break', index: j }; break; }
+        if (up ? closes[j] < Lw.at(j) : closes[j] > U.at(j)) { outcome = { kind: 'expired', index: j, why: 'counter' }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars, why: 'timeout' };
+      const toIdx = outcome ? outcome.index : limit;
+      const cs = [crit('ポールの大きさ（高さ ≥ ATR×4）', +(poleH / atrRef).toFixed(4), P.poleAtr, true, Math.min(1, (poleH / atrRef) / P.poleAtr), 25, true),
+                    crit('ポールの速さ（到達 ≤ 20本）', poleBars, P.poleMaxBars, true, 1, 15, true),
+                    crit('保ち合いの戻し（≤ ポールの50%）', +retrace.toFixed(4), P.retraceMax, true, Math.max(0, 1 - retrace), 20, true),
+                    crit('保ち合いの形状（収束=pennant／平行・緩傾斜=flag）', type === 'pennant' ? +narrowing.toFixed(4) : +Math.abs(narrowing).toFixed(4), type === 'pennant' ? P.convergeAtr : P.convergeAtr, true, 1, 20, true),
+                    crit('ポール方向への終値ブレイク', null, null, false, 0, 20, true)];
+      const base = { variant: type, startIndex: A.pivotIndex, endIndex: x5, overlays: [{ type: 'trendline', role: 'upper', from: x1, to: toIdx, priceFrom: U.at(x1), priceTo: U.at(toIdx) }, { type: 'trendline', role: 'lower', from: x1, to: toIdx, priceFrom: Lw.at(x1), priceTo: Lw.at(toIdx) }, { type: 'pivots', points: [A, ...q].map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      const nm = type === 'pennant' ? 'ペナント' : '旗型';
+      const dayNote = crossesDay(A.pivotIndex, toIdx) ? 'パターンの区間は日を跨ぐ。' : '';
+      const shapeNote = `${up ? '上昇' : '下降'}ポール（高さ ${fmt(poleH)}円＝ATR×${fmt(poleH / atrRef, 1)}、${poleBars}本）の後に${nm}を形成。戻しはポールの ${fmt(retrace * 100, 0)}%。`;
+      if (outcome && outcome.kind === 'break') {
+        cs[4] = crit(cs[4].name, closes[outcome.index], up ? U.at(outcome.index) : Lw.at(outcome.index), true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, direction: up ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `${shapeNote}終値がポールと同方向へブレイクして成立した。形状の一致は継続の証明や予測を意味しない。${dayNote}` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        const whyText = outcome.why === 'counter' ? 'ポールと逆方向へ終値がブレイクし、継続形として失敗したため失効した。' : outcome.why === 'apex' ? '2線の交点（頂点）に達して失効した（ブレイクには至らなかった）。' : `監視窓（${P.expireBars}本）内にブレイクせず期限切れで失効した。`;
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: `${shapeNote}${whyText}${dayNote}` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `${shapeNote}保ち合いは確定し、同方向への終値ブレイク待ち（未成立）。${dayNote}` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+
+// 22. Broadening formation (Stage 5-D-4 batch 1, defs 0.24). The
+// mirror image of the symmetric triangle on the same machinery: five
+// alternating CONFIRMED pivots, fitLine over each side's pivot prices,
+// lines FIXED at birth (the fifth pivot's confirmedIndex), never
+// refit; the fitted lines are regressions, not envelopes. Gates at
+// birth: the upper slope is strictly positive with travel >= slopeAtr
+// x ATRref, the lower slope is strictly negative with travel >=
+// slopeAtr x ATRref (ATR14 at the fifth pivot's pivotIndex; equality
+// passes), the width widens by >= widenAtr x ATRref (implied >= 1.0 x
+// ATRref by the two travel gates; kept as an explicit measured
+// criterion), and each leg spans minGap..maxGap bars. The lines
+// diverge, so their crossing lies in the past and there is NO apex
+// expiry: watch born+1..+expireBars; a strict close beyond either
+// line confirms (variant = break direction, null while unbroken;
+// equality is not a break); timeout expires; series end leaves
+// forming. detectedIndex is the outcome-determination bar (the
+// trendline-break / flag-pennant convention; the older shape rules
+// record birth there for expired events — a known family split,
+// handed to 5-D-5). Partition by construction: triangle needs
+// convergence, wedge needs same-sign slopes, flag/pennant need
+// narrowing or near-parallel lines; rectangle uses extreme levels
+// and may co-fire on boundary shapes (overlaps are recorded, not
+// suppressed). Thresholds mirror the wedge convergence floor by
+// symmetry; they are project conventions, not literature values.
+registerRule(defRule('broadening', {
+  id: 'broadening', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const piv = wf.pivots, closes = bars.map(b => b.close);
+    for (let s = 0; s + 4 < piv.length; s++) {
+      const q = piv.slice(s, s + 5);
+      if (!(q[1].kind !== q[0].kind && q[2].kind === q[0].kind && q[3].kind !== q[0].kind && q[4].kind === q[0].kind)) continue;
+      const highs = q.filter(p => p.kind === 'high'), lows = q.filter(p => p.kind === 'low');
+      const atrRef = F.atr14[q[4].pivotIndex];
+      if (atrRef == null || atrRef <= 0) continue;
+      const U = fitLine(highs.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const Lw = fitLine(lows.map(p => ({ x: p.pivotIndex, y: p.price })));
+      const x1 = q[0].pivotIndex, x5 = q[4].pivotIndex, span = x5 - x1;
+      const upTravel = U.a * span / atrRef, loTravel = -Lw.a * span / atrRef;
+      const wStart = U.at(x1) - Lw.at(x1), wEnd = U.at(x5) - Lw.at(x5);
+      const widening = (wEnd - wStart) / atrRef;
+      const gaps = [q[1].pivotIndex - q[0].pivotIndex, q[2].pivotIndex - q[1].pivotIndex, q[3].pivotIndex - q[2].pivotIndex, q[4].pivotIndex - q[3].pivotIndex];
+      const cs = [crit('上辺の上昇（傾き正・区間移動量 ≥ ATR×0.5）', upTravel, P.slopeAtr, U.a > 0 && upTravel >= P.slopeAtr, Math.min(1, Math.max(0, upTravel) / P.slopeAtr), 25, true),
+                    crit('下辺の下降（傾き負・区間移動量 ≥ ATR×0.5）', loTravel, P.slopeAtr, Lw.a < 0 && loTravel >= P.slopeAtr, Math.min(1, Math.max(0, loTravel) / P.slopeAtr), 25, true),
+                    crit('幅の拡大（拡大量 ≥ ATR×0.5）', widening, P.widenAtr, wStart > 0 && widening >= P.widenAtr, Math.min(1, Math.max(0, widening) / P.widenAtr), 20, true),
+                    crit('転換点間隔 2〜30本', Math.max(...gaps), P.maxGap, gaps.every(g => g >= P.minGap && g <= P.maxGap), 1, 10, true),
+                    crit('終値の辺ブレイク', null, null, false, 0, 20, true)];
+      if (!(cs[0].pass && cs[1].pass && cs[2].pass && cs[3].pass)) continue;
+      const born = q[4].confirmedIndex, limit = Math.min(bars.length - 1, born + P.expireBars);
+      let outcome = null;
+      for (let j = born + 1; j <= limit; j++) {
+        if (closes[j] > U.at(j)) { outcome = { kind: 'break', index: j, dir: 'up' }; break; }
+        if (closes[j] < Lw.at(j)) { outcome = { kind: 'break', index: j, dir: 'down' }; break; }
+      }
+      if (!outcome && bars.length - 1 > born + P.expireBars) outcome = { kind: 'expired', index: born + P.expireBars };
+      const toIdx = outcome ? outcome.index : limit;
+      const legs = wf.swings.filter(w => w.from && w.to && q.some(p => p.key === w.from.key) && q.some(p => p.key === w.to.key));
+      const crossNote = legs.some(w => w.crossesDay) ? '（日跨ぎを含む）' : legs.some(w => w.crossesSession) ? '（昼休み跨ぎを含む）' : '';
+      const base = { startIndex: x1, endIndex: x5, overlays: [{ type: 'trendline', role: 'upper', from: x1, to: toIdx, priceFrom: U.at(x1), priceTo: U.at(toIdx) }, { type: 'trendline', role: 'lower', from: x1, to: toIdx, priceFrom: Lw.at(x1), priceTo: Lw.at(toIdx) }, { type: 'pivots', points: q.map(p => ({ index: p.pivotIndex, price: p.price, type: p.kind })) }] };
+      if (outcome && outcome.kind === 'break') {
+        const up = outcome.dir === 'up';
+        cs[4] = crit(cs[4].name, closes[outcome.index], up ? U.at(outcome.index) : Lw.at(outcome.index), true, 1, 20, true);
+        ev.push(makeEvent(this, { ...base, variant: outcome.dir, direction: up ? 'bullish-traditional' : 'bearish-traditional', state: 'confirmed', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'confirmed', index: outcome.index }], explanation: `拡大型（発散）が成立。終値が${up ? '上辺' : '下辺'}を${up ? '上抜け' : '下抜け'}した（上辺の傾き ${fmt(U.a, 2)}円/本、下辺の傾き ${fmt(Lw.a, 2)}円/本、幅は ${fmt(wStart)}円から ${fmt(wEnd)}円へ拡大${crossNote}）。形状の一致は予測を意味しない。` }));
+      } else if (outcome && outcome.kind === 'expired') {
+        ev.push(makeEvent(this, { ...base, state: 'expired', score: scoreOf(cs), detectedIndex: outcome.index, criteria: cs, history: [{ state: 'forming', index: born }, { state: 'expired', index: outcome.index }], explanation: `拡大型の候補は監視窓（${P.expireBars}本）内にブレイクせず期限切れで失効した（幅は ${fmt(wStart)}円から ${fmt(wEnd)}円へ拡大${crossNote}）。` }));
+      } else {
+        ev.push(makeEvent(this, { ...base, state: 'forming', score: scoreOf(cs), detectedIndex: born, criteria: cs, explanation: `拡大型（発散）を形成中。5ピボットは確認済みで、終値の辺ブレイク待ち（未成立${crossNote}）。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
 // ---------- runner ----------
 // options.enabled: array of rule ids (default: all). Disabled rules are NOT executed at all
 // (separation by on/off, per product decision 2026-11-18).
@@ -5039,7 +5958,12 @@ function runDetector(bars, options = {}) {
   const F = computeFeatures(bars);
   const atrMode = options.zigzagAtrMode === 'pivot' ? 'pivot' : 'current';
   const zigzags = { 1: zigzag(bars, F, 1, atrMode), 2: zigzag(bars, F, 2, atrMode), 3: zigzag(bars, F, 3, atrMode) };
-  const ctx = { bars, F, zigzags, zigzagAtrMode: atrMode };
+  const waveforms = {
+    1: buildWaveformFoundation(bars, F, zigzags[1], 1, atrMode),
+    2: buildWaveformFoundation(bars, F, zigzags[2], 2, atrMode),
+    3: buildWaveformFoundation(bars, F, zigzags[3], 3, atrMode),
+  };
+  const ctx = { bars, F, zigzags, waveforms, zigzagAtrMode: atrMode };
   const enabled = options.enabled ? new Set(options.enabled) : null;
   const events = [];
   for (const rule of RULES) {
@@ -5047,7 +5971,7 @@ function runDetector(bars, options = {}) {
     for (const e of rule.evaluate(ctx)) events.push(e);
   }
   events.sort((a, b) => a.detectedIndex - b.detectedIndex || a.ruleId.localeCompare(b.ruleId));
-  return { events, features: F, zigzags, defs: { version: DEFS_VERSION, digest: DEFS_DIGEST } };
+  return { events, features: F, zigzags, waveforms, defs: { version: DEFS_VERSION, digest: DEFS_DIGEST } };
 }
 
 function quantize(v) {
@@ -5065,7 +5989,7 @@ function normalizeEvents(events) {
     explanation: e.explanation, history: e.history,
   })));
 }
-/* v0.5.1 補助ダイジェスト用（正本の正規化と同じフィールド並び） */
+/* 補助ダイジェスト用（正本の正規化と同じフィールド並び） */
 function pickCanonical(e) {
   return {
     eventId: e.eventId, ruleId: e.ruleId, ruleVersion: e.ruleVersion, category: e.category, family: e.family,
@@ -5284,7 +6208,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数6849件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数6966件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -5558,7 +6482,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: '0.5.1', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: 'v0.6.0', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -5598,10 +6522,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: 'abc1f1152836ec0454860e6e3ee854c7456720adfc70a7161e18ef0e35ef0807', expectedCount: 6850, expectedStructural: 'a73cc62ae4c1f83625f15774d983383129433da37425d3ecb356ba77843fe9d9', expectedAux8: '2cfb9966482bed857863d72e1442ec118bc1339e83e17a7abd21568c1fc9b9c3' },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '73ca648b265b235939d8f3b75f24254739c7affb61b9491c88c71189ea70eade', expectedCount: 6849, expectedStructural: 'b46da2d41b433ce7ad28b9338ef942c65144216ee1860c9c51b4479d5b835ae6', expectedAux8: '20cee42c2b2a5758c82ce0932129111fbb78626b856ad2e550c16c341f3bf5b1' },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '468d7ba4d5665e523a5568adc91bd4223ce11ce30199d74ad314d08e99d72320', expectedCount: 6607, expectedStructural: '0825273ff7f0eaa635128751038ac08b71191b0bcd6ad4703e2fde882aa07145', expectedAux8: 'ff3d24cca1c24389f5087acfde620a664297a13f21452f5e4e547dbb61e097dd' },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '61bdf06feb3ee130c357a014cab4c477c5ce7d88efef98e0f9d00c5895289554', expectedCount: 6607, expectedStructural: '85a7649b852b9b74d6c8a4966fab56417429ff35097d0e54c5d86fdc4ab32e99', expectedAux8: '33cb0efb40b8dde7479cbf96fb44a309d20692f00d108cc7072cb2a45fbf37c3' }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '9d8a8257c08f751540b996d325cf11b100c3b916e8b9d43cc3037401dad4547d', expectedCount: 6973, expectedStructural: '5ee32cebb9124df273b1d58b32d58a83dad8a3d0f235f52b10a78ccabe5e853c', expectedAux8: '76c1c94a58835633c2065da70d2d43922c12da548a1f63641e74d74f4d9e0c54' },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '0b41d34ceee7ccdf6ef8b587930d23f706bf604fe682da85d3b740161087c0df', expectedCount: 6966, expectedStructural: 'f74483aafe814ef06af3314a904cbba04db5a009e229a86215edbbca26c9e085', expectedAux8: 'e697e448255c3c9fc87ecf6f6d00469deb07dc76430c42f7db9d396d46b7cf3a' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '6ef27c579e98114b32bc981353faa1c0a86147c44d0c5e35baf3a51a15a01f40', expectedCount: 6761, expectedStructural: 'efe598edf2abcfc2235404b7e3179f9078db3c5d58c8bf2bc97d3da0f490c41b', expectedAux8: '76ab1c8efd0638cbc5436510095d36f42634aab0b7d651026ad4cbbaa3472315' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '4baa72f2c18567cf179502d0a24788e8a0183ae6f3625b2dd13928ee3b30fc24', expectedCount: 6763, expectedStructural: '3a8b6d3dc09d6ad36d2b73ffc280ffedbac36719cca59ba7eea0b0ec0938dddd', expectedAux8: '7a10d2732c690f594262bd741ba1bb19431db9c855d719d1bac9cabd8286e966' }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
