@@ -130,7 +130,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>テクニカル抽出実験室 <span class="ver">v0.6.0 ／ 工程2〜5-D</span></h1>
+        <h1>テクニカル抽出実験室 <span class="ver">v0.7.0 ／ 工程2〜5-E</span></h1>
         <p class="sub">生成済みの株価サンプルに対して、テクニカル分析の「抽出」だけを行う実験室です。価格の生成と判定は分離し、生成器の内部情報（variance・jumps）は判定器に渡しません。売買・採点・反省ノートは後工程です。</p>
         <div class="caution">
           <ul class="tight">
@@ -171,7 +171,7 @@
         <p class="error" id="dataError" role="alert"></p>
         <div class="needs-engine">
           <h3>検出サマリー（検証アンカー）</h3>
-          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全133ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 1.15／defs 0.24）の実測 <b>総数6973件</b> と一致しなければなりません（「極値時点」では6966件）。純GBM seed 7 では、全133ルール有効・ATR基準「現在足」で <b>総数6761件</b> です。</p>
+          <p class="sub" style="margin:0;">現在のデータ・現在のスライダー時点・ONになっているルール・現在のZigZag ATR基準での検出結果です。拡張モデル seed 42 を全期間・全146ルール有効・ATR基準「現在足」で実行すると、正本（Node、検出器 1.23／defs 0.32）の実測 <b>総数7083件</b> と一致しなければなりません（「極値時点」では7071件）。純GBM seed 7 では、全146ルール有効・ATR基準「現在足」で <b>総数6905件</b> です。</p>
           <div class="counts" id="anchorSummary"></div>
           <p class="mono" id="anchorCheck"></p>
         </div>
@@ -257,13 +257,13 @@
         <p class="sub">組み込みサンプルの全566本・全ルール有効・スライダー全量の条件で検出器を実行し（画面のON/OFFやスライダー状態には依存しません）、イベント列から構造ダイジェスト・8桁補助ダイジェスト・正本ハッシュ（有効数字10桁）の3種類を計算して Node 正本の期待値と照合します。合否は「件数・構造ダイジェスト・8桁補助ダイジェスト」の一致で判定し、正本ハッシュは参考として実値と期待値を表示します。読み込みデータの場合は、計算したダイジェストのみを表示します（照合先はありません）。不一致の場合は合わせ込みをせず、実際の値をそのまま表示します。</p>
         <div class="row"><button id="btnHashCheck" class="primary">ハッシュチェックを実行</button></div>
         <div id="hashResults"><p class="sub">まだ実行していません。</p></div>
-        <h3>Node正本の検証実績（静的記録・v0.6.0）</h3>
+        <h3>Node正本の検証実績（静的記録・v0.7.0）</h3>
         <ul class="tight">
           <li>ハッシュ照合は構造ダイジェストと8桁補助ダイジェストで判定し、Node正本の独立計算と4条件とも一致を確認済み（10桁正本ハッシュはNode環境でのみ一致する既知の制約）。状態フィルタは観察を含む5状態（初期ON）。</li>
           <li>単体テスト：<b>全テスト群合格（内訳は検証報告書参照）</b>。</li>
-          <li>因果性テスト v3：<b>337,392件（全133ルール、両ATR方式、prefix因果性の履歴込み深い等価比較で全一致）</b>。異常注入テスト21件も全て期待どおりの判定。未来足の置換に対する不変性も合格。</li>
-          <li>検証アンカー：拡張モデル seed 42（566本）で総数6973件（現在足）／6966件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は6761件（現在足）／6763件（極値時点）。</li>
-          <li>互換確認：検出器1.15で旧122ルールのみを有効にすると、凍結した検出器1.5の出力と4条件とも全項目が一致する（5-D-5で再検証）。旧版アンカーの再現履歴は v0.5.1 の検証報告書にある。</li>
+          <li>因果性テスト v3：<b>342,703件（全146ルール、両ATR方式、prefix因果性の履歴込み深い等価比較で全一致）</b>。異常注入テスト21件も全て期待どおりの判定。未来足の置換に対する不変性も合格。</li>
+          <li>検証アンカー：拡張モデル seed 42（566本）で総数7083件（現在足）／7071件（極値時点）・ルール別件数が、この画面の表示と一致すること。純GBM seed 7 は6905件（現在足）／6907件（極値時点）。</li>
+          <li>互換確認：検出器1.23で旧133ルールのみを有効にすると、公開版 v0.6.0 のアンカー（6973／6966／6761／6763件）と4条件とも一致し、新規13ルールを有効にしても旧133ルールの全項目が一致する（5-E-9で再検証）。旧版アンカーの再現履歴は v0.6.0 の検証報告書にある。</li>
         </ul>
         <h3>統計監査（v0.1 バッチの再監査）</h3>
         <p>v0.1 の報告値（ダブルボトム −0.169% 等）は、状態（成立/形成中/失効）の混在と、点推定（イベント加重）と区間（日均等）の集計単位の不一致が原因と判明。状態を分離し集計を対応させた再計算では、純GBMの成立イベントのみ: ダブルボトム −0.008%（95%区間 [−0.085, +0.069]）、ダブルトップ −0.090%（[−0.182, +0.004]）で、いずれもゼロと整合。失効イベントは定義上、その後の方向で選ばれるため収益率が偏る（ボトム失効 −0.658%、トップ失効 +0.602%）。固定時刻対照は −0.002% で生成器自体に偏りはない。</p>
@@ -286,12 +286,12 @@
 
       <section aria-labelledby="h-report" class="report">
         <h2 id="h-report">実装・検証レポート</h2>
-        <p>現行版は <b>v0.6.0（検出器 1.15／defs 0.24／全133ルール）</b> です。前公開版 v0.5.1（検出器 1.5／defs 0.14／全122ルール）からの変更は、工程5-Dの11ルール（swing-break、fib-retracement、triple-top、triple-bottom、head-and-shoulders、triangle、rectangle-break、wedge、trendline-break、flag-pennant、broadening）の追加と定義の版の更新です。定義集は defs 0.24 の正式版を参照します：<a href="https://docs.google.com/document/d/18TYVMloNny0l-5sPpyiy3Hm7RCRSo3UJoD0jir1ZAsk/edit" target="_blank" rel="noopener">テクニカル定義集（defs 0.24）（Google ドキュメント）</a></p>
+        <p>現行版は <b>v0.7.0（検出器 1.23／defs 0.32／全146ルール）</b> です。前公開版 v0.6.0（検出器 1.15／defs 0.24／全133ルール）からの変更は、工程5-Eの13ルール（divergence-rsi、divergence-macd、divergence-stochastic、divergence-obv、ichimoku-three-roles、gmma-cross、squeeze-breakout、trend-pullback-rsi、bollinger-rsi-confluence、engulfing-confluence、perfect-order-pullback、pattern-divergence、breakout-retest）の追加と定義の版の更新です。定義集は defs 0.32 の正式版を参照します：<a href="https://docs.google.com/document/d/1Dnn08MFoTnQruupsU1dHnc_FAlPd4SmI9LZmrdsFc2A/edit" target="_blank" rel="noopener">テクニカル定義集（defs 0.32）（Google ドキュメント）</a></p>
         <p>経緯・検証報告書はアイデアノートに集約しています：<a href="https://docs.google.com/document/d/1ORdhYxk0DAEL2z7uqryTE7IYHcGDCRSPiF7D61fZRmk/edit" target="_blank" rel="noopener">アイデアノート（Google ドキュメント）</a></p>
       </section>
 
       <footer>
-        <p class="sub">テクニカル抽出実験室 v0.6.0 ／ デイトレゲーム工程2〜5-D。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
+        <p class="sub">テクニカル抽出実験室 v0.7.0 ／ デイトレゲーム工程2〜5-E。既存の株価生成エンジン実験室とは独立したアプリです。価格生成器のロジック・乱数には一切変更を加えていません。外部ライブラリ・外部通信は使用していません。</p>
       </footer>
     </div>
 
@@ -344,12 +344,12 @@ function generate(seed=1, options={}) {
   return {seed,config:c,bars:bars.slice(-(c.history+66))};
 }
 
-/* ===== 正本コード2：テクニカル検出器 1.15／defs 0.24（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
+/* ===== 正本コード2：テクニカル検出器 1.23／defs 0.32（detector.mjs と defs.generated.mjs を export/import を外し、DEFS をインライン展開して埋め込み。ロジック無変更） ===== */
 // GENERATED from defs/catalog.json by defs/build_detector_defs.py — do not edit by hand.
 // JSON is the source of truth for metadata, parameters and lookback of the
 // JSON-driven candle rules; JS remains the source of truth for the math.
-const DEFS_VERSION = '0.24';
-const DEFS_DIGEST = '2f2f42a9b7b3c077f1480fdb50be3ae6ecc9d4a858ac3031493019f21c8e0950';
+const DEFS_VERSION = '0.32';
+const DEFS_DIGEST = 'e82e06523eaafd7bb8f7c8ff0a54e80e8710f02045ceb45bdef7dd3fe600b95f';
 const DEFS = {
  "doji": {
   "catalogRuleId": "doji",
@@ -2006,6 +2006,199 @@ const DEFS = {
    "maxGap": 30,
    "expireBars": 30
   }
+ },
+ "divergence-rsi": {
+  "catalogRuleId": "divergence-rsi",
+  "name": "RSIダイバージェンス",
+  "nameEn": "RSI Divergence",
+  "category": "composite",
+  "family": "divergence",
+  "lookback": 18,
+  "parameters": {
+   "zigzagScale": 2,
+   "rsiPeriod": 14
+  }
+ },
+ "divergence-macd": {
+  "catalogRuleId": "divergence-macd",
+  "name": "MACDダイバージェンス",
+  "nameEn": "MACD Divergence",
+  "category": "composite",
+  "family": "divergence",
+  "lookback": 29,
+  "parameters": {
+   "zigzagScale": 2,
+   "macdFast": 12,
+   "macdSlow": 26
+  }
+ },
+ "divergence-stochastic": {
+  "catalogRuleId": "divergence-stochastic",
+  "name": "ストキャスティクス・ダイバージェンス",
+  "nameEn": "Stochastic Divergence",
+  "category": "composite",
+  "family": "divergence",
+  "lookback": 17,
+  "parameters": {
+   "zigzagScale": 2,
+   "stochPeriod": 14
+  }
+ },
+ "ichimoku-three-roles": {
+  "catalogRuleId": "ichimoku-three-roles",
+  "name": "一目・三役好転/逆転",
+  "nameEn": "Ichimoku Three Roles",
+  "category": "trend",
+  "family": "ichimoku",
+  "lookback": 78,
+  "parameters": {}
+ },
+ "gmma-cross": {
+  "catalogRuleId": "gmma-cross",
+  "name": "GMMA群交差",
+  "nameEn": "GMMA Cross",
+  "category": "trend",
+  "family": "moving-average",
+  "lookback": 61,
+  "parameters": {
+   "shortPeriods": [
+    3,
+    5,
+    8,
+    10,
+    12,
+    15
+   ],
+   "longPeriods": [
+    30,
+    35,
+    40,
+    45,
+    50,
+    60
+   ],
+   "representative": "group-mean",
+   "priceSource": "close"
+  }
+ },
+ "squeeze-breakout": {
+  "catalogRuleId": "squeeze-breakout",
+  "name": "スクイーズブレイクアウト",
+  "nameEn": "Squeeze Breakout",
+  "category": "composite",
+  "family": "squeeze",
+  "lookback": 21,
+  "parameters": {
+   "bbPeriod": 20,
+   "bbMultiplier": 2,
+   "kcEmaPeriod": 20,
+   "kcAtrPeriod": 10,
+   "kcMultiplier": 2
+  }
+ },
+ "trend-pullback-rsi": {
+  "catalogRuleId": "trend-pullback-rsi",
+  "name": "トレンド押し目（RSI）",
+  "nameEn": "Trend Pullback (RSI)",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 76,
+  "parameters": {
+   "rsiPeriod": 14,
+   "oversold": 30,
+   "overbought": 70,
+   "emaPeriods": [
+    5,
+    25,
+    75
+   ]
+  }
+ },
+ "bollinger-rsi-confluence": {
+  "catalogRuleId": "bollinger-rsi-confluence",
+  "name": "ボリンジャー×RSI合流",
+  "nameEn": "Bollinger x RSI Confluence",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 20,
+  "parameters": {
+   "bbPeriod": 20,
+   "bbMultiplier": 2,
+   "rsiPeriod": 14,
+   "oversold": 30,
+   "overbought": 70
+  }
+ },
+ "engulfing-confluence": {
+  "catalogRuleId": "engulfing-confluence",
+  "name": "包み足×圏域合流",
+  "nameEn": "Engulfing x Zone Confluence",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 15,
+  "parameters": {
+   "rsiPeriod": 14,
+   "oversold": 30,
+   "overbought": 70
+  }
+ },
+ "perfect-order-pullback": {
+  "catalogRuleId": "perfect-order-pullback",
+  "name": "パーフェクトオーダー押し目",
+  "nameEn": "Perfect Order Pullback",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 76,
+  "parameters": {
+   "emaPeriods": [
+    5,
+    25,
+    75
+   ],
+   "levelSource": "ema5-prev-bar"
+  }
+ },
+ "pattern-divergence": {
+  "catalogRuleId": "pattern-divergence",
+  "name": "形状×ダイバージェンス",
+  "nameEn": "Pattern x Divergence",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 90,
+  "parameters": {
+   "zigzagScale": 2,
+   "dependencies": [
+    "double-bottom",
+    "double-top",
+    "divergence-rsi"
+   ]
+  }
+ },
+ "breakout-retest": {
+  "catalogRuleId": "breakout-retest",
+  "name": "ブレイク後リテスト",
+  "nameEn": "Breakout Retest",
+  "category": "composite",
+  "family": "confluence",
+  "lookback": 90,
+  "parameters": {
+   "dependencies": [
+    "rectangle-break"
+   ],
+   "toleranceAtr": 0.5,
+   "watchBars": 30
+  }
+ },
+ "divergence-obv": {
+  "catalogRuleId": "divergence-obv",
+  "name": "OBVダイバージェンス",
+  "nameEn": "OBV Divergence",
+  "category": "composite",
+  "family": "divergence",
+  "lookback": 4,
+  "parameters": {
+   "zigzagScale": 2
+  }
  }
 };
 // Technical extraction engine (detector) v0.3
@@ -2029,7 +2222,7 @@ const DEFS = {
 // pivot-time ATR mode (default remains current-bar ATR, v0.1 behaviour is bit-identical);
 // events/bars carry extension metadata (category, family, timeframe, isSessionStart)
 // that no rule reads, so metadata never changes detection results.
-const DETECTOR_VERSION = '1.15';
+const DETECTOR_VERSION = '1.23';
 const TIMEFRAME = '5m';
 
 // ---------- Stage 2: input adapter & validation ----------
@@ -2187,6 +2380,18 @@ function computeFeatures(bars) {
   F.ema25 = emaSeries(closes, 25);
   F.ema26 = emaSeries(closes, 26);
   F.ema75 = emaSeries(closes, 75);
+  // Stage 5-E-4 (additive only): the GMMA group EMAs that were missing.
+  // Same SMA-seeded emaSeries convention; no existing series is touched.
+  F.ema3 = emaSeries(closes, 3);
+  F.ema8 = emaSeries(closes, 8);
+  F.ema10 = emaSeries(closes, 10);
+  F.ema15 = emaSeries(closes, 15);
+  F.ema30 = emaSeries(closes, 30);
+  F.ema35 = emaSeries(closes, 35);
+  F.ema40 = emaSeries(closes, 40);
+  F.ema45 = emaSeries(closes, 45);
+  F.ema50 = emaSeries(closes, 50);
+  F.ema60 = emaSeries(closes, 60);
   for (let i = 25; i < n; i++) F.macd[i] = F.ema12[i] - F.ema26[i];
   F.macdSignal = emaOfSparse(F.macd, 9, 25);
   for (let i = 33; i < n; i++) if (F.macdSignal[i] != null) F.macdHist[i] = F.macd[i] - F.macdSignal[i];
@@ -2751,10 +2956,26 @@ function scoreOf(criteria) {
   let sw = 0, s = 0; for (const c of criteria) { sw += c.weight; s += c.weight * c.match; }
   return sw > 0 ? Math.round(100 * s / sw) : null;
 }
+// Deterministic event id (Stage 5-E-7, proposal A): the base format
+// is unchanged. A rule may pass o.idSuffix to append ONE
+// '#'-separated discriminator taken from a fixed source record (used
+// only by method-E composites whose base id cannot distinguish
+// source individuals). The suffix must be a non-empty string without
+// '#', so suffixed ids stay single-level and unambiguous; anything
+// else is rejected.
+function buildEventId(ruleId, o) {
+  const base = o.variant ? `${ruleId}:${o.variant}@${o.startIndex}-${o.detectedIndex}` : `${ruleId}@${o.startIndex}-${o.detectedIndex}`;
+  if (o.idSuffix === undefined) return base;
+  if (typeof o.idSuffix !== 'string' || o.idSuffix.length === 0 || o.idSuffix.includes('#')) {
+    throw new Error(`buildEventId: invalid idSuffix for ${ruleId}`);
+  }
+  return `${base}#${o.idSuffix}`;
+}
+
 function makeEvent(rule, o) {
   const missing = o.criteria.filter(c => c.mandatory && !c.pass).map(c => c.name);
   return {
-    eventId: o.variant ? `${rule.id}:${o.variant}@${o.startIndex}-${o.detectedIndex}` : `${rule.id}@${o.startIndex}-${o.detectedIndex}`, ruleId: rule.id, ruleVersion: rule.version,
+    eventId: buildEventId(rule.id, o), ruleId: rule.id, ruleVersion: rule.version,
     variant: o.variant ?? null, coverage: o.coverage === undefined ? 1 : o.coverage,
     category: rule.category, family: rule.family, timeframe: TIMEFRAME,
     state: o.state, score: o.score, direction: o.direction ?? null,
@@ -2820,6 +3041,47 @@ registerRule(defRule('bullish-engulfing', {
                   crit('実体が前実体を包含', Math.min(coverTop, coverBot), 0, full, full ? 1 : Math.max(0, coverRatio / prevBody), 3, true)];
       if (full) ev.push(makeEvent(this, { state: 'confirmed', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `陽線の実体（${fmt(c.open)}〜${fmt(c.close)}円）が前陰線の実体（${fmt(prevBodyBot)}〜${fmt(prevBodyTop)}円）を包含し、強気包み足が成立。` }));
       else if (coverRatio / prevBody >= P.approxCoverRatio) ev.push(makeEvent(this, { state: 'approximate', score: scoreOf(cs), direction: 'bullish-traditional', startIndex: i - 1, endIndex: i, detectedIndex: i, criteria: cs, explanation: `実体の被覆率は${fmt(coverRatio / prevBody * 100, 0)}%で完全包含に届かず近似。` }));
+    }
+    return ev;
+  }
+}));
+
+// Engulfing / RSI confluence (Stage 5-E-5; method F). The engulfing
+// judgment is re-derived from OHLC with EXACTLY the confirmed
+// mandatory conditions of bullish-engulfing / bearish-engulfing
+// (both bars completed, opposite directions, the current body fully
+// covering the previous body with equality allowed; approximate is
+// excluded), combined with the SAME bar's RSI zone state (bullish:
+// RSI14 < 30; bearish: RSI14 > 70). No zone-entry event and no
+// multi-bar window. Independent of the sub-rules' outputs and ON/OFF.
+registerRule(defRule('engulfing-confluence', {
+  id: 'engulfing-confluence', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    for (let t = 1; t < bars.length; t++) {
+      const p = bars[t - 1], c = bars[t];
+      if (!p.complete || !c.complete) continue;
+      const R = F.rsi14[t];
+      if (R == null || !Number.isFinite(R)) continue;
+      const bullEng = p.close < p.open && c.close > c.open && c.close >= p.open && c.open <= p.close;
+      const bearEng = p.close > p.open && c.close < c.open && c.open >= p.close && c.close <= p.open;
+      if (bullEng && R < 30) {
+        const cs = [critN('前足が陰線（始値 − 終値）', p.open - p.close, 0, true, 1, 1, true),
+                    critN('当足が陽線（終値 − 始値）', c.close - c.open, 0, true, 1, 1, true),
+                    critN('包含・終値側（当足終値 − 前足始値）>= 0', c.close - p.open, 0, true, 1, 1, true),
+                    critN('包含・始値側（前足終値 − 当足始値）>= 0', p.close - c.open, 0, true, 1, 1, true),
+                    critN('30 − RSI14 > 0（同足の圏域状態）', 30 - R, 0, true, 1, 1, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: 'bullish', direction: 'bullish-traditional', startIndex: t - 1, endIndex: t, detectedIndex: t, criteria: cs, explanation: `強気包み足（陽線の実体 ${fmt(c.open)}〜${fmt(c.close)} が前陰線の実体 ${fmt(p.close)}〜${fmt(p.open)} を完全包含）が、RSI14 ${fmt(R, 1)} の売られすぎ圏（<30）と同一足で合流した。包み足判定は既存 bullish-engulfing の confirmed 必須条件と同一で、approximate は含まない。OHLCからの再導出であり、下位ルールの出力には依存しない。伝統的な解釈であり予測ではない。` }));
+      } else if (bearEng && R > 70) {
+        const cs = [critN('前足が陽線（終値 − 始値）', p.close - p.open, 0, true, 1, 1, true),
+                    critN('当足が陰線（始値 − 終値）', c.open - c.close, 0, true, 1, 1, true),
+                    critN('包含・始値側（当足始値 − 前足終値）>= 0', c.open - p.close, 0, true, 1, 1, true),
+                    critN('包含・終値側（前足始値 − 当足終値）>= 0', p.open - c.close, 0, true, 1, 1, true),
+                    critN('RSI14 − 70 > 0（同足の圏域状態）', R - 70, 0, true, 1, 1, true)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: 'bearish', direction: 'bearish-traditional', startIndex: t - 1, endIndex: t, detectedIndex: t, criteria: cs, explanation: `弱気包み足（陰線の実体 ${fmt(c.close)}〜${fmt(c.open)} が前陽線の実体 ${fmt(p.open)}〜${fmt(p.close)} を完全包含）が、RSI14 ${fmt(R, 1)} の買われすぎ圏（>70）と同一足で合流した。包み足判定は既存 bearish-engulfing の confirmed 必須条件と同一で、approximate は含まない。OHLCからの再導出であり、下位ルールの出力には依存しない。伝統的な解釈であり予測ではない。` }));
+      }
     }
     return ev;
   }
@@ -3949,6 +4211,48 @@ registerRule(defRule('ema-cross', {
   }
 }));
 
+// GMMA group-mean cross (Stage 5-E-4; project-original judgment on the
+// generally known 12-EMA GMMA composition). Representatives are the
+// plain means S (short group 3/5/8/10/12/15) and L (long group
+// 30/35/40/45/50/60) of the close EMAs; a strict sign change of
+// D = S - L between ADJACENT valid completed bars fires once. No fire
+// through equality, at the first valid bar, across a gap (null /
+// non-finite / incomplete bar resets adjacency), and no refire while
+// the sign persists. A mean cross does NOT imply every short line is
+// above every long line; no separation/order/width conditions.
+registerRule(defRule('gmma-cross', {
+  id: 'gmma-cross', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    const SH = [F.ema3, F.ema5, F.ema8, F.ema10, F.ema12, F.ema15];
+    const LO = [F.ema30, F.ema35, F.ema40, F.ema45, F.ema50, F.ema60];
+    let prev = null;
+    for (let t = 0; t < bars.length; t++) {
+      let s = 0, l = 0, ok = !!bars[t].complete;
+      if (ok) {
+        for (const a of SH) { const v = a[t]; if (v == null || !Number.isFinite(v)) { ok = false; break; } s += v; }
+        if (ok) for (const a of LO) { const v = a[t]; if (v == null || !Number.isFinite(v)) { ok = false; break; } l += v; }
+      }
+      if (!ok) { prev = null; continue; }
+      s /= 6; l /= 6;
+      const d = s - l;
+      if (prev) {
+        const up = prev.d < 0 && d > 0, down = prev.d > 0 && d < 0;
+        if (up || down) {
+          const cs = [critN('群平均差 D（前足）', prev.d, 0, true, 1, 1, true),
+                      critN('群平均差 D（当足）', d, 0, true, 1, 1, true),
+                      critN('短期群平均 S（当足）', s, null, true, 1, 1, true),
+                      critN('長期群平均 L（当足）', l, null, true, 1, 1, true)];
+          const sc = scoreOf2(cs);
+          ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: up ? 'up' : 'down', direction: up ? 'bullish-traditional' : 'bearish-traditional', startIndex: t, endIndex: t, detectedIndex: t, criteria: cs, explanation: `GMMA群平均が${up ? '上' : '下'}向きに交差した：短期群（EMA 3・5・8・10・12・15）の平均 ${fmt(s)} と長期群（EMA 30・35・40・45・50・60）の平均 ${fmt(l)} の差が、前足 ${fmt(prev.d)} から当足 ${fmt(d)} へ厳密に符号変化した。群平均の交差であり、全短期線が全長期線より${up ? '上' : '下'}にあることは意味しない。群平均による判定はプロジェクト独自の操作的定義。伝統的な解釈であり予測ではない。` }));
+        }
+      }
+      prev = { d };
+    }
+    return ev;
+  }
+}));
+
 registerRule(defRule('price-ma-cross', {
   id: 'price-ma-cross', version: '0.1',
   evaluate(ctx) {
@@ -4019,6 +4323,58 @@ registerRule(defRule('perfect-order', {
         }
       }
       prev = cur;
+    }
+    return ev;
+  }
+}));
+
+// Perfect-order pullback (Stage 5-E-5; method F, single-bar type).
+// Both the previous and the current bar must be in perfect order
+// (bullish: C > EMA5 > EMA25 > EMA75; bearish mirrored). The level M
+// is the PREVIOUS bar's EMA5, known once that bar completed. Bullish
+// fires when the current low touches M (L <= M, equality allowed) and
+// the close recovers strictly above M (C > M); bearish mirrored with
+// the high and C < M. Within a continuous run of the composite
+// condition only the first bar fires; refire requires a valid
+// non-satisfaction (unknown does not release). Multi-bar pullbacks
+// and post-breakdown recoveries are out of scope. Independent of the
+// sub-rules' outputs and ON/OFF.
+registerRule(defRule('perfect-order-pullback', {
+  id: 'perfect-order-pullback', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prevState = null, lastValid = -1;
+    for (let t = 1; t < bars.length; t++) {
+      const p = bars[t - 1], c = bars[t];
+      const E5p = F.ema5[t - 1], E25p = F.ema25[t - 1], E75p = F.ema75[t - 1];
+      const E5 = F.ema5[t], E25 = F.ema25[t], E75 = F.ema75[t];
+      const vals = [E5p, E25p, E75p, E5, E25, E75, p.close, c.close, c.high, c.low];
+      if (!p.complete || !c.complete || vals.some(v => v == null || !Number.isFinite(v))) continue;
+      const orderP = (p.close > E5p && E5p > E25p && E25p > E75p) ? 'bullish' : (p.close < E5p && E5p < E25p && E25p < E75p) ? 'bearish' : null;
+      const orderT = (c.close > E5 && E5 > E25 && E25 > E75) ? 'bullish' : (c.close < E5 && E5 < E25 && E25 < E75) ? 'bearish' : null;
+      let s = 'neutral';
+      if (orderP === 'bullish' && orderT === 'bullish' && c.low <= E5p && c.close > E5p) s = 'bullish';
+      else if (orderP === 'bearish' && orderT === 'bearish' && c.high >= E5p && c.close < E5p) s = 'bearish';
+      const first = lastValid < 0, gap = !first && t - lastValid > 1;
+      if ((s === 'bullish' || s === 'bearish') && s !== prevState) {
+        const bull = s === 'bullish', sg = bull ? 1 : -1, M = E5p;
+        const cs = [critN(bull ? '前足：終値 − EMA5 > 0' : '前足：EMA5 − 終値 > 0', sg * (p.close - E5p), 0, true, 1, 1, true),
+                    critN(bull ? '前足：EMA5 − EMA25 > 0' : '前足：EMA25 − EMA5 > 0', sg * (E5p - E25p), 0, true, 1, 1, true),
+                    critN(bull ? '前足：EMA25 − EMA75 > 0' : '前足：EMA75 − EMA25 > 0', sg * (E25p - E75p), 0, true, 1, 1, true),
+                    critN(bull ? '当足：終値 − EMA5 > 0' : '当足：EMA5 − 終値 > 0', sg * (c.close - E5), 0, true, 1, 1, true),
+                    critN(bull ? '当足：EMA5 − EMA25 > 0' : '当足：EMA25 − EMA5 > 0', sg * (E5 - E25), 0, true, 1, 1, true),
+                    critN(bull ? '当足：EMA25 − EMA75 > 0' : '当足：EMA75 − EMA25 > 0', sg * (E25 - E75), 0, true, 1, 1, true),
+                    critN(bull ? '接触（水準M − 当足安値）>= 0' : '接触（当足高値 − 水準M）>= 0', bull ? M - c.low : c.high - M, 0, true, 1, 1, true),
+                    critN(bull ? '終値回復（当足終値 − 水準M）> 0' : '終値回復（水準M − 当足終値）> 0', bull ? c.close - M : M - c.close, 0, true, 1, 1, true)];
+        const sc = scoreOf2(cs);
+        const kindText = first
+          ? 'この足対が最初の有効な評価であり、過去の成立は不明（初観測）。'
+          : gap
+            ? '評価不能な足対を挟んだ初観測であり、間の成立は断定しない。'
+            : '有効な不成立を経た成立として検出した。';
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: bull ? 'bullish' : 'bearish', direction: bull ? 'bullish-traditional' : 'bearish-traditional', startIndex: t - 1, endIndex: t, detectedIndex: t, criteria: cs, explanation: `${bull ? '強気' : '弱気'}パーフェクトオーダーが前足・当足とも継続する中で、当足の${bull ? '安値' : '高値'} ${fmt(bull ? c.low : c.high)} が前足EMA5の水準 M=${fmt(M)} に接触し、終値 ${fmt(c.close)} が水準を${bull ? '上' : '下'}回って回復した。${kindText}水準は前足確定時のEMA5であり、当足のEMA5ではない。足内の到達順・約定は主張しない。特徴量からの再導出であり、下位ルールの出力には依存しない。伝統的な解釈であり予測ではない。` }));
+      }
+      prevState = s; lastValid = t;
     }
     return ev;
   }
@@ -4185,6 +4541,51 @@ registerRule(defRule('rsi-zone-exit', {
         const sc = scoreOf2(cs);
         ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: side, direction: oversold ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `RSI14 が ${fmt(r0, 1)} → ${fmt(r1, 1)} と${oversold ? '売られすぎ圏（30未満）から退出' : '買われすぎ圏（70超）から退出'}した。進入ルールの再発火解除（${oversold ? 35 : 65}）とは別の事象として記録する。伝統的解釈であり予測ではない。` }));
       }
+    }
+    return ev;
+  }
+}));
+
+// Trend pullback RSI confluence (Stage 5-E-5; method F — re-derived
+// from features, independent of the sub-rules' outputs and ON/OFF).
+// Bullish: RSI14 exits the oversold zone between ADJACENT valid
+// completed bars (R[t-1] < 30, R[t] >= 30) while the recovery bar t is
+// in bullish perfect order (C > EMA5 > EMA25 > EMA75) and the previous
+// bar's EMA order was already bullish (its close position is not
+// required). Bearish mirrored. This is NOT the rsi-zone-exit state
+// machine (no 35/65 rearm): the exit transition itself is the event.
+// No fire across a gap or when the exit and the order disagree.
+registerRule(defRule('trend-pullback-rsi', {
+  id: 'trend-pullback-rsi', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prev = null;
+    for (let t = 0; t < bars.length; t++) {
+      const R = F.rsi14[t], E5 = F.ema5[t], E25 = F.ema25[t], E75 = F.ema75[t], C = bars[t].close;
+      const ok = !!bars[t].complete && R != null && E5 != null && E25 != null && E75 != null &&
+        Number.isFinite(R) && Number.isFinite(E5) && Number.isFinite(E25) && Number.isFinite(E75) && Number.isFinite(C);
+      if (!ok) { prev = null; continue; }
+      if (prev) {
+        const exitBull = prev.r < 30 && R >= 30, exitBear = prev.r > 70 && R <= 70;
+        if (exitBull || exitBear) {
+          const bull = exitBull;
+          const orderT = bull ? (C > E5 && E5 > E25 && E25 > E75) : (C < E5 && E5 < E25 && E25 < E75);
+          const orderP = bull ? (prev.e5 > prev.e25 && prev.e25 > prev.e75) : (prev.e5 < prev.e25 && prev.e25 < prev.e75);
+          if (orderT && orderP) {
+            const s = bull ? 1 : -1;
+            const cs = [critN(bull ? 'RSI14（前足）< 30（圏域内）' : 'RSI14（前足）> 70（圏域内）', bull ? 30 - prev.r : prev.r - 70, 0, true, 1, 1, true),
+                        critN(bull ? 'RSI14（当足）>= 30（退出）' : 'RSI14（当足）<= 70（退出）', bull ? R - 30 : 70 - R, 0, true, 1, 1, true),
+                        critN(bull ? '終値 − EMA5（当足）> 0' : 'EMA5 − 終値（当足）> 0', s * (C - E5), 0, true, 1, 1, true),
+                        critN(bull ? 'EMA5 − EMA25（当足）> 0' : 'EMA25 − EMA5（当足）> 0', s * (E5 - E25), 0, true, 1, 1, true),
+                        critN(bull ? 'EMA25 − EMA75（当足）> 0' : 'EMA75 − EMA25（当足）> 0', s * (E25 - E75), 0, true, 1, 1, true),
+                        critN(bull ? 'EMA5 − EMA25（前足）> 0' : 'EMA25 − EMA5（前足）> 0', s * (prev.e5 - prev.e25), 0, true, 1, 1, true),
+                        critN(bull ? 'EMA25 − EMA75（前足）> 0' : 'EMA75 − EMA25（前足）> 0', s * (prev.e25 - prev.e75), 0, true, 1, 1, true)];
+            const sc = scoreOf2(cs);
+            ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: bull ? 'bullish' : 'bearish', direction: bull ? 'bullish-traditional' : 'bearish-traditional', startIndex: t - 1, endIndex: t, detectedIndex: t, criteria: cs, explanation: `RSI14 が${bull ? '売られすぎ圏' : '買われすぎ圏'}を退出し（${fmt(prev.r, 1)} → ${fmt(R, 1)}）、回復足で${bull ? '強気' : '弱気'}パーフェクトオーダーが成立している（終値 ${fmt(C)}、EMA5 ${fmt(E5)}、EMA25 ${fmt(E25)}、EMA75 ${fmt(E75)}）。前足もEMA順序が同方向だった。圏域滞在全体のトレンド継続を示すものではなく、rsi-zone-exit の再発火解除（35／65）とは別の判定。特徴量からの再導出であり、下位ルールの出力には依存しない。伝統的な解釈であり予測ではない。` }));
+          }
+        }
+      }
+      prev = { r: R, e5: E5, e25: E25, e75: E75 };
     }
     return ev;
   }
@@ -4486,6 +4887,53 @@ registerRule(defRule('bollinger-break', {
   }
 }));
 
+// Bollinger / RSI confluence (Stage 5-E-5; method F). State
+// coexistence on ONE completed bar: bullish = low reaches the lower
+// Bollinger band (equality included) AND RSI14 < 30 (strict); bearish
+// = high reaches the upper band AND RSI14 > 70. The band width must be
+// positive. Reaches include closes outside the band (unlike
+// bollinger-break's touch classification). Fires only on transition
+// into the coexisting state (Stage 5-E-3 state conventions: unknown
+// neither fires nor releases; same-direction return after a gap does
+// not refire). Independent of the sub-rules' outputs and ON/OFF.
+registerRule(defRule('bollinger-rsi-confluence', {
+  id: 'bollinger-rsi-confluence', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prev = null, lastValid = -1;
+    for (let t = 0; t < bars.length; t++) {
+      const BU = F.bbUpper[t], BL = F.bbLower[t], R = F.rsi14[t];
+      const H = bars[t].high, L = bars[t].low;
+      if (!bars[t].complete || BU == null || BL == null || R == null ||
+          !Number.isFinite(BU) || !Number.isFinite(BL) || !Number.isFinite(R) || !Number.isFinite(H) || !Number.isFinite(L) ||
+          !(BU > BL)) continue;
+      let s = 'neutral';
+      if (L <= BL && R < 30) s = 'bullish';
+      else if (H >= BU && R > 70) s = 'bearish';
+      const first = lastValid < 0, gap = !first && t - lastValid > 1;
+      if ((s === 'bullish' || s === 'bearish') && s !== prev) {
+        const bull = s === 'bullish';
+        const cs = bull
+          ? [critN('BB下限 − 安値 >= 0（到達）', BL - L, 0, true, 1, 1, true),
+             critN('30 − RSI14 > 0', 30 - R, 0, true, 1, 1, true),
+             critN('BB幅 > 0', BU - BL, 0, true, 1, 1, true)]
+          : [critN('高値 − BB上限 >= 0（到達）', H - BU, 0, true, 1, 1, true),
+             critN('RSI14 − 70 > 0', R - 70, 0, true, 1, 1, true),
+             critN('BB幅 > 0', BU - BL, 0, true, 1, 1, true)];
+        const sc = scoreOf2(cs);
+        const kindText = first
+          ? 'この足が最初の有効な評価であり、過去の成立時刻は不明（初観測）。'
+          : gap
+            ? '欠測区間を挟んだ初観測であり、欠測中の状態遷移は断定しない。'
+            : `直前の有効状態（${prev === 'bullish' ? '強気合流' : prev === 'bearish' ? '弱気合流' : '中立'}）からの変化として検出した。`;
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: bull ? 'bullish' : 'bearish', direction: bull ? 'bullish-traditional' : 'bearish-traditional', startIndex: t, endIndex: t, detectedIndex: t, criteria: cs, explanation: `${bull ? '安値がボリンジャーバンド下限に到達し' : '高値がボリンジャーバンド上限に到達し'}、同時に RSI14 が ${fmt(R, 1)} で${bull ? '売られすぎ圏（<30）' : '買われすぎ圏（>70）'}にある（BB[${fmt(BL)}, ${fmt(BU)}]、${bull ? '安値' : '高値'} ${fmt(bull ? L : H)}）。${kindText}終値確定後の当足バンドとの比較であり、足内の到達順は示さない。特徴量からの再導出であり、下位ルールの出力には依存しない。反発を保証せず、伝統的な解釈であり予測ではない。` }));
+      }
+      prev = s; lastValid = t;
+    }
+    return ev;
+  }
+}));
+
 registerRule(defRule('bollinger-percentb', {
   id: 'bollinger-percentb', version: '0.1',
   evaluate(ctx) {
@@ -4588,6 +5036,58 @@ registerRule(defRule('keltner-break', {
       const cs = [critN(`終値がケルトナー${hit === 'upper' ? '上限' : '下限'}を突破`, hit === 'upper' ? c1 - band : band - c1, 0, true, Math.min(1, Math.abs(c1 - band) / (F.atr14[i] || 1) + 0.3), 2, true)];
       const sc = scoreOf2(cs);
       ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit, direction: hit === 'upper' ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `終値 ${fmt(c1)} がケルトナーチャネル（EMA20±2×ATR10）の${hit === 'upper' ? '上限' : '下限'} ${fmt(band)} を終値で抜けた。定義は独自確定。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// Squeeze breakout (Stage 5-E-4; project-original). Reuses the
+// existing Bollinger bands (SMA20 +/- 2 population SD) and Keltner
+// channels (EMA20 +/- 2 Wilder ATR10). Q[t] (BB contained in KC,
+// equality counts as containment) is evaluated only when all four
+// bounds are finite and consistent and the KC width is positive;
+// anything else is unknown. A release is certified only between
+// ADJACENT valid completed bars (Q true -> false), and only the
+// release bar itself can fire: up when the previous close was at or
+// inside the upper BB and the release close breaks above it, down
+// mirrored. At most one event per squeeze interval; late breakouts
+// after the release bar are out of scope. An unknown bar voids any
+// release across it and restarts the interval from the returning
+// compression state. startIndex is the observed interval start;
+// history stays a single transition at the release bar. Direction is
+// judged by the price close only (no TTM momentum/histogram).
+registerRule(defRule('squeeze-breakout', {
+  id: 'squeeze-breakout', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prevQ = null, prev = null, start = null;
+    for (let t = 0; t < bars.length; t++) {
+      const BU = F.bbUpper[t], BL = F.bbLower[t], KU = F.kcUpper[t], KL = F.kcLower[t], C = bars[t].close;
+      const valid = !!bars[t].complete && BU != null && BL != null && KU != null && KL != null &&
+        Number.isFinite(BU) && Number.isFinite(BL) && Number.isFinite(KU) && Number.isFinite(KL) && Number.isFinite(C) &&
+        BU >= BL && KU > KL;
+      if (!valid) { prevQ = null; prev = null; start = null; continue; }
+      const q = BL >= KL && BU <= KU;
+      if (q) {
+        if (prevQ !== true) start = t;
+      } else {
+        if (prevQ === true && start !== null && prev) {
+          const up = prev.c <= prev.bu && C > BU;
+          const down = prev.c >= prev.bl && C < BL;
+          if (up || down) {
+            const cs = [critN('前足の内包（BB下限 − KC下限）', prev.bl - prev.kl, 0, true, 1, 1, true),
+                        critN('前足の内包（KC上限 − BB上限）', prev.ku - prev.bu, 0, true, 1, 1, true),
+                        critN('当足の解消幅（内包の不成立量）', Math.max(KL - BL, BU - KU), 0, true, 1, 1, true),
+                        critN(up ? '前足終値の位置（BB上限 − 前足終値）' : '前足終値の位置（前足終値 − BB下限）', up ? prev.bu - prev.c : prev.c - prev.bl, 0, true, 1, 1, true),
+                        critN(up ? '当足終値の突破幅（終値 − BB上限）' : '当足終値の突破幅（BB下限 − 終値）', up ? C - BU : BL - C, 0, true, 1, 1, true)];
+            const sc = scoreOf2(cs);
+            ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: up ? 'up' : 'down', direction: up ? 'bullish-traditional' : 'bearish-traditional', startIndex: start, endIndex: t, detectedIndex: t, criteria: cs, explanation: `スクイーズ（BBがKC内に内包）が解消し、解消足の終値がボリンジャーバンドを${up ? '上' : '下'}抜けた：圧縮区間は足 ${start} から観測され、前足は BB[${fmt(prev.bl)}, ${fmt(prev.bu)}] が KC[${fmt(prev.kl)}, ${fmt(prev.ku)}] 内にあり、当足の終値 ${fmt(C)} が BB${up ? '上限' : '下限'} ${fmt(up ? BU : BL)} を終値で突破した。解消足のみを対象とし、遅れて起こる突破は対象外。方向は価格終値で判定するプロジェクト独自の操作的定義であり、TTMのモメンタム判定とは異なる。伝統的な解釈であり予測ではない。` }));
+          }
+        }
+        start = null;
+      }
+      prevQ = q;
+      prev = { c: C, bu: BU, bl: BL, ku: KU, kl: KL };
     }
     return ev;
   }
@@ -5091,6 +5591,74 @@ registerRule(defRule('ichimoku-chikou-cross', {
                   critN('現時点 終値 − 26本前終値', F.chikouDiff[i], 0, true, 1, 2, true)];
       const sc = scoreOf2(cs);
       ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: hit > 0 ? 'up' : 'down', direction: hit > 0 ? 'bullish-traditional' : 'bearish-traditional', startIndex: i, endIndex: i, detectedIndex: i, criteria: cs, explanation: `遅行スパン（終値を26本遅行表示）が価格線を${hit > 0 ? '上抜け' : '下抜け'}した（現在の終値と26本前の終値の比較で、発生時刻は現在の足）。期間は5分足の本数として扱う独自適用。伝統的な解釈であり予測ではない。` }));
+    }
+    return ev;
+  }
+}));
+
+// Ichimoku three roles (Stage 5-E-3, defs 0.27). Method F: state
+// composition at a single bar (project doc section 46), NOT an AND of
+// the three single-cross events. At each completed bar t the three
+// conditions must coexist: bullish = tenkan > kijun AND close >
+// cloudTop AND chikouDiff > 0; bearish = tenkan < kijun AND close <
+// cloudBottom AND chikouDiff < 0 (all strict; inside the cloud, on a
+// boundary, any equality or a mixed direction is neutral).
+// F.cloudTop / F.cloudBottom are the cloud formed by the senkou spans
+// computed at t-26 (the shift is already folded in); the raw senkou
+// values are never used as the current cloud, and no event is
+// backdated to the chikou display position t-26.
+// Internal states bullish / bearish / neutral / unknown never add
+// output states. A bar whose inputs are not all finite (warmup, null)
+// or that is incomplete is unknown: it neither fires nor releases,
+// and the previous valid state is kept. The first valid bar fires
+// once as an initial observation if it is bullish / bearish (when it
+// became true in the past is unknown). Afterwards a fire happens only
+// on a transition to a different bullish / bearish state; a move to
+// neutral is an internal release only, and persistence never refires.
+// Returning from a gap in the SAME direction does not refire;
+// returning in a DIFFERENT direction fires as an initial observation
+// at that bar (no transition during the gap is asserted). A direct
+// flip fires. No reset at day / lunch boundaries (continuous).
+// Events are confirmed only — confirmation that the three conditions
+// hold, not of any profit. Periods are 5-minute bar counts (project's
+// own application); the firing / gap rules are project conventions.
+registerRule(defRule('ichimoku-three-roles', {
+  id: 'ichimoku-three-roles', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    let prev = null, lastValid = -1;
+    for (let t = 0; t < bars.length; t++) {
+      const T = F.tenkan[t], K = F.kijun[t], C = bars[t].close, U = F.cloudTop[t], L = F.cloudBottom[t], D = F.chikouDiff[t];
+      if (!bars[t].complete || T == null || K == null || U == null || L == null || D == null ||
+          !Number.isFinite(T) || !Number.isFinite(K) || !Number.isFinite(C) || !Number.isFinite(U) || !Number.isFinite(L) || !Number.isFinite(D)) continue;
+      let s = 'neutral';
+      if (T > K && C > U && D > 0) s = 'bullish';
+      else if (T < K && C < L && D < 0) s = 'bearish';
+      const first = lastValid < 0, gap = !first && t - lastValid > 1;
+      if ((s === 'bullish' || s === 'bearish') && s !== prev) {
+        const bull = s === 'bullish';
+        const cs = bull
+          ? [critN('転換線 − 基準線 > 0', T - K, 0, true, 1, 1, true),
+             critN('終値 − 雲上限 > 0', C - U, 0, true, 1, 1, true),
+             critN('遅行差（終値 − 26本前終値）> 0', D, 0, true, 1, 1, true)]
+          : [critN('基準線 − 転換線 > 0', K - T, 0, true, 1, 1, true),
+             critN('雲下限 − 終値 > 0', L - C, 0, true, 1, 1, true),
+             critN('−遅行差（26本前終値 − 終値）> 0', -D, 0, true, 1, 1, true)];
+        const sc = scoreOf2(cs);
+        const kindText = first
+          ? 'この足が最初の有効な評価であり、過去に成立した時刻は不明（初観測）。'
+          : gap
+            ? '欠測区間を挟んだ初観測であり、欠測中の状態遷移は断定しない。'
+            : `直前の有効状態（${prev === 'bullish' ? '三役好転' : prev === 'bearish' ? '三役逆転' : '中立'}）からの変化として検出した。`;
+        ev.push(makeEvent(this, {
+          state: 'confirmed', score: sc.score, coverage: sc.coverage,
+          variant: bull ? 'bullish' : 'bearish',
+          direction: bull ? 'bullish-traditional' : 'bearish-traditional',
+          startIndex: t, endIndex: t, detectedIndex: t, criteria: cs,
+          explanation: `一目三役${bull ? '好転' : '逆転'}の3条件が同一足で成立した（転換線 ${fmt(T)} ${bull ? '>' : '<'} 基準線 ${fmt(K)}、終値 ${fmt(C)} ${bull ? '>' : '<'} 雲${bull ? '上限' : '下限'} ${fmt(bull ? U : L)}、遅行差 ${fmt(D)} ${bull ? '>' : '<'} 0）。${kindText}3条件の成立確認であり収益の確認ではない。期間は5分足の本数として扱う独自適用。伝統的な解釈であり予測ではない。`,
+        }));
+      }
+      prev = s; lastValid = t;
     }
     return ev;
   }
@@ -5669,6 +6237,75 @@ registerRule(defRule('rectangle-break', {
   }
 }));
 
+// Breakout retest (Stage 5-E-7 restart; method E — event
+// referencing). For each CONFIRMED rectangle-break record, the old
+// upper (up break) or lower (down break) is FIXED as the level M and
+// the tolerance e = 0.5 x ATR14[b] is FIXED at the break bar b (the
+// record's actual confirmed transition); neither is recomputed during
+// the watch. The watch runs b+1..b+30 and accepts only the single-bar
+// type: previous close strictly outside the band on the break side,
+// the bar's extreme (low for up, high for down) inside the CLOSED
+// band [M-e, M+e], and the close strictly back outside. First success
+// ends the watch; a failure close (beyond the far side of the band)
+// ends it internally; a deep wick alone does not. A gap in the
+// observations (incomplete bar, non-finite values) aborts the watch
+// with no resume. The event id carries the source record's full
+// eventId as its suffix (proposal A), so distinct source individuals
+// firing at the same b/t/level still get distinct ids.
+registerRule(defRule('breakout-retest', {
+  id: 'breakout-retest', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const sources = ctx.internalEvents['rectangle-break'] || [];
+    const seen = new Map();
+    for (const s of sources) {
+      if (s.state !== 'confirmed') continue;
+      const conf = (s.history || []).find(h => h.state === 'confirmed');
+      if (!conf) continue;
+      const band = (s.overlays || []).find(o => o.type === 'range-band');
+      if (!band || (s.variant !== 'up' && s.variant !== 'down')) continue;
+      const up = s.variant === 'up';
+      const b = conf.index, M = up ? band.upper : band.lower;
+      const fp = `${s.variant}|${b}|${band.upper}|${band.lower}|${s.startIndex}`;
+      if (seen.has(s.eventId)) {
+        if (seen.get(s.eventId) !== fp) throw new Error(`breakout-retest: source id ${s.eventId} carries conflicting fixed information`);
+        continue; // duplicate source record -> one watch
+      }
+      seen.set(s.eventId, fp);
+      const bc = bars[b];
+      if (!bc || !Number.isFinite(bc.close) || !(up ? bc.close > M : bc.close < M)) continue; // record/bars inconsistency
+      const atr = F.atr14[b];
+      if (atr == null || !Number.isFinite(atr) || atr <= 0) continue;
+      const e = P.toleranceAtr * atr;
+      const last = Math.min(bars.length - 1, b + P.watchBars);
+      for (let t = b + 1; t <= last; t++) {
+        const bar = bars[t], prev = bars[t - 1];
+        if (!bar.complete || !prev.complete) break; // observation gap aborts the watch
+        const c = bar.close, pc = prev.close, ext = up ? bar.low : bar.high;
+        if (!Number.isFinite(c) || !Number.isFinite(pc) || !Number.isFinite(ext)) break;
+        if (up ? c < M - e : c > M + e) break; // failure close ends the watch internally
+        const prevOut = up ? pc > M + e : pc < M - e;
+        const closeOut = up ? c > M + e : c < M - e;
+        const inBand = ext >= M - e && ext <= M + e;
+        if (!(prevOut && inBand && closeOut)) continue;
+        const cs = [critN('元水準 M（旧上限／旧下限で固定）', M, null, true, 1, 1, false),
+                    critN('許容幅 e = 0.5 × ATR14[b]', e, null, true, 1, 1, false),
+                    critN('ATR14[b]', atr, null, true, 1, 1, false),
+                    critN('前足終値の外側余裕（方向調整済み）', up ? pc - (M + e) : (M - e) - pc, 0, true, 1, 2, true),
+                    critN('接触の帯内余裕（近い側）', Math.min(ext - (M - e), (M + e) - ext), 0, true, 1, 2, true),
+                    critN('当足終値の外側余裕（方向調整済み）', up ? c - (M + e) : (M - e) - c, 0, true, 1, 2, true),
+                    critN('経過本数（t − b）', t - b, P.watchBars, true, 1, 1, false)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: up ? 'bullish' : 'bearish', direction: up ? 'bullish-traditional' : 'bearish-traditional', startIndex: b, endIndex: t, detectedIndex: t, criteria: cs, idSuffix: s.eventId,
+          overlays: [{ type: 'source', ruleId: 'rectangle-break', eventId: s.eventId, breakIndex: b, level: M, tolerance: e }],
+          explanation: `rectangle-break（${s.eventId}、確定足 b=${b}）の旧${up ? '上限' : '下限'} ${fmt(M)}円へのリテスト。許容幅 e=${fmt(e)}円（0.5×ATR14[b]=${fmt(atr)}円、確定時に固定）。${t - b}本目に${up ? '安値' : '高値'}が帯 [${fmt(M - e)}, ${fmt(M + e)}] に触れ、終値 ${fmt(c)}円が帯の外側へ復帰した。足内経路は断定しない。独立した証拠や反転保証ではなく、伝統的な解釈であり予測ではない。` }));
+        break; // first success ends the watch
+      }
+    }
+    return ev;
+  }
+}));
+
 // 18. Wedge (Stage 5-D-3 batch 3, defs 0.21). Skeleton: five alternating
 // CONFIRMED pivots; the two lines are the same fitLine OLS fits over each
 // side's pivot prices as triangle, fixed at the birth and never refit.
@@ -5950,10 +6587,319 @@ registerRule(defRule('broadening', {
   }
 }));
 
+// 16. RSI divergence (Stage 5-E-1, defs 0.25). Method A, fixed in project
+// doc section 44: over the CONFIRMED pivot sequence of the waveform
+// foundation (zigzagScale=2, ATR mode as selected at run time), only the
+// immediately preceding same-kind pivot forms a pair with each pivot
+// (an opposite-kind pivot in between is allowed). Regular type only:
+// a low pair with P2.price < P1.price and RSI14 at P2's pivot bar
+// strictly above RSI14 at P1's pivot bar is bullish; a high pair with
+// P2.price > P1.price and RSI strictly lower is bearish. The RSI is
+// read at the pivot OCCURRENCE bar (F.rsi14), never at the confirmed
+// bar. Equality on either side fails (strict inequalities). No spacing
+// cap, no price/RSI difference threshold, no RSI zone condition and no
+// extra trend condition. A pair whose RSI is null or non-finite at
+// either pivot bar is unjudgeable and skipped — it is NOT replaced by
+// an older same-kind pivot (the next pair still starts from P2).
+// Provisional pivots are never used. Detection is at P2's
+// confirmedIndex only (P1 is necessarily confirmed by then, pivots
+// confirming in sequence); state is confirmed only, with the existing
+// single-transition history at the confirmation bar. Hidden type and
+// method B (independent indicator-extremum detection) are NOT
+// implemented. sessionPolicy=continuous: pairs may cross lunch and
+// day boundaries. Co-firing with other rules is allowed; the
+// direction is the traditional interpretation, not a prediction.
+registerRule(defRule('divergence-rsi', {
+  id: 'divergence-rsi', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const last = { high: null, low: null };
+    for (const p2 of wf.pivots) {
+      const p1 = last[p2.kind];
+      last[p2.kind] = p2;
+      if (!p1) continue;
+      const r1 = F.rsi14[p1.pivotIndex], r2 = F.rsi14[p2.pivotIndex];
+      if (r1 == null || r2 == null || !Number.isFinite(r1) || !Number.isFinite(r2)) continue;
+      const bull = p2.kind === 'low';
+      const priceDiff = bull ? p1.price - p2.price : p2.price - p1.price;
+      const rsiDiff = bull ? r2 - r1 : r1 - r2;
+      if (!(priceDiff > 0 && rsiDiff > 0)) continue;
+      const cs = [critN(bull ? '価格の安値が直前の安値ピボットより切り下がり（厳密）' : '価格の高値が直前の高値ピボットより切り上がり（厳密）', priceDiff, 0, true, 1, 2, true),
+                  critN(bull ? '発生足のRSI14が前側ピボット発生足より上昇（厳密）' : '発生足のRSI14が前側ピボット発生足より下降（厳密）', rsiDiff, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      const b1 = bars[p1.pivotIndex], b2 = bars[p2.pivotIndex];
+      const crossNote = b1 && b2 && b1.day != null && b2.day != null && b1.day !== b2.day ? '（日跨ぎのピボット対）' : '';
+      ev.push(makeEvent(this, {
+        state: 'confirmed', score: sc.score, coverage: sc.coverage,
+        variant: bull ? 'bullish' : 'bearish',
+        direction: bull ? 'bullish-traditional' : 'bearish-traditional',
+        startIndex: p1.pivotIndex, endIndex: p2.pivotIndex, detectedIndex: p2.confirmedIndex, criteria: cs,
+        overlays: [
+          { type: 'pivots', points: [{ index: p1.pivotIndex, price: p1.price, type: p1.kind }, { index: p2.pivotIndex, price: p2.price, type: p2.kind }] },
+        ],
+        explanation: `確定ピボット対（${bull ? '安値' : '高値'} ${p1.pivotIndex} 本目の ${fmt(p1.price)} → ${bull ? '安値' : '高値'} ${p2.pivotIndex} 本目の ${fmt(p2.price)}）で、価格の${bull ? '安値が切り下がった' : '高値が切り上がった'}一方、発生足のRSI14は ${fmt(r1, 1)} → ${fmt(r2, 1)} と${bull ? '上昇' : '下降'}した。通常型の${bull ? '強気' : '弱気'}ダイバージェンス（方式A）${crossNote}。後側ピボットの確認足 ${p2.confirmedIndex} 本目で検出した。伝統的な解釈であり予測ではない。`,
+      }));
+    }
+    return ev;
+  }
+}));
+
+// 17. MACD / Stochastic divergence (Stage 5-E-2, defs 0.26). Method A
+// inherited from the RSI rule above (project doc section 45, which
+// fixed section 44's framework for these two): the same confirmed
+// pivot pairs of the waveform foundation (zigzagScale=2, run-time ATR
+// mode), the indicator read at each pivot's OCCURRENCE bar only,
+// regular type only, strict inequalities, no spacing / difference /
+// zone / trend additions, a null or non-finite pair is skipped and
+// never bridged, provisional pivots unused, detection at P2's
+// confirmedIndex, confirmed state only with the single-transition
+// history. The shared helper below serves ONLY these two new rules;
+// the RSI rule keeps its own implementation (section 45: do not touch
+// it, no common refactor in this batch). Simultaneous firing of the
+// three divergence indicators is allowed and is NOT independent
+// evidence. Hidden type and method B are NOT implemented.
+function divergencePairEvents(rule, ctx, series, ind) {
+  const { bars } = ctx, P = rule.parameters, ev = [];
+  const wf = ctx.waveforms[P.zigzagScale];
+  if (!wf) return ev;
+  const last = { high: null, low: null };
+  for (const p2 of wf.pivots) {
+    const p1 = last[p2.kind];
+    last[p2.kind] = p2;
+    if (!p1) continue;
+    const v1 = series[p1.pivotIndex], v2 = series[p2.pivotIndex];
+    if (v1 == null || v2 == null || !Number.isFinite(v1) || !Number.isFinite(v2)) continue;
+    const bull = p2.kind === 'low';
+    const priceDiff = bull ? p1.price - p2.price : p2.price - p1.price;
+    const indDiff = bull ? v2 - v1 : v1 - v2;
+    if (!(priceDiff > 0 && indDiff > 0)) continue;
+    const cs = [critN(bull ? '価格の安値が直前の安値ピボットより切り下がり（厳密）' : '価格の高値が直前の高値ピボットより切り上がり（厳密）', priceDiff, 0, true, 1, 2, true),
+                critN(ind.critName(bull), indDiff, 0, true, 1, 2, true)];
+    const sc = scoreOf2(cs);
+    const b1 = bars[p1.pivotIndex], b2 = bars[p2.pivotIndex];
+    const crossNote = b1 && b2 && b1.day != null && b2.day != null && b1.day !== b2.day ? '（日跨ぎのピボット対）' : '';
+    ev.push(makeEvent(rule, {
+      state: 'confirmed', score: sc.score, coverage: sc.coverage,
+      variant: bull ? 'bullish' : 'bearish',
+      direction: bull ? 'bullish-traditional' : 'bearish-traditional',
+      startIndex: p1.pivotIndex, endIndex: p2.pivotIndex, detectedIndex: p2.confirmedIndex, criteria: cs,
+      overlays: [
+        { type: 'pivots', points: [{ index: p1.pivotIndex, price: p1.price, type: p1.kind }, { index: p2.pivotIndex, price: p2.price, type: p2.kind }] },
+      ],
+      explanation: ind.explain(bull, p1, p2, v1, v2, crossNote),
+    }));
+  }
+  return ev;
+}
+
+// MACD divergence uses the MACD LINE (F.macd = EMA12 - EMA26 of the
+// closes), never the signal line (EMA9 of the MACD line) and never the
+// histogram (line - signal): those belong to macd-signal-cross /
+// macd-histogram-turn and can judge a pair oppositely.
+registerRule(defRule('divergence-macd', {
+  id: 'divergence-macd', version: '0.1',
+  evaluate(ctx) {
+    return divergencePairEvents(this, ctx, ctx.F.macd, {
+      critName: bull => bull ? '発生足のMACD線が前側ピボット発生足より上昇（厳密）' : '発生足のMACD線が前側ピボット発生足より下降（厳密）',
+      explain: (bull, p1, p2, v1, v2, crossNote) => `確定ピボット対（${bull ? '安値' : '高値'} ${p1.pivotIndex} 本目の ${fmt(p1.price)} → ${bull ? '安値' : '高値'} ${p2.pivotIndex} 本目の ${fmt(p2.price)}）で、価格の${bull ? '安値が切り下がった' : '高値が切り上がった'}一方、発生足のMACD線（EMA12−EMA26）は ${fmt(v1, 1)} → ${fmt(v2, 1)} と${bull ? '上昇' : '下降'}した。通常型の${bull ? '強気' : '弱気'}ダイバージェンス（方式A）${crossNote}。シグナル線・ヒストグラムではなくMACD線を用いる。後側ピボットの確認足 ${p2.confirmedIndex} 本目で検出した。伝統的な解釈であり予測ではない。`,
+    });
+  }
+}));
+
+// Stochastic divergence uses Fast %K (F.stochK, period 14), never %D
+// (the 3-bar SMA of %K): %D smoothing can judge a pair oppositely and
+// belongs to stochastic-cross. %K is null on a zero-range 14-bar
+// window (unjudgeable pair) and saturates at 0 / 100, where equality
+// fails the strict inequality — no threshold or %D substitution is
+// introduced to change the count.
+registerRule(defRule('divergence-stochastic', {
+  id: 'divergence-stochastic', version: '0.1',
+  evaluate(ctx) {
+    return divergencePairEvents(this, ctx, ctx.F.stochK, {
+      critName: bull => bull ? '発生足のFast %K（14）が前側ピボット発生足より上昇（厳密）' : '発生足のFast %K（14）が前側ピボット発生足より下降（厳密）',
+      explain: (bull, p1, p2, v1, v2, crossNote) => `確定ピボット対（${bull ? '安値' : '高値'} ${p1.pivotIndex} 本目の ${fmt(p1.price)} → ${bull ? '安値' : '高値'} ${p2.pivotIndex} 本目の ${fmt(p2.price)}）で、価格の${bull ? '安値が切り下がった' : '高値が切り上がった'}一方、発生足のFast %K（14）は ${fmt(v1, 1)} → ${fmt(v2, 1)} と${bull ? '上昇' : '下降'}した。通常型の${bull ? '強気' : '弱気'}ダイバージェンス（方式A）${crossNote}。%DではなくFast %Kを用いる。後側ピボットの確認足 ${p2.confirmedIndex} 本目で検出した。伝統的な解釈であり予測ではない。`,
+    });
+  }
+}));
+
 // ---------- runner ----------
 // options.enabled: array of rule ids (default: all). Disabled rules are NOT executed at all
 // (separation by on/off, per product decision 2026-11-18).
 // options.zigzagAtrMode: 'current' (default) | 'pivot' — see zigzag() notes.
+// Pattern x RSI divergence (Stage 5-E-6; method E — event
+// referencing). Fires only when a CONFIRMED double-bottom (double-top)
+// record and a CONFIRMED regular bullish (bearish) divergence-rsi
+// record refer to the very same confirmed pivot pair: the shape's two
+// bottoms (tops) P1/P2 and the RSI record's consecutive same-kind pair
+// must agree on kind, occurrence bars, prices and the P2 confirmation
+// bar — all read from the records' fixed identification data (pivot
+// overlays and the confirmed history transition), never re-judged.
+// Ts is the shape's actual transition to confirmed (the neckline-break
+// bar in its history, not the skeleton birth); Td is the P2
+// OBV divergence (Stage 5-E-8, defs 0.32). Method A on the existing
+// F.obv cumulative feature: consecutive same-kind confirmed pivot
+// pairs (zigzagScale=2), OBV read at each pivot's OCCURRENCE bar
+// only, regular type only, strict inequalities, no spacing /
+// difference / zone / trend additions. A null or non-finite pair is
+// skipped and never bridged. On top of the sibling convention, the
+// OBV value must also be VALID at P2's confirmation bar and that bar
+// must be complete (validity only — the confirmation bar's value is
+// never used for direction). F.obv itself is unchanged: it starts at
+// 0, adds sign(close diff) x volume (unchanged close adds nothing),
+// and stays null forever after a missing volume. The volume here is
+// SYNTHETIC — mechanically linked to price moves and time of day —
+// so this is not evidence of real trading or fund flows.
+registerRule(defRule('divergence-obv', {
+  id: 'divergence-obv', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, P = this.parameters, ev = [];
+    const wf = ctx.waveforms[P.zigzagScale];
+    if (!wf) return ev;
+    const last = { high: null, low: null };
+    for (const p2 of wf.pivots) {
+      const p1 = last[p2.kind];
+      last[p2.kind] = p2;
+      if (!p1) continue;
+      const o1 = F.obv[p1.pivotIndex], o2 = F.obv[p2.pivotIndex];
+      if (o1 == null || o2 == null || !Number.isFinite(o1) || !Number.isFinite(o2)) continue;
+      const oc = F.obv[p2.confirmedIndex], bc = bars[p2.confirmedIndex];
+      if (oc == null || !Number.isFinite(oc) || !bc || !bc.complete) continue;
+      const bull = p2.kind === 'low';
+      const priceDiff = bull ? p1.price - p2.price : p2.price - p1.price;
+      const obvDiff = bull ? o2 - o1 : o1 - o2;
+      if (!(priceDiff > 0 && obvDiff > 0)) continue;
+      const cs = [critN(bull ? '価格の安値が直前の安値ピボットより切り下がり（厳密）' : '価格の高値が直前の高値ピボットより切り上がり（厳密）', priceDiff, 0, true, 1, 2, true),
+                  critN(bull ? '発生足のOBVが前側ピボット発生足より上昇（厳密）' : '発生足のOBVが前側ピボット発生足より下降（厳密）', obvDiff, 0, true, 1, 2, true)];
+      const sc = scoreOf2(cs);
+      const b1 = bars[p1.pivotIndex], b2 = bars[p2.pivotIndex];
+      const crossNote = b1 && b2 && b1.day != null && b2.day != null && b1.day !== b2.day ? '（日跨ぎのピボット対）' : '';
+      ev.push(makeEvent(this, {
+        state: 'confirmed', score: sc.score, coverage: sc.coverage,
+        variant: bull ? 'bullish' : 'bearish',
+        direction: bull ? 'bullish-traditional' : 'bearish-traditional',
+        startIndex: p1.pivotIndex, endIndex: p2.pivotIndex, detectedIndex: p2.confirmedIndex, criteria: cs,
+        overlays: [
+          { type: 'pivots', points: [{ index: p1.pivotIndex, price: p1.price, type: p1.kind }, { index: p2.pivotIndex, price: p2.price, type: p2.kind }] },
+        ],
+        explanation: `確定ピボット対（${bull ? '安値' : '高値'} ${p1.pivotIndex} 本目の ${fmt(p1.price)} → ${bull ? '安値' : '高値'} ${p2.pivotIndex} 本目の ${fmt(p2.price)}）で、価格の${bull ? '安値が切り下がった' : '高値が切り上がった'}一方、発生足のOBVは ${fmt(o1)} → ${fmt(o2)} と${bull ? '上昇' : '下降'}した。通常型の${bull ? '強気' : '弱気'}ダイバージェンス（方式A）${crossNote}。後側ピボットの確認足 ${p2.confirmedIndex} 本目で検出した。出来高は合成値であり価格変動・時間帯に機械的に連動する生成値で、現実の売買・資金流入の証拠ではない。伝統的な解釈であり予測ではない。`,
+      }));
+    }
+    return ev;
+  }
+}));
+
+// confirmation bar (the RSI record's detectedIndex). The composite
+// fires at t = max(Ts, Td), once per (shape individual, RSI pair).
+// Forming / expired shapes and non-confirmed records never count.
+// Records come from the internal evaluation (ctx.internalEvents), so
+// the result does not depend on the sub-rules' display ON/OFF.
+registerRule(defRule('pattern-divergence', {
+  id: 'pattern-divergence', version: '0.1',
+  evaluate(ctx) {
+    const { bars, F } = ctx, ev = [];
+    const doubles = [...(ctx.internalEvents['double-bottom'] || []), ...(ctx.internalEvents['double-top'] || [])];
+    const rsis = ctx.internalEvents['divergence-rsi'] || [];
+    const byKey = new Map();
+    for (const e of rsis) {
+      if (e.state !== 'confirmed') continue;
+      const pts = (e.overlays || []).find(o => o.type === 'pivots')?.points;
+      if (!pts || pts.length !== 2) continue;
+      const [a, b] = pts;
+      const key = `${a.type}|${a.index}|${a.price}|${b.index}|${b.price}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(e);
+    }
+    const seen = new Set();
+    for (const d of doubles) {
+      const bull = d.ruleId === 'double-bottom';
+      if (d.state !== 'confirmed') continue;
+      const conf = (d.history || []).find(h => h.state === 'confirmed');
+      if (!conf) continue;
+      const Ts = conf.index;
+      const pts = (d.overlays || []).find(o => o.type === 'pivots')?.points;
+      if (!pts || pts.length !== 3) continue;
+      const [p1, , p2] = pts;
+      const kind = bull ? 'low' : 'high';
+      if (p1.type !== kind || p2.type !== kind) continue;
+      const key = `${kind}|${p1.index}|${p1.price}|${p2.index}|${p2.price}`;
+      for (const e of byKey.get(key) || []) {
+        if ((e.variant === 'bullish') !== bull) continue;
+        const Td = e.detectedIndex;
+        if (p2.confirmedIndex !== Td) continue; // same pivot, same confirmation bar
+        const dedup = `${d.ruleId}|${key}|${Ts}|${Td}`;
+        if (seen.has(dedup)) continue;
+        seen.add(dedup);
+        const t = Math.max(Ts, Td);
+        const v1 = F.rsi14[p1.index], v2 = F.rsi14[p2.index];
+        if (v1 == null || v2 == null || !Number.isFinite(v1) || !Number.isFinite(v2)) continue;
+        const priceDiff = e.criteria?.[0]?.measured, indDiff = e.criteria?.[1]?.measured;
+        const cs = [critN('ピボット対の同一性（種別・発生足・価格の不一致量）', 0, 0, true, 1, 2, true),
+                    critN('形状の確定（Ts − P2確認足）', Ts - p2.confirmedIndex, 0, Ts > p2.confirmedIndex, 1, 2, true),
+                    critN('RSI対の確定（Td − P2確認足）', Td - p2.confirmedIndex, 0, true, 1, 2, true),
+                    critN(bull ? '価格の安値切り下がり（P1価格 − P2価格）' : '価格の高値切り上がり（P2価格 − P1価格）', priceDiff, 0, priceDiff > 0, 1, 2, true),
+                    critN(bull ? 'RSIの逆行（RSI(P2) − RSI(P1)）' : 'RSIの逆行（RSI(P1) − RSI(P2)）', indDiff, 0, indDiff > 0, 1, 2, true),
+                    critN('P1確認足（形状側記録）', p1.confirmedIndex, null, true, 1, 1, false),
+                    critN('P2確認足（両記録で一致）', p2.confirmedIndex, null, true, 1, 1, false),
+                    critN('RSI14（P1発生足）', v1, null, true, 1, 1, false),
+                    critN('RSI14（P2発生足）', v2, null, true, 1, 1, false),
+                    critN('発火時刻 t = max(Ts, Td)', t, null, true, 1, 1, false)];
+        const sc = scoreOf2(cs);
+        ev.push(makeEvent(this, { state: 'confirmed', score: sc.score, coverage: sc.coverage, variant: bull ? 'bullish' : 'bearish', direction: bull ? 'bullish-traditional' : 'bearish-traditional', startIndex: p1.index, endIndex: t, detectedIndex: t, criteria: cs, explanation: `${bull ? 'ダブルボトム' : 'ダブルトップ'}（P1 ${fmt(p1.price)}円@${p1.index}、P2 ${fmt(p2.price)}円@${p2.index}、形状の確定 Ts=${Ts}）と RSIダイバージェンス（RSI ${fmt(v1, 1)} → ${fmt(v2, 1)}、P2確認 Td=${Td}）が同一の確定ピボット対で合流した。発火は遅い方の確定時刻 t=${t}。元記録の固定識別情報による照合であり、近接や区間の重なりでは合流しない。独立した証拠や売買推奨ではなく、伝統的な解釈であり予測ではない。` }));
+      }
+    }
+    return ev;
+  }
+}));
+
+// Method-E dependency foundation (Stage 5-E-6): a fixed directed
+// acyclic graph of rules whose event records another rule may read
+// internally. Internal evaluation is separated from public output: a
+// dependent rule can use its dependencies' results even when they are
+// display-OFF, hidden dependencies never appear in the public event
+// set, and a dependency is never evaluated when no enabled rule needs
+// it. Each rule is evaluated at most once per runDetector call, in
+// registration order; internal results are per-call and read-only
+// (frozen arrays), and are never shared across calls.
+const RULE_DEPENDENCIES = Object.freeze({
+  'pattern-divergence': Object.freeze(['double-bottom', 'double-top', 'divergence-rsi']),
+  'breakout-retest': Object.freeze(['rectangle-break']),
+});
+
+// Pure resolver: given the display-enabled ids (null = all), a
+// dependency map and the registration order, return the set of rules
+// to EVALUATE (display set plus transitive dependencies). Throws on
+// unknown ids in the graph, on cycles, and on a dependency that is
+// not registered before its dependent. Unknown DISPLAY ids keep the
+// legacy behaviour (ignored).
+function resolveEvaluationSet(enabledIds, deps = RULE_DEPENDENCIES, order = RULES.map(r => r.id)) {
+  const known = new Set(order);
+  const pos = new Map(order.map((id, i) => [id, i]));
+  for (const [id, ds] of Object.entries(deps)) {
+    if (!known.has(id)) throw new Error(`dependency graph: unknown dependent ${id}`);
+    for (const d of ds) {
+      if (!known.has(d)) throw new Error(`dependency graph: unknown dependency ${d} for ${id}`);
+      if (pos.get(d) >= pos.get(id)) throw new Error(`dependency graph: ${d} must be registered before ${id}`);
+    }
+  }
+  const state = new Map();
+  const visit = (id) => {
+    const s = state.get(id) || 0;
+    if (s === 1) throw new Error(`dependency graph: cycle involving ${id}`);
+    if (s === 2) return;
+    state.set(id, 1);
+    for (const d of deps[id] || []) visit(d);
+    state.set(id, 2);
+  };
+  for (const id of Object.keys(deps)) visit(id);
+  if (!enabledIds) return new Set(order);
+  const evalSet = new Set();
+  const add = (id) => { if (evalSet.has(id)) return; evalSet.add(id); for (const d of deps[id] || []) add(d); };
+  for (const id of enabledIds) if (known.has(id)) add(id);
+  return evalSet;
+}
+
 function runDetector(bars, options = {}) {
   const F = computeFeatures(bars);
   const atrMode = options.zigzagAtrMode === 'pivot' ? 'pivot' : 'current';
@@ -5963,12 +6909,17 @@ function runDetector(bars, options = {}) {
     2: buildWaveformFoundation(bars, F, zigzags[2], 2, atrMode),
     3: buildWaveformFoundation(bars, F, zigzags[3], 3, atrMode),
   };
-  const ctx = { bars, F, zigzags, waveforms, zigzagAtrMode: atrMode };
+  const ctx = { bars, F, zigzags, waveforms, zigzagAtrMode: atrMode, internalEvents: Object.freeze({}) };
   const enabled = options.enabled ? new Set(options.enabled) : null;
+  const evalSet = resolveEvaluationSet(enabled);
+  const internal = {};
   const events = [];
   for (const rule of RULES) {
-    if (enabled && !enabled.has(rule.id)) continue;
-    for (const e of rule.evaluate(ctx)) events.push(e);
+    if (!evalSet.has(rule.id)) continue;
+    const evs = rule.evaluate(ctx);
+    internal[rule.id] = Object.freeze(evs.slice());
+    ctx.internalEvents = Object.freeze({ ...internal });
+    if (!enabled || enabled.has(rule.id)) for (const e of evs) events.push(e);
   }
   events.sort((a, b) => a.detectedIndex - b.detectedIndex || a.ruleId.localeCompare(b.ruleId));
   return { events, features: F, zigzags, waveforms, defs: { version: DEFS_VERSION, digest: DEFS_DIGEST } };
@@ -6208,7 +7159,7 @@ function renderSummary() {
     $('anchorCheck').className = 'mono ' + ((okTotal && okRules) ? 'anchor-ok' : 'error');
   } else {
     $('anchorCheck').className = 'mono';
-    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数6966件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
+    check = '検証アンカーとの照合は「拡張モデル seed 42・全期間・全ルールON・ZigZag ATR基準＝現在足」のときに表示されます（極値時点方式では総数7071件が正本実測です。検証節のハッシュチェックで両方式を照合できます）。';
   }
   $('anchorCheck').textContent = check;
 }
@@ -6482,7 +7433,7 @@ function download(name, text, type) {
 function exportJSON() {
   if (!state.result) return;
   var out = {
-    app: 'technical-lab', version: 'v0.6.0', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
+    app: 'technical-lab', version: 'v0.7.0', detectorVersion: DETECTOR_VERSION, zigzagAtrMode: state.zigzagAtrMode, source: state.sourceLabel, sliderPosition: state.sliderPos,
     note: '適合度は形状・条件への一致度であり勝率・予測確率ではない。方向は伝統的解釈であり予測ではない。',
     events: visibleEvents().map(function (e) {
       var b = state.bars[e.detectedIndex];
@@ -6522,10 +7473,10 @@ function runChecks() {
 
 /* ---------- 正本一致ハッシュチェック ---------- */
 var CANONICAL_HASHES = [
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '9d8a8257c08f751540b996d325cf11b100c3b916e8b9d43cc3037401dad4547d', expectedCount: 6973, expectedStructural: '5ee32cebb9124df273b1d58b32d58a83dad8a3d0f235f52b10a78ccabe5e853c', expectedAux8: '76c1c94a58835633c2065da70d2d43922c12da548a1f63641e74d74f4d9e0c54' },
-  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: '0b41d34ceee7ccdf6ef8b587930d23f706bf604fe682da85d3b740161087c0df', expectedCount: 6966, expectedStructural: 'f74483aafe814ef06af3314a904cbba04db5a009e229a86215edbbca26c9e085', expectedAux8: 'e697e448255c3c9fc87ecf6f6d00469deb07dc76430c42f7db9d396d46b7cf3a' },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: '6ef27c579e98114b32bc981353faa1c0a86147c44d0c5e35baf3a51a15a01f40', expectedCount: 6761, expectedStructural: 'efe598edf2abcfc2235404b7e3179f9078db3c5d58c8bf2bc97d3da0f490c41b', expectedAux8: '76ab1c8efd0638cbc5436510095d36f42634aab0b7d651026ad4cbbaa3472315' },
-  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: '4baa72f2c18567cf179502d0a24788e8a0183ae6f3625b2dd13928ee3b30fc24', expectedCount: 6763, expectedStructural: '3a8b6d3dc09d6ad36d2b73ffc280ffedbac36719cca59ba7eea0b0ec0938dddd', expectedAux8: '7a10d2732c690f594262bd741ba1bb19431db9c855d719d1bac9cabd8286e966' }
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'current', modeLabel: '現在足', expected: '654ea41a2330e65ecaaafd476d41470530f820592c46a79f69166341d190b828', expectedCount: 7083, expectedStructural: '96b48b718c2557a46b26c0ebac0e7d6f671451a4cde9db9eec0f4048ba16ad11', expectedAux8: '3a5f301bbfbe057947cbeda5290fb4f27f0b1d119e265247104c1d21419260ad' },
+  { kind: 'ext', label: '拡張モデル seed 42', mode: 'pivot', modeLabel: '極値時点', expected: 'a2118263012abc2bb7b87aa470987a03822f7e5c0dfea86c4f9a8916d520772e', expectedCount: 7071, expectedStructural: '650ebf3ded0c733be71ad9efd275b08cd5c4cf6beac2706eb4ec9e1b1b7a172c', expectedAux8: '229a0e9d7bc06ed97a7676539a22c5c578fb166aecc073622d90d814d257999a' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'current', modeLabel: '現在足', expected: 'dfc1be8307e26ef5a492a7e6be541aa95e20a3c282b47e14c647d3353885ba4f', expectedCount: 6905, expectedStructural: '2b77b641659baa6b9ad58222cf5e9d40ba60cb2bdd5711fb00dabd611aa03e73', expectedAux8: 'e692075a7bdfdd085c4ca034dc1f3e25e2af9af2553450ee83211245dde25c65' },
+  { kind: 'gbm', label: '純GBM seed 7', mode: 'pivot', modeLabel: '極値時点', expected: 'e719b0aa39dc902dd3427fd9a73ad51ce2112debd90a2741c8238e3386e58168', expectedCount: 6907, expectedStructural: 'b6575300e0ba5d22401e56bc44b343c49af88c1e66253c517accce654075f4e2', expectedAux8: '501f57325103f086b1a5b6b20bd956a6b5f8b42727ab59d0659a56a35e506f01' }
 ];
 function sha256Hex(text) {
   if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) return Promise.reject(new Error('この環境では crypto.subtle が使えません'));
