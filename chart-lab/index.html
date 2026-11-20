@@ -9,52 +9,125 @@
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.55; }
-  main { max-width: 720px; margin: 0 auto; padding: 12px 12px 32px; }
+  main { max-width: 860px; margin: 0 auto; padding: 12px 10px 32px; }
   h1 { font-size: 20px; margin: 8px 0 2px; }
   h2 { font-size: 17px; margin: 4px 0; }
   h3 { font-size: 14px; margin: 12px 0 2px; }
   p { margin: 4px 0; }
   .sub { color: #888; font-size: 12.5px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 8px; }
   button { font-size: 15px; padding: 9px 14px; border-radius: 10px; border: 1px solid #9996; background: #8882; cursor: pointer; }
-  button.primary { background: #ffb000; border-color: #ffb000; color: #1a1a1a; font-weight: 700; }
-  input[type=number] { font-size: 15px; padding: 8px; width: 110px; border-radius: 10px; border: 1px solid #9996; }
-  #chart { width: 100%; height: 300px; display: block; border: 1px solid #9995; border-radius: 10px; }
+  button.primary { background: #ffb000; border-color: #ffb000; color: #1a1a1a; font-weight: 700; width: 100%; padding: 13px; font-size: 16px; margin: 10px 0 6px; }
+  .tabs { display: flex; gap: 6px; margin: 10px 0; }
+  .tabs button { flex: 1; }
+  .tabs button.sel { outline: 2px solid #ffb000; font-weight: 700; }
+  #chart { width: 100%; height: 320px; display: block; border: 1px solid #9995; border-radius: 10px; touch-action: pan-y; }
+  .chart-controls { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .chart-controls button { padding: 6px 11px; font-size: 14px; }
+  .chart-controls input[type=range] { flex: 1; min-width: 110px; }
+  #view-info { font-size: 12px; color: #888; }
   #summary { font-size: 13px; margin: 8px 0; }
-  #picks { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
-  .pick { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; }
+  details { border: 1px solid #9995; border-radius: 10px; padding: 8px 12px; margin: 10px 0; }
+  details summary { cursor: pointer; font-weight: 700; font-size: 14.5px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  input[type=number], input[type=text], select { font-size: 15px; padding: 8px; border-radius: 10px; border: 1px solid #9996; }
+  input[type=number] { width: 110px; }
+  input[type=text] { flex: 1; min-width: 140px; }
+  #csv-msg { font-size: 12.5px; color: #666; white-space: pre-wrap; }
+  .list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .pick { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; width: 100%; }
   .pick.sel { outline: 2px solid #ffb000; }
   .pick-name { font-weight: 700; font-size: 15px; }
   .pick-meta, .meta { color: #888; font-size: 12.5px; }
+  .reasons { font-size: 12px; color: #a60; }
+  .row { text-align: left; width: 100%; padding: 8px 10px; font-size: 13.5px; display: flex; justify-content: space-between; gap: 8px; }
+  .row.sel { outline: 2px solid #ffb000; }
+  .row .rmeta { color: #888; font-size: 12px; white-space: nowrap; }
   #detail { border: 1px solid #9995; border-radius: 10px; padding: 10px 14px; margin-top: 10px; }
   #detail ul { margin: 4px 0; padding-left: 18px; font-size: 13.5px; }
   .op { font-size: 13px; color: #666; }
   .eid { font-family: ui-monospace, monospace; font-size: 11px; color: #999; word-break: break-all; }
   .empty { color: #888; }
+  .rule-group { font-size: 13px; font-weight: 700; margin: 10px 0 2px; }
+  .rule-item { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; margin: 2px 8px 2px 0; }
   footer { margin-top: 18px; font-size: 12px; color: #888; }
+  .badge { display: inline-block; border: 1px solid #ffb000; color: #a60; border-radius: 999px; padding: 0 8px; font-size: 12px; margin-left: 6px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>デイトレ・チャート解析実験室</h1>
-  <p class="sub">株価生成エンジン × テクニカル判定エンジンの接続実験。正式なデイトレゲームの開発工程とは独立した、動作確認・紹介用の試作品です。価格はすべて架空の生成値で、実在銘柄とは無関係です。</p>
+  <h1>デイトレ・チャート解析実験室<span id="tf-badge" class="badge">5分足・生成</span></h1>
+  <p class="sub">株価生成エンジン × テクニカル判定エンジンの接続実験。正式なデイトレゲームの開発工程とは独立した、動作確認・紹介用の試作品です。生成モードの価格はすべて架空です。</p>
 
-  <div class="controls">
-    <button id="btn-random" class="primary">ランダム生成</button>
-    <button id="btn-regen">再生成</button>
-    <label>seed <input id="seed" type="number" inputmode="numeric"></label>
-    <button id="btn-seed">このseedで生成</button>
-  </div>
+  <button id="btn-new" class="primary">新しいチャートを生成</button>
 
   <canvas id="chart"></canvas>
+  <div class="chart-controls">
+    <button id="btn-pan-left" title="過去へ">◀</button>
+    <button id="btn-pan-right" title="直近へ">▶</button>
+    <input id="view-slider" type="range" min="0" max="0" value="0">
+    <button id="btn-zoom-out" title="縮小（多く表示）">−</button>
+    <button id="btn-zoom-in" title="拡大（少なく表示）">＋</button>
+    <span id="view-info"></span>
+  </div>
   <p id="summary">生成中…</p>
 
-  <div id="picks"></div>
+  <details id="data-panel">
+    <summary>データの読み込み・seed（補助操作）</summary>
+    <h3>生成モード（5分足）</h3>
+    <div class="controls">
+      <label>seed <input id="seed" type="number" inputmode="numeric"></label>
+      <button id="btn-seed">このseedで生成</button>
+      <button id="btn-regen">再生成</button>
+      <button id="btn-back-gen" style="display:none">生成モードに戻る</button>
+    </div>
+    <h3>実株価モード（日足CSV）</h3>
+    <div class="controls">
+      <input id="csv-file" type="file" accept=".csv,text/csv,text/plain">
+    </div>
+    <p class="sub">日付・始値・高値・安値・終値・（出来高）の列があるCSVに対応します（日本語・英語の列名、Yahoo Finance形式など）。出来高がないCSVも読み込めます。ファイルはブラウザ内だけで処理し、送信しません。</p>
+    <p id="csv-msg"></p>
+  </details>
+
+  <div class="tabs">
+    <button data-mode="main" class="sel">主要</button>
+    <button data-mode="custom">カスタム</button>
+    <button data-mode="all">全件・辞書</button>
+  </div>
+
+  <section id="mode-main">
+    <div id="picks" class="list"></div>
+  </section>
+
+  <section id="mode-custom" style="display:none">
+    <div class="controls">
+      <input id="rule-search" type="text" placeholder="テクニカル名・IDで検索">
+      <button id="rule-clear">選択をクリア</button>
+    </div>
+    <p id="custom-count" class="meta"></p>
+    <div id="rule-list"></div>
+    <h3>選択したテクニカルの検出（新しい順）</h3>
+    <div id="custom-events" class="list"></div>
+  </section>
+
+  <section id="mode-all" style="display:none">
+    <div class="controls">
+      <input id="all-search" type="text" placeholder="名称・IDで検索">
+      <select id="all-category"><option value="">全カテゴリ</option></select>
+      <select id="all-state">
+        <option value="">全状態</option><option>confirmed</option><option>approximate</option>
+        <option>forming</option><option>expired</option><option>observation</option>
+      </select>
+    </div>
+    <p id="all-count" class="meta"></p>
+    <div id="all-list" class="list"></div>
+  </section>
+
   <section id="detail"></section>
 
   <footer>
     <p id="versions"></p>
-    <p>チャートは直近2日分（132本）を表示しています。代表イベントは表示窓内の確定イベントから、種類が重ならないように最大3件を接続側で選んでいます（判定自体はエンジンの結果そのままです）。</p>
+    <p>表示上の優先順位（主要モード）について：人気度は、一般的な教材や証券会社の標準搭載指標をもとにした暫定的な3段階分類です。明瞭度は、検出器が返す score（判定基準への適合度 0〜100、評価可能な基準で正規化）と coverage（評価できた基準の割合）から計算します。score は勝率や将来の予測力を表すものではありません。優先順位は表示順のためだけのもので、売買成績を意味しません。</p>
+    <p id="mode-note">チャートはドラッグ／スライダーで過去へ移動でき、＋／−で表示本数を変えられます。テクニカルをタップすると該当位置へ移動して強調します。</p>
   </footer>
 </main>
 <script>
@@ -6692,107 +6765,290 @@ function ruleCatalog() {
 const DICT = {"doji": {"name": "十字線", "nameEn": "Doji", "general": "始値と終値がほぼ等しく、実体が極めて小さい足。迷いの象徴とされる。", "operational": "実体/値幅≦0.1で成立、≦0.2で近似（既存実装・確定）。方向なし。", "params": "bodyRatioMax=0.1, approxBodyRatioMax=0.2（確定・実装済）"}, "long-lower-shadow": {"name": "長い下ヒゲ", "nameEn": "Long Lower Shadow", "general": "下ヒゲが実体・値幅に対して長い足。下値での買い意欲の表れと解釈される。", "operational": "下ヒゲ≧実体×2 かつ 値幅の60%以上で成立（既存実装・確定）。", "params": "lowerVsBody=2, lowerVsRange=0.6（確定・実装済）"}, "long-upper-shadow": {"name": "長い上ヒゲ", "nameEn": "Long Upper Shadow", "general": "上ヒゲが実体・値幅に対して長い足。上値での売り圧力の表れと解釈される。", "operational": "long-lower-shadow の対称形として確定：upperVsBody>=2、upperVsRange>=0.6 を必須、1.5/0.5 を近似とする（代数検査済み、単足条件のみ）。", "params": "upperVsBody=2, upperVsRange=0.6（暫定）"}, "gravestone-doji": {"name": "上影十字線（墓石）", "nameEn": "Gravestone Doji", "general": "始終値が安値圏にあり上ヒゲだけが長い十字。高値圏では天井示唆とされる。", "operational": "十字条件（実体比<=0.1）に加え、上ヒゲ/値幅>=0.8 かつ 下ヒゲ/値幅<=0.1 を必須として確定。近似は実体比<=0.2、上ヒゲ>=0.65、下ヒゲ<=0.2。方向は示さない（十字ファミリーと同一）。", "params": "bodyRatioMax=0.1, upperVsRange=0.7（暫定）"}, "dragonfly-doji": {"name": "下影十字線（トンボ）", "nameEn": "Dragonfly Doji", "general": "始終値が高値圏にあり下ヒゲだけが長い十字。安値圏では底示唆とされる。", "operational": "gravestone-doji と対称：実体比<=0.1、下ヒゲ/値幅>=0.8 かつ 上ヒゲ/値幅<=0.1 を必須。近似は実体比<=0.2、下ヒゲ>=0.65、上ヒゲ<=0.2。方向は示さない。", "params": "bodyRatioMax=0.1, lowerVsRange=0.7（暫定）"}, "long-legged-doji": {"name": "長脚十字線", "nameEn": "Long-legged Doji", "general": "上下両ヒゲが長く実体が中央付近にある十字（別名リキシャ線）。", "operational": "十字条件（実体比<=0.1）に加え、上下ヒゲとも値幅の0.3以上を必須として確定。近似は実体比<=0.2、両ヒゲ>=0.25。方向は示さない。", "params": "bodyRatioMax=0.1, shadowVsRange=0.3（暫定）"}, "four-price-doji": {"name": "四値同一十字線", "nameEn": "Four Price Doji", "general": "四値が全て等しい十字。流動性の乏しい相場で現れる。", "operational": "始値=高値=安値=終値（値幅ゼロ）で成立として確定。近似は設けない。方向は示さない。生成足では完全横ばいの区間でのみ発生しうる。", "params": "（パラメータなし）"}, "spinning-top": {"name": "小幅線（コマ）", "nameEn": "Spinning Top", "general": "実体が小さく上下ヒゲが相応にある足。気迷いとされる。", "operational": "実体/値幅<=0.35 かつ上下ヒゲとも値幅の0.15以上を必須として確定。実体ゼロは十字ファミリーに譲り対象外。variant は実体の色（bullish/bearish）、方向は示さない（迷いの形状）。近似は実体比<=0.45、両ヒゲ>=0.1。", "params": "bodyRatioMax=0.35（暫定）"}, "high-wave": {"name": "寄せ線", "nameEn": "High Wave Candle", "general": "上下ヒゲが非常に長く実体が小さい足。相場の転換点で現れやすいとされる。", "operational": "上下ヒゲとも値幅の0.3以上 かつ 実体/値幅<=0.4 を必須として確定。近似は両ヒゲ>=0.25 かつ 実体比<=0.5。variant は実体の色（実体ゼロでは variant なし）、方向は示さない。長脚十字線とは実体比の上限で区別する。", "params": "shadowVsRange=0.8（暫定）"}, "marubozu": {"name": "丸坊主", "nameEn": "Marubozu", "general": "ヒゲがほぼない大実体の足（陽・陰の両方向）。一方方向への強い勢いとされる。", "operational": "実体比>=0.9 を確定、>=0.8 を近似とする。方向は variant（bullish/bearish）。", "params": "bodyRatioMin=0.9（暫定）"}, "belt-hold": {"name": "寄せ切り線", "nameEn": "Belt Hold", "general": "寄付きから一方向に進み反対側ヒゲがない足（寄付坊主に近い形状）。", "operational": "寄せ側のヒゲ（陽線なら下ヒゲ、陰線なら上ヒゲ）がゼロ かつ 実体/値幅>=0.7 を必須として確定。variant は方向（bullish/bearish）。近似は寄せ側ヒゲ/値幅<=0.05 かつ 実体比>=0.6。丸坊主と重なりうる（併発は許容）。", "params": "bodyRatioMin=0.7（暫定）"}, "hammer-context": {"name": "金槌・首吊り線", "nameEn": "Hammer / Hanging Man", "general": "長い下ヒゲの小実体足。下落文脈では金槌（底示唆）、上昇文脈では首吊り線（天井示唆）と名称が変わる。", "operational": "形状は long-lower-shadow の必須条件と同一。文脈は対象足より前10本の終値回帰傾きで必須判定し、傾き<=0 で金槌（強気）、>0 で首吊り線（弱気）の variant とする。", "params": "contextBars=10（暫定）"}, "shooting-star-context": {"name": "流れ星・逆金槌", "nameEn": "Shooting Star / Inverted Hammer", "general": "長い上ヒゲの小実体足。上昇文脈では流れ星、下落文脈では逆金槌と名称が変わる。", "operational": "hammer-context と対称として確定：形状は long-upper-shadow の必須条件と同一。文脈は対象足より前10本の終値回帰傾きで必須判定し、傾き>=0 で流れ星（弱気）、<0 で逆金槌（強気）の variant とする。文脈を判定できない場合はイベントを出さない。", "params": "contextBars=10（暫定）"}, "bullish-engulfing": {"name": "包み足", "nameEn": "Engulfing Pattern", "general": "当足の実体が前足の実体を完全に包含する2本足（陽線包み=強気、陰線包み=弱気）。", "operational": "強気版は既存実装（確定）：前陰線の実体を当陽線の実体が包含、被覆率80%以上で近似。弱気版を対称に追加（暫定）。", "params": "approxCoverRatio=0.8（確定・実装済）"}, "bearish-engulfing": {"name": "包み足", "nameEn": "Engulfing Pattern", "general": "当足の実体が前足の実体を完全に包含する2本足（陽線包み=強気、陰線包み=弱気）。", "operational": "強気版は既存実装（確定）：前陰線の実体を当陽線の実体が包含、被覆率80%以上で近似。弱気版を対称に追加（暫定）。", "params": "approxCoverRatio=0.8（確定・実装済）"}, "harami": {"name": "はらみ足", "nameEn": "Harami", "general": "当足の実体が前足の実体の内側に収まる2本足。前足と逆方向の当足が典型。", "operational": "包含は非厳密、当足実体が前足実体より厳密に小さいことを必須とする。逆色は典型として補助条件（必須にしない）。variant は前足方向の反対。", "params": "（パラメータなし、暫定）"}, "harami-cross": {"name": "はらみ寄せ線", "nameEn": "Harami Cross", "general": "はらみ足の当足が十字線になった形。通常のはらみより転換示唆が強いとされる。", "operational": "harami と同じ包含（非厳密）と厳密な大小を必須とし、第2足に十字条件（実体/値幅<=0.1、実体ゼロを含む）を追加して確定。第2足の実体がゼロの場合、逆色の補助条件は評価不能（pass=null、coverageが下がる）とする。variant は第1足方向の反対。強い包含（第2足実体<=第1足実体の0.5倍）は補助条件。", "params": "bodyRatioMax=0.1（暫定）"}, "tweezer": {"name": "毛抜き（並び赤）", "nameEn": "Tweezer Top / Bottom", "general": "連続2本の高値（天井）または安値（底）がほぼ一致する形。", "operational": "高値・安値の一致は ATR14 比で判定する（暫定記述を確定）：天井型は陽線→陰線で |高値差|<=0.1×ATR14、底型は陰線→陽線で |安値差|<=0.1×ATR14 を必須とする。近似は0.25×ATR14。variant は top／bottom。ATRが未確定の履歴では判定しない。", "params": "proxAtr=0.1（暫定）"}, "three-soldiers": {"name": "赤三兵・三羽烏", "nameEn": "Three White Soldiers / Three Black Crows", "general": "同方向の大実体が3本連続し終値が順に切り上がる（下がる）形。", "operational": "赤三兵は既存実装（確定）：実体比・上ヒゲ上限・前方文脈を条件化。三羽烏を対称 variant として追加（暫定）。", "params": "bodyRatioMin=0.5, upperRatioMax=0.25, contextBars=10（確定・実装済）"}, "three-inside": {"name": "はらみ三法", "nameEn": "Three Inside Up / Down", "general": "はらみ足に確認足を加えた3本足。", "operational": "harami（包含・厳密な大小）の成立に、第3足が第1足と逆方向でその実体端を超える終値を必須として確定。近似は第3足が第1足実体の中点を超える場合。variant は第1足方向の反対（bullish／bearish）。強い包含は harami と同じ補助条件。", "params": "（パラメータなし、暫定）"}, "three-outside": {"name": "包み三法", "nameEn": "Three Outside Up / Down", "general": "包み足に確認足を加えた3本足。", "operational": "包み足（完全包含）の成立に、第3足が包み方向と同方向で第2足終値を超えることを必須として確定。近似は被覆率0.8以上の包み＋同条件の第3足。variant は包みの方向。", "params": "（パラメータなし、暫定）"}, "three-methods": {"name": "マットホールド", "nameEn": "Mat Hold", "general": "上げ三法の変形。第2足が窓を開けて逆行する点が本来の要素。", "operational": "three-methods の variant（mat-hold）として実装した（検出器0.5）。窓なし形の区別は、中間足の実体が第1足の実体の上限を超えて推移し（少なくとも1本は高値も第1足の高値を超え）、中間足の終値がすべて第1足実体の中点を割り込まないことによる。実体が第1足実体内に収まる場合は通常の上げ三法とする。窓を必須とする原型の成立ではない。", "params": "（未確定）"}, "on-neck": {"name": "首線乗り", "nameEn": "On Neck Pattern", "general": "下落文脈で陽線の終値が前足安値とほぼ同水準にとどまる形。弱い反発とされる。", "operational": "第1足は陰線の大実体（実体比>=0.5）、第2足は陽線で、終値と第1足安値の差が0.1×ATR14以内を必須として確定（暫定のATR比記述を確定）。近似は設けない。弱気継続の解釈。ATRが未確定の履歴では判定しない。", "params": "proxAtr=0.1（暫定）"}, "in-neck": {"name": "入り首線", "nameEn": "In Neck Pattern", "general": "首線乗りよりやや深く、前足実体の下端付近まで入る形。", "operational": "首線系の侵入度で区別して確定：第1足（陰線・大実体）の実体への侵入度（終値−第1足終値）／第1足実体 が (0, 0.25] の陽線。近似は設けない。弱気継続の解釈。", "params": "（未確定）"}, "thrusting": {"name": "突っ込み線", "nameEn": "Thrusting Pattern", "general": "前実体の中点手前まで切り込む陽線。切り込み足に届かない弱い形。", "operational": "侵入度が (0.25, 0.5) の陽線として確定（0.5以上は切り込み足（窓なし型）の領域）。近似は設けない。弱気継続の解釈。", "params": "（未確定）"}, "counterattack": {"name": "反撃線", "nameEn": "Counterattack Lines", "general": "逆方向の大実体が前足終値とほぼ同値で引ける形（出会い線に近い）。", "operational": "meeting-lines と共通判定で確定：2足が逆方向、第2足は大実体（実体比>=0.5）、終値差が0.1×ATR14以内を必須とする。近似は0.25×ATR14。連続足では meeting-lines と条件集合が一致するが、出典上の別IDを保持し、family を equal-close として関係を記録する。variant は第1足方向の反対。ATRが未確定の履歴では判定しない。", "params": "proxAtr=0.1（暫定）"}, "meeting-lines": {"name": "出会い線", "nameEn": "Meeting Lines", "general": "反撃線と同系統で終値が一致する形。", "operational": "counterattack と共通判定・同一パラメータで確定（同上）。family は equal-close。", "params": "（未確定）"}, "advance-block": {"name": "先行ブロック", "nameEn": "Advance Block", "general": "3本の陽線が続くが実体が縮小し上ヒゲが伸びる形。上昇の勢い減衰とされる。", "operational": "陽線3本（終値上昇、各足の始値が前足実体内）の骨格に、実体の縮小（第3足<第1足かつ各足が非増大）と第3足の上ヒゲ/値幅>=0.25 を必須として確定。近似は骨格＋第3足<第1足＋上ヒゲ条件。上ヒゲの増大は補助条件。弱気解釈（勢いの減衰）。", "params": "（未確定）"}, "stalled": {"name": "停滞線", "nameEn": "Stalled Pattern", "general": "大陽線の後、小幅陽線が2本続く形（熟慮線）。", "operational": "大陽線（実体比>=0.5）の後に陽線が続き、第3足が小実体（第1足実体の0.3倍以下）で終値が非減少に並ぶ形として確定。第2足の実体は第1足以下。近似は第3足が0.5倍以下。advance-block との区別は、第3足の「小ささ」で判定し上ヒゲを条件にしない点。弱気解釈（停滞）。", "params": "（未確定）"}, "three-line-strike": {"name": "三線打", "nameEn": "Three Line Strike", "general": "同方向3本の後にそれらを包む逆方向の大実体が現れる形。", "operational": "同方向3本（終値が単調に進行）の後に、逆方向の第4足が第1足の始値を超えて引ける形として確定。近似は第4足終値が3本の始値―終値スパンの中点を超える場合。variant は第4足の方向。始値条件（第3足の外側で寄る）は連続足では等号に退化するため判定に含めない。", "params": "（未確定）"}, "unique-three-river": {"name": "特異三川底", "nameEn": "Unique Three River", "general": "長い下ヒゲの足、小実体の陰線、陽線からなる底型。", "operational": "底型として確定：第1足は陰線の大実体（実体比>=0.5）、第2足は小実体の陰線で下ヒゲ/値幅>=0.5 かつ安値が第1足安値を更新、第3足は小実体の陽線で終値が第2足終値より上かつ第1足終値より下（反発の弱さが特徴）。近似は第2足の安値更新が等号の場合。", "params": "（未確定）"}, "stick-sandwich": {"name": "スティックサンドイッチ", "nameEn": "Stick Sandwich", "general": "陰線・陽線・陰線で両端の終値がほぼ一致する形。", "operational": "陰線・陽線・陰線の3本で、両端の終値一致を ATR14 比（<=0.1×ATR）で判定して確定。近似は0.25×ATR。family は equal-close（終値一致の判定を共有）。ATRが未確定の履歴では判定しない。強気解釈（下値支持）。", "params": "proxAtr=0.1（暫定）"}, "homing-pigeon": {"name": "帰り鳩", "nameEn": "Homing Pigeon", "general": "下落文脈で陰線の実体が前陰線の実体内に収まる形（はらみの弱気文脈版）。", "operational": "原典どおり下落側のみで確定：第1足・第2足とも陰線で、harami と同じ包含（非厳密）と厳密な大小を必須とする。同色であることが harami との区別。強い包含は補助条件。方向は強気解釈。", "params": "（未確定）"}, "ladder": {"name": "ラダー（底・天）", "nameEn": "Ladder Bottom / Top", "general": "陰線（陽線）が連続した後、最終足が逆方向に転じる複数足の反転形。", "operational": "本数を5本に固定して確定（底型）：陰線3本が終値を切り下げ、第4足は値幅の0.5以上の上ヒゲを持つ足、第5足は陽線で第4足の実体上端を超えて引ける。天型は対称（第4足は下ヒゲ）。variant は bottom／top。近似は第5足終値が第4足終値を超える場合。", "params": "bars=5（暫定）"}, "matching-low": {"name": "同値安値", "nameEn": "Matching Low", "general": "2本の陰線の終値がほぼ一致する形。", "operational": "2本とも陰線で、終値差が0.1×ATR14以内を必須として確定（暫定のATR比記述を確定）。近似は0.25×ATR14。family は equal-close（終値一致の判定を共有）。ATRが未確定の履歴では判定しない。", "params": "proxAtr=0.1（暫定）"}, "streak": {"name": "連続足カウント", "nameEn": "Consecutive Bar Streak", "general": "陽線・陰線の連続本数を数える観察指標。日本の八手・十手の考え方の基礎にもなる。", "operational": "観察型として確定：同方向（実体の向き）で終値が単調な連続が4本に達した足から、連続が続く間 observation イベントを出す。variant は連続の方向、criteria に連続本数を記録する。方向予測ではなく記録である。", "params": "threshold=8（暫定）"}, "double-top": {"name": "ダブルトップ", "nameEn": "Double Top", "general": "2つの高値がほぼ同水準で、その間の谷（ネックライン）を終値で下抜けて成立する天井形。", "operational": "既存実装（確定）：ZigZag×2、近接0.5ATR、深さ1.5ATR以上、間隔2〜30本、期限30本、直前傾向は直前20本の極値終値。", "params": "zigzagScale=2, proxAtr=0.5, depthAtr=1.5, minGap=2, maxGap=30, expireBars=30, trendBars=20（確定・実装済）"}, "double-bottom": {"name": "ダブルボトム", "nameEn": "Double Bottom", "general": "ダブルトップと対称の底形。", "operational": "既存実装（確定）：ダブルトップと対称。", "params": "（ダブルトップと同一・確定）"}, "triple-top": {"name": "三山", "nameEn": "Triple Top", "general": "ほぼ同水準の高値が3つ並ぶ天井形。酒田五法の三山に対応する。", "operational": "三山（トリプルトップ）として確定する（独自確定）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した5ピボット（高・安・高・安・高）を骨格とする。3峰の近接は、最終峰の発生足のATR14を共通スケールとし、3峰の最大価格と最小価格の差が 0.5×ATR 以下であることとする。2谷の深さは、それぞれ隣接する2峰のうち低い方から測って 1.5×ATR 以上を必須とする。各脚の間隔は2〜30本。直前傾向（第1高値が直前20本の最高終値であること）はダブル系と同様に必須条件ではなく配点項目とする。ネックラインは2谷のうち低い方（安い方）を通る水平線とし、終値がこれを厳密に下回ったときに成立（confirmed）とする。監視は第3峰の確定足の翌足から30本で、監視中に終値が3峰の最高値を上回れば形状破壊で失効（expired）し、窓を過ぎても未成立なら期限切れで失効する。系列が窓の途中で終われば forming。中央峰が両側峰より許容差を超えて高い形状は三尊側の領域として本ルールでは成立させない（3峰が許容帯に収まることと相補的に判定する）。酒田五法の三山という呼称は一般的な対応として記録するが、原典の操作的定義を確認したものではない。sessionPolicy=continuous のため骨格は日・昼休みをまたぎうる。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "proxAtr=0.5（暫定）"}, "triple-bottom": {"name": "三川", "nameEn": "Triple Bottom", "general": "ほぼ同水準の安値が3つ並ぶ底形。酒田五法の三川に対応する。", "operational": "三川（トリプルボトム）として確定する（独自確定）：三山と対称。波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した5ピボット（安・高・安・高・安）を骨格とする。3底の近接は、最終底の発生足のATR14を共通スケールとし、3底の最大価格と最小価格の差が 0.5×ATR 以下であることとする。2山の高さは、それぞれ隣接する2底のうち高い方から測って 1.5×ATR 以上を必須とする。各脚の間隔は2〜30本。直前傾向（第1安値が直前20本の最安終値であること）は必須条件ではなく配点項目とする。ネックラインは2山のうち高い方を通る水平線とし、終値がこれを厳密に上回ったときに成立（confirmed）とする。監視は第3底の確定足の翌足から30本で、監視中に終値が3底の最安値を下回れば形状破壊で失効し、窓を過ぎても未成立なら期限切れで失効する。系列が窓の途中で終われば forming。中央底が両側底より許容差を超えて低い形状は逆三尊側の領域として本ルールでは成立させない。酒田五法の三川という呼称は一般的な対応として記録するが、原典の操作的定義を確認したものではない。sessionPolicy=continuous。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "proxAtr=0.5（暫定）"}, "head-and-shoulders": {"name": "三尊・逆三尊", "nameEn": "Head and Shoulders", "general": "中央の峰が両肩より高い3峰形（逆は底形）。酒田の三尊と西洋のヘッドアンドショルダーは同系統。", "operational": "三尊・逆三尊として確定する（独自確定、variant で区別）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した5ピボットを骨格とし、高・安・高・安・高を三尊（variant top）、安・高・安・高・安を逆三尊（variant bottom）とする。共通スケールは三山・三川と同じく最終ピボット（右肩／右底）の発生足のATR14とする。頭の優位は「頭が高い方の肩より 0.5×ATR を超えて高い」こと（等号は優位ではない）とし、肩の近接は左右の肩の価格差が 0.5×ATR 以下（等号を含む）とする。この帯は三山の3峰近接（最大最小差 0.5×ATR 以下）と相補的であり、両形状が重なって発火することはない。肩同士が離れすぎ、かつ頭の優位も帯を超えない形状は、どちらの形状にも該当しない。2谷の深さは、それぞれ隣接する肩・頭のうち低い方から測って 1.5×ATR 以上を必須とする。各脚の間隔は2〜30本で、左右の時間対称性には追加の制約を置かない。直前傾向（左肩が直前20本の極値終値であること）は必須条件ではなく配点項目とする。ネックラインは2谷のうち低い方（逆三尊では2山のうち高い方）を通る水平線とし、終値が厳密に割った（上回った）ときに成立（confirmed）とする。監視は右肩の確定足の翌足から30本で、監視中に終値が頭の価格を超えれば形状破壊で失効（expired）し、窓を過ぎても未成立なら期限切れで失効する。系列が窓の途中で終われば forming。酒田の三尊と西洋のヘッドアンドショルダーの同一性や閾値の典拠は確認しておらず、本定義は出典未確認の独自操作定義である。形状の一致は予測収益率・勝率を意味しない。sessionPolicy=continuous。未確定ピボットは使わない。", "params": "shoulderProxAtr=0.5（暫定）"}, "triangle": {"name": "三角持ち合い", "nameEn": "Triangle", "general": "高値切り下げと安値切り上げが収束する持ち合い（対称型）。上昇・下降型は片側が水平。", "operational": "三角持ち合い（対称型）として確定する（独自確定）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した5ピボットを骨格とする。上辺・下辺は、各辺のピボット（本数位置・価格）の組に対する最小二乗回帰直線とし、標本は確定ピボット価格のみとする（全バーの高安は未確定の極値や骨格外のノイズを含むため使わない）。回帰式は a＝Σ(x−x̄)(y−ȳ)／Σ(x−x̄)²、b＝ȳ−a・x̄ で、x はバー本数の位置（実時間ではない。日・昼休みをまたいでも1本は1本として扱う規約）。直線は第5ピボットの確定足（候補の生誕）で固定し、以後は再フィットしない。形状条件は生誕時に判定する：上辺・下辺それぞれについて、骨格区間全体での直線の移動量が ATR14（第5ピボットの発生足を参照）の 0.5 倍以上あり、向きが上辺は下降・下辺は上昇であること。区間開始位置での幅より終了位置での幅が狭く、かつ終了位置の幅が正であること（収束し、まだ交差していない）。回帰直線は包絡線ではないため、骨格ピボットが直線の外側に残差として位置すること自体は不適合としない（内包条件は、脚の本数が縮む自然な三角形で中間ピボットが回帰線を割り込む反例があったため採用しなかった）。各脚の間隔は2〜30本。監視は生誕の翌足から30本で、各足についてまず2線の交差（頂点到達）を確認して失効とし、次に終値が上辺を厳密に上回れば上抜け（variant up）、下辺を厳密に下回れば下抜け（variant down）として成立とする。等号はブレイクではない。窓内にブレイクがなければ期限切れで失効し、系列が途中で終われば forming。未成立の間 variant は持たない。片側が水平な上昇型・下降型は傾きの実質条件を満たさないため本バッチでは対象外（保留）。閾値の 0.5×ATR は本プロジェクトの近接帯の規約にそろえた操作的な仮置きであり、文献で確認した値ではない。検出は価格予測や売買の優位を意味しない。sessionPolicy=continuous。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "（未確定）"}, "rectangle-break": {"name": "レンジブレイク", "nameEn": "Rectangle Breakout", "general": "水平な高値・安値の範囲（ボックス）を終値で抜ける形。", "operational": "水平レンジ（ボックス）のブレイクとして確定する（独自確定）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した4ピボット（高値2・安値2）を骨格とし、各辺2回の接触を必須とする（目録の暫定値 touches=2 を採用した）。上限は2つの高値の最大、下限は2つの安値の最小とする（水準を平均や帯の中心にすると、接触したピボット自体が帯の外に出て不整合になるため採らない）。同種ピボットの価格差（広がり）が ATR14（第4ピボットの発生足を参照）の 0.5 倍以下であること（等号を含む）を上限・下限の双方に必須とし、これが外れ値的な突出した接触を排除する条件も兼ねる。レンジの高さ（上限−下限）が 1.0×ATR 以上であることを必須とする（1本分の通常変動に埋もれる帯はレンジとして扱わない）。高さの上限は設けない（帯の濫用は近接条件で排除される）。各脚の間隔は2〜30本。監視は第4ピボットの確定足の翌足から30本で、終値が上限を厳密に上回れば上抜け（variant up）、下限を厳密に下回れば下抜け（variant down）として成立とする。等号はブレイクではない。ヒゲは使わない。候補の破壊条件は設けない（帯の外への終値は、それ自体がブレイクである）。窓内にブレイクがなければ期限切れで失効し、系列が途中で終われば forming。未成立の間 variant は持たない。三角持ち合いとの区別は幾何条件による：本ルールは同種ピボットの水平な近接を、三角形は両辺の逆向きの傾きと収束を要求し、境界では双方・どちらでもない形がありうる。閾値の 0.5×ATR は本プロジェクトの近接帯の規約にそろえた操作的な仮置きであり、文献で確認した値ではない。検出は価格予測や売買の優位を意味しない。sessionPolicy=continuous。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "touches=2（暫定）"}, "flag-pennant": {"name": "旗型", "nameEn": "Flag / Pennant", "general": "急騰（急落）の後に小さな持ち合いを挟んで同方向へ再び動く継続形。", "operational": "旗型（flag）／ペナントとして確定する（独自確定）：ポールは波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の完了した Swing のうち、高さがポール終端ピボットの発生足の ATR14 の 4 倍以上（zigzag の最小 Swing の約2倍）で、かつ到達まで 20 本以内のものとする。ポールは終端ピボットの確定時点で初めて認識され、値動きの発生時点へは遡らない。保ち合いの骨格はポール終端ピボットとそれに続く4個の確定ピボット（計5個）で、脚間隔は各 2〜30 本とする（骨格の全長は脚間隔から最大120本まで許容され、形状系の骨格と同規模である）。上下線は骨格の同種ピボット価格への最小二乗回帰（fitLine）で、第5ピボットの確定足（候補の生誕）に固定し、以後は再フィットしない。戻しは、ポールと逆方向の骨格ピボットの最深部がポール高さの 50% 以内であることを必須とする。型の判定：幅が 0.5×ATR 以上狭まり終端の幅が正で、上辺の傾きが 0 以下・下辺の傾きが 0 以上（逆向きか水平）なら pennant とする。幅の変化が 0.5×ATR 未満に収まり、各辺の区間移動量が 1×ATR 以下なら flag とする。同方向へ傾いた実質的な収束はウェッジの領域、実質的な発散はどちらでもないため、本ルールの候補にはならない。監視は生誕の翌足から 30 本で、ポールと同方向への厳密な終値ブレイク（等号はブレイクではない）で成立とする。逆方向への終値ブレイクは継続形の失敗として expired（ブレイク方向違いによる失効）に記録し、逆方向の成立イベントにはしない。ペナントでは監視中に2線が交差したら頂点失効とし、窓内にブレイクがなければ期限切れで失効する。系列の終了時点で監視中なら forming とする。detectedIndex は、成立はブレイク足、失効はその事象が確定した足（逆ブレイク足・頂点の足・生誕+30本）、forming は生誕足とする。正式イベントとして記録した候補は後に消去しない。ポールの方向は variant ではなく成立イベントの方向として記録し、variant は型（flag／pennant）とする。閾値はいずれも本プロジェクトの規約にそろえた操作的な仮置きであり、文献で確認した値ではない。出典（BULKOWSKI2000）は形状の一般的な説明への対応であり、数値の根拠ではない。形状の一致は継続や予測を意味しない。sessionPolicy=continuous。未確定ピボットは使わない。", "params": "（未確定）"}, "wedge": {"name": "ウェッジ", "nameEn": "Wedge", "general": "同方向に傾いた2本の直線が収束する形。上昇ウェッジは弱気、下降ウェッジは強気とされる。", "operational": "ウェッジとして確定する（独自確定）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の交互に確定した5ピボットを骨格とし、上辺・下辺は各辺のピボット価格に対する最小二乗回帰直線（triangle と同じ fitLine）とする。直線は第5ピボットの確定足（候補の生誕）で固定し、以後は再フィットしない。x はバー本数の位置（実時間ではない）。形状条件は生誕時に判定する：両辺の傾きが同方向で（上昇型はともに正、下降型はともに負）、各辺について骨格区間全体での直線の移動量が ATR14（第5ピボットの発生足を参照）の 0.5 倍以上あること。さらに、区間の幅が終了位置で正であり、かつ区間全体で幅が 0.5×ATR 以上狭まっていること（収束の実質条件。同方向の傾きでは単なる大小比較だけでは平行に近いチャネルと区別できないため置く。triangle では逆向きの移動量が合計 1×ATR 以上の収束を自動的に含む）。各脚の間隔は2〜30本。variant は形状の型（rising／falling）で生誕時に決まる。監視は生誕の翌足から30本で、各足についてまず2線の交差（頂点到達）を確認して失効とし、次に終値が上辺を厳密に上回れば上抜け、下辺を厳密に下回れば下抜けとして成立とする。等号はブレイクではない。ブレイク方向は実際に起きた方向を記録し、上下どちらのブレイクも成立になりうる。伝統的に上昇ウェッジは弱気・下降ウェッジは強気の反転形と説明されるが、それは関連付けの言説であり本ルールの条件や予測ではない。窓内にブレイクがなければ期限切れで失効し、系列が途中で終われば forming。回帰直線は包絡線ではないため、ピボットが直線の外側に残差として位置すること自体は不適合としない（triangle と同じ意味論）。閾値の 0.5×ATR は本プロジェクトの実質移動量の規約にそろえた操作的な仮置きであり、文献で確認した値ではない。検出は価格予測や売買の優位を意味しない。sessionPolicy=continuous。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "（未確定）"}, "broadening": {"name": "拡大型", "nameEn": "Broadening Formation", "general": "高値・安値の幅が拡大していく形。", "operational": "骨格は交互に並ぶ5個の確定ピボット（波形基盤、k=2）とし、上辺は高値ピボット列・下辺は安値ピボット列への回帰直線（fitLine）で、第5ピボットの確定足（生誕）に固定する（再フィットしない。回帰線は包絡線ではない）。参照ATRは第5ピボットの発生足のATR14。成立条件は生誕時点で、上辺の傾きが正でその区間移動量が0.5×ATR以上、下辺の傾きが負でその区間移動量が0.5×ATR以上（等号は通過）、幅の拡大量が0.5×ATR以上（両辺の条件から実際は1.0×ATR以上が含意される）で、かつ開始時点の幅が正であること（生誕前に2線が交差している骨格は、帯が存在しないため候補にしない）、各脚が2〜30本であること。2線は発散するため交点は過去側にあり、頂点失効はない。監視は生誕の翌足から30本で、終値が上辺を厳密に上回れば up、下辺を厳密に下回れば down として成立とし（等号はブレイクではない）、窓内にブレイクがなければ期限切れで失効、系列終了時点で監視中なら形成中とする。detectedIndex は結果が確定した足（成立はブレイク足、失効は生誕+30本、形成中は生誕足）。variant はブレイク方向（up／down）で未ブレイク時は null。日跨ぎは許可する（sessionPolicy=continuous）。形状の一致は予測を意味しない。", "params": "（未確定）"}, "sma-cross-bullish": {"name": "SMA強気クロス", "nameEn": "SMA Bullish Cross", "general": "短期SMAが長期SMAを下から上へ抜ける（ゴールデンクロス）。", "operational": "既存実装（確定）：SMA5/20。既存互換のため強気・弱気は別ルールIDを維持。", "params": "periods=5/20（確定・実装済）"}, "sma-cross-bearish": {"name": "SMA弱気クロス", "nameEn": "SMA Bearish Cross", "general": "短期SMAが長期SMAを上から下へ抜ける（デッドクロス）。", "operational": "既存実装（確定）：強気版と対。", "params": "periods=5/20（確定・実装済）"}, "ema-cross": {"name": "EMAクロス", "nameEn": "EMA Cross", "general": "短期EMAと長期EMAの交差。", "operational": "EMA5とEMA25の交差として確定（MACDゼロ交差と同一になるEMA12／26は採用しない）。EMA25の初値は25本目、交差の判定は26本目から。等号は交差としない。variant は golden（短期が長期を上抜け）／dead（下抜け）。", "params": "periods=12/26 variant short, 20/60 variant medium（暫定）"}, "price-ma-cross": {"name": "価格・MAクロス", "nameEn": "Price / MA Cross", "general": "終値が移動平均を抜ける交差。", "operational": "終値と期間20の移動平均の交差として確定。variant は sma（SMA20）／ema（EMA20）とし、両者は別々に判定する。初値は20本目、交差の判定は21本目から。等号は交差としない。", "params": "period=20（暫定）"}, "ma-slope-turn": {"name": "MA傾き転換", "nameEn": "MA Slope Turn", "general": "移動平均の傾き（差分）の符号転換を観察する。", "operational": "SMA20の1本差分の符号転換として確定（差分は（終値の20本変化）/20に比例し、平滑化はSMA自体が担う）。傾きの初値は21本目、転換の判定は22本目から。傾きゼロとの等号は転換としない。variant は up（負→正）／down（正→負）。", "params": "（未確定）"}, "perfect-order": {"name": "パーフェクトオーダー", "nameEn": "Perfect Order", "general": "短期・中期・長期MAが価格の方向に沿って整列した状態（強気：価格>短期>中期>長期）。", "operational": "EMA5／25／75と終値の整列状態として確定。強気整列は 終値>EMA5>EMA25>EMA75、弱気整列はその逆。すべて厳密な不等号で、等号があれば整列でない。EMA75の初値は75本目で、整列の評価は75本目から。整列への遷移（成立）と整列からの離脱（解消）を observation イベントとし、variant は bullish／bearish（成立）と bullish-end／bearish-end（解消）。解消イベントの direction は null。", "params": "periods=5/25/75（暫定）"}, "macd-signal-cross": {"name": "MACDシグナルクロス", "nameEn": "MACD Signal Cross", "general": "MACD線（EMA12−EMA26）がシグナル線（MACDのEMA9）を抜ける交差。", "operational": "MACD(12,26,9)。MACD線の初値は26本目、信号線の初値は34本目、信号交差の判定は35本目から（34本目では信号線は有効だが交差は判定不能）。等号は交差としない。variant は bullish（上抜け）／bearish（下抜け）。", "params": "fast=12, slow=26, signal=9（暫定）"}, "macd-zero-cross": {"name": "MACDゼロクロス", "nameEn": "MACD Zero Cross", "general": "MACD線がゼロ線を抜ける交差。", "operational": "MACD線のゼロ交差として確定。MACD初値は26本目、判定は27本目から。ゼロちょうどは正負どちらの側でもないため、等号を含む変化は交差としない。variant は bullish／bearish。", "params": "（同上）"}, "macd-histogram-turn": {"name": "MACDヒストグラム転換", "nameEn": "MACD Histogram Turn", "general": "ヒストグラム（MACD−シグナル）の増減方向の転換。", "operational": "ヒストグラムの傾き反転として確定（3値比較方式）。ヒストグラム初値は34本目、反転の判定は36本目から（35本目では2値しかない）。判定は反転した極値の次の足で行い、等号があれば反転としない。variant は up（減少→増加）／down（増加→減少）。", "params": "bars=3（暫定）"}, "dmi-cross": {"name": "DMIクロス", "nameEn": "DMI Cross", "general": "+DIと−DIの交差による方向転換の示唆。", "operational": "Wilder の DMI 交差として確定する：+DM は高値の上昇分が安値の下落分より大きく正のときその上昇分、−DM は逆。同値は双方0。TR・±DM は Wilder 平滑（種値は14本合計、以後は前値−前値/14＋当値）で、+DI／−DI は平滑DM÷平滑TR×100（平滑TRゼロは未判定）。±DI は14本目に初値、交差は厳密な符号変化のみで15本目から判定。variant は bullish／bearish。出典は WILDER1978（目録で確認済み）。", "params": "period=14（暫定）"}, "adx-trend-state": {"name": "ADXトレンド状態", "nameEn": "ADX Trend State", "general": "ADXが閾値（一般に25）を超えるとトレンドありとみなす観察。", "operational": "ADXのトレンド状態遷移として確定する：DX＝|+DI−−DI|÷(+DI+−DI)×100（分母ゼロで平滑TRありは0、平滑TRゼロは未判定）。ADX は DX の Wilder 平滑で、種値は DX の最初の14値の平均（27本目に初値）。閾値25の上方通過を trend-start、下方通過を trend-end とする observation（毎足連発しない遷移のみ）。判定は28本目から。出典は WILDER1978（目録で確認済み）。", "params": "threshold=25（暫定）"}, "ichimoku-tk-cross": {"name": "一目・転換基準クロス", "nameEn": "Ichimoku Tenkan/Kijun Cross", "general": "転換線（9期間の中値）と基準線（26期間の中値）の交差。", "operational": "転換線と基準線の交差として確定する：転換線は直近9本（当足込み）の最高値と最安値の中値、基準線は直近26本の中値。期間は日ではなく5分足の本数として扱う独自適用。転換線の初値は9本目、基準線は26本目、交差は厳密な符号変化のみで27本目から判定。variant は up／down。出典は HOSODA（目録で確認済み）。", "params": "tenkan=9, kijun=26（暫定）"}, "ichimoku-cloud-break": {"name": "一目・雲ブレイク", "nameEn": "Ichimoku Cloud Break", "general": "価格が雲（先行スパン1・2の間）を抜ける。", "operational": "雲ブレイクとして確定する：時刻 t の雲は、t−26 で計算された先行スパンA（転換・基準の中点）と先行スパンB（直近52本の中値）の上下限であり、t で知り得る値だけを使う（将来足から計算したスパンを現在へ引き戻さない）。終値が雲の上限を上抜け／下限を下抜けする交差をイベントとし、雲の初値は78本目、ブレイクの判定は79本目から。variant は upper／lower。期間は本数扱いの独自適用。出典は HOSODA（目録で確認済み）。", "params": "senkouB=52（暫定）"}, "ichimoku-chikou-cross": {"name": "一目・遅行スパンクロス", "nameEn": "Ichimoku Chikou Cross", "general": "遅行スパン（終値を26本遅行表示）が価格を抜ける。", "operational": "遅行スパンの価格クロスとして確定する：遅行スパン（終値を26本遅行表示）と価格線の関係を、時刻 t の終値と t−26 の終値の差として評価し、その差の厳密な符号変化を交差とする。イベントの発生時刻は t（現在の足）に記録し、過去へ遡及しない。差の初値は27本目、交差の判定は28本目から。variant は up／down。期間は本数扱いの独自適用。出典は HOSODA（目録で確認済み）。", "params": "shift=26（暫定）"}, "ichimoku-three-roles": {"name": "一目・三役好転/逆転", "nameEn": "Ichimoku Three Roles", "general": "転換>基準、価格>雲、遅行>価格の3条件が揃った状態（三役好転）。", "operational": "方式F（プロジェクトノート第46節で確定）：既存の一目特徴量を用い、確定足 t の同時点で3条件の状態を合成する。転換線 T[t]=F.tenkan（9本）、基準線 K[t]=F.kijun（26本）、終値 C[t]、雲上限 U[t]=F.cloudTop・下限 L[t]=F.cloudBottom（いずれも t−26 で計算された先行スパンA・B の max／min、Bは52本。F.cloudTop／cloudBottom はこのシフト済みの雲であり、先行スパンの生値を現在の雲として使わない）、遅行差 D[t]=F.chikouDiff＝C[t]−C[t−26] を用いる。好転（bullish、三役好転）は T>K かつ C>U かつ D>0、逆転（bearish、三役逆転）は T<K かつ C<L かつ D<0（全て厳密な不等号）。雲の内部・境界、比較の等号、方向の不一致はいずれも不成立（内部状態 neutral）。過去の3クロスの単純なANDや近接窓は採用せず、3条件が同一足で共存することを必須とする。雲の色、連続本数、追加閾値は要求しない。期間は5分足の本数として扱う独自適用である。内部状態は bullish／bearish／neutral／unknown の4値とし、出力するイベントの状態は増やさない。全入力が有限の足だけを有効評価とし、warmup・欠測（unknown）では発火も解除もせず直前の有効状態を保持する。最初の有効足で好転・逆転なら、その足で初観測として1回発火する（過去に成立した時刻は不明）。以後は直前の有効状態と異なる bullish／bearish への移行時のみ発火し、neutral への移行は内部解除のみとし、成立持続中の連発はしない。欠測後に同方向で復帰しても再発火せず、異なる方向で復帰した場合はその足で初めて観測した状態として発火する（欠測中の遷移は断定しない）。反対方向への直接移行は発火する。日・昼跨ぎでリセットしない。イベントは confirmed のみ（3条件の成立確認であり収益の確認ではない）とし、variant は bullish／bearish、direction は伝統的解釈、startIndex=endIndex=detectedIndex=t、history は t への単一遷移、根拠には3条件の当足実測値を記録する。説明では初観測（warmup・欠測後）と連続有効足間の状態変化を区別する。形成中・解消・近似のイベントは追加しない。遅行スパンの表示位置 t−26 へイベントを遡及しない。HOSODAで確認できるのは一目均衡表の書誌と指標式までであり、発火・欠測の規約はプロジェクト独自の操作規約である。", "params": "（パラメータなし）"}, "parabolic-sar-flip": {"name": "パラボリック反転", "nameEn": "Parabolic SAR Flip", "general": "パラボリックSAR（加速係数つき追随点）が価格の上下を入れ替える反転。", "operational": "Wilder のパラボリックSARの反転として確定する：初期方向は2本目の終値が1本目以上ならロング。EP は保有方向の極値、AF は 0.02 開始・極値更新ごとに +0.02（上限 0.2）。SAR は前値＋AF×(EP−前値) で進め、直前2本の高安で制約する。価格が SAR を厳密に割れば反転し、SAR は反転前の EP へ、AF は 0.02 にリセット。判定は3本目から。variant は up／down（反転後の方向）。出典は WILDER1978（目録で確認済み）。", "params": "afStart=0.02, afStep=0.02, afMax=0.2（暫定）"}, "aroon-cross": {"name": "アルーンクロス", "nameEn": "Aroon Cross", "general": "Aroon Up/Down（最高値・最安値からの経過本数指標）の交差。", "operational": "Aroon の交差として確定する（独自確定）：期間25。直近26本（当足込み）の最高値・最安値からの経過本数を数え、同値の極値が複数あれば最も新しいものを採用する。AroonUp＝(25−高値からの経過)÷25×100、Down も同様。初値は26本目、交差は厳密な符号変化のみで27本目から判定。variant は up／down。出典未確認。", "params": "period=25（暫定）"}, "regression-slope": {"name": "線形回帰傾き", "nameEn": "Linear Regression Slope", "general": "終値の線形回帰の傾きの符号・大きさを観察する。", "operational": "終値20本の最小二乗回帰の傾きの符号転換として確定。傾きの初値は20本目、転換の判定は21本目から。傾きの大きさはATR14で正規化して criteria に記録する（符号判定には影響しない）。傾きゼロは転換としない。variant は up／down。", "params": "period=20（暫定）"}, "swing-break": {"name": "スイングブレイク（ダウ理論）", "nameEn": "Swing Break (Dow)", "general": "確定した高値・安値の更新（HH/HL）や割れ（LH/LL）によるトレンド継続・転換の判定。", "operational": "ダウ理論のスイングブレイクとして確定する（独自確定）：5-D-0の波形基盤（waveforms、zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の確定ピボットだけを用いる。監視水準は、直近の確定高値ピボットの価格（上抜け水準）と直近の確定安値ピボットの価格（下抜け水準）を独立に保持する。水準が使えるのは、そのピボットの confirmedIndex より後の足からであり、確定した足自身では水準として扱わない（同一足で初めて確定したピボットを過去から既知だったものとして扱わない）。終値が上抜け水準を厳密に上回った最初の足で上方向のブレイク、下抜け水準を厳密に下回った最初の足で下方向のブレイクを、状態 confirmed で発火する。等値はブレイクではない。許容差は設けない。ピボットごとに発火は1回まで（水準は消費される）。より新しい同種ピボットが確定したら、未消費の旧水準は発火せずに置き換わる。期限切れはない。HH/HL/LH/LL のようなピボット同士の構造関係は本ルールのイベントではなく、波形基盤から観察できる情報として区別する。variant は up／down、方向は up が bullish-traditional、down が bearish-traditional。sessionPolicy=continuous のため水準は昼休み・日をまたいで保持される。未確定ピボット（provisional）は使わない。判定は最初のピボットが確定した翌足から可能で、ATR14の初値（15本目）以降に限られる。出典未確認（ダウ理論のスイング高安の更新・割れという一般定義を、確定ピボットと終値ブレイクで操作化した独自確定）。", "params": "zigzagScale=2（暫定）"}, "supertrend-flip": {"name": "スーパートレンド反転", "nameEn": "Supertrend Flip", "general": "ATRバンドに基づく追随型トレンド指標の反転。", "operational": "スーパートレンドの反転として確定する（独自確定）：ATR10（Wilder）×3 を中値 (H+L)/2 に加減した基本バンドを持越し規則（上限は下がるときのみ更新、下限は上がるときのみ更新し、前足終値がバンド外ならリセット）で確定バンド化する。方向は確定バンドと終値で遷移し、初期方向はアップ（10本目）。反転の判定は11本目から。variant は up／down（反転後の方向）。出典未確認。", "params": "period=10, multiplier=3（暫定）"}, "vortex-cross": {"name": "ボルテックスクロス", "nameEn": "Vortex Cross", "general": "VM+/VM−（真の値幅の方向成分）の交差。", "operational": "Vortex の交差として確定する（独自確定）：期間14。VM+＝|当足高値−前足安値|、VM−＝|当足安値−前足高値|を各14本合計し、同期間の TR 合計で割る（TR 合計ゼロは未判定）。VI の初値は15本目、交差は厳密な符号変化のみで16本目から判定。variant は up／down。出典未確認。", "params": "period=14（暫定）"}, "gmma-cross": {"name": "GMMA群交差", "nameEn": "GMMA Cross", "general": "短期群・長期群の移動平均群の上下関係の入れ替わり。", "operational": "短期群EMA（3・5・8・10・12・15）と長期群EMA（30・35・40・45・50・60）を5分足終値で計算し、各群の6値の単純平均を代表値 S[t]・L[t] とする。差 D[t]=S[t]−L[t] が、隣接する有効な確定足の間で厳密に符号変化した足を交差とする（D[t−1]<0 かつ D[t]>0 で up、逆で down）。群平均の交差は、全短期線が全長期線より上／下にあることを意味しない。完全分離・群内順序・幅・傾きの条件は課さない。一般的なGMMAは12期間のEMA群の構成そのものであり、本ルールの群平均による交差判定はプロジェクト独自の操作的定義である。", "params": "short=[3,5,8,10,12,15], long=[30,35,40,45,50,60]（5分足終値・SMA種値EMA）、代表値=各群6値の単純平均、差の隣接有効足間の厳密な符号変化"}, "trendline-break": {"name": "トレンドライン突破", "nameEn": "Trendline Break", "general": "確定極値を結ぶ直線の突破。", "operational": "トレンドライン突破として確定する（独自確定）：波形基盤（zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の確定ピボットのうち、直近の同種2点（高値2点による抵抗線、安値2点による支持線）を結ぶ直線を対象とする。3点以上の回帰は、古い極値の混入と残差のため採用しなかった。直線は第2ピボットの確定足（候補の生誕）で固定し、以後は再フィットしない。x はバー本数の位置（実時間ではない）。構成する2脚はいずれも2本以上とする。傾きの符号・大きさには制限を置かない（水平な直線も対象になる。rectangle の水平帯とは構成が異なる）。監視は生誕の翌足からで、ブレイクは「交差」で判定する：抵抗線では前足の終値が直線以下にあり、当足の終値が直線を厳密に上回った場合に上抜け（variant resistance）として成立し、支持線では前足の終値が直線以上にあり、当足の終値が直線を厳密に下回った場合に下抜け（variant support）として成立する。等号はブレイクではない。ヒゲは使わない。生誕時点で価格が既に線の外側にある候補は、価格がいったん内側へ戻ってから交差しない限り成立しない（線の存在しない過去の交差や、生誕前の線の延長への接触は数えない）。候補はブレイクするか、より新しい同種ピボットが確定して直線が置き換わるまで存続し、置き換えられた未成立の候補は expired（置換による失効）として記録する。本ルールは候補を forming イベントとして出すため、prefix 実行で現れたイベントが後続データで消えないという検出器全体の因果性契約上、置換を無言にできない（swing-break の水準はイベントとして現れないため事情が異なる）。固定の期限は設けない。系列の終了時点で存続している候補は forming として記録する。トレンドラインの突破はトレンド転換の証明ではなく、線の定義に依存する価格事象である。sessionPolicy=continuous。未確定ピボットは使わない。出典未確認の独自操作定義。", "params": "（未確定）"}, "chandelier-flip": {"name": "シャンデリア反転", "nameEn": "Chandelier Exit Flip", "general": "ATRに基づく追随ストップ水準（シャンデリア）の反転。", "operational": "シャンデリア追随ストップの反転として確定する（独自確定）：ATR は期間22の Wilder 平滑（種値は22本平均、22本目に初値）。ロング側ストップ＝直近22本の最高値−3×ATR22 で上方へのみラチェットし、終値が厳密に下回ればショートへ反転（ショート側は直近22本の最安値＋3×ATR22 で下方へのみラチェット、終値が厳密に上回れば反転）。等号は反転ではない。初期方向はロング（22本目）。反転の判定は23本目から。variant は up／down（反転後の方向）。出典未確認。", "params": "period=22, multiplier=3（暫定）"}, "hull-cross": {"name": "HMAクロス", "nameEn": "Hull MA Cross", "general": "Hull移動平均（WMAの組み合わせで遅延を抑えたMA）の交差。", "operational": "価格と HMA の交差として確定する（独自確定）：HMA(9)＝WMA3(2×WMA4(終値)−WMA9(終値))。期間の半分は 9/2 を切り捨てて4、平方根期間は √9＝3 とする。生系列の初値は9本目、HMA の初値は11本目、価格との交差は厳密な符号変化のみで12本目から判定。variant は up／down。出典未確認。", "params": "（未確定）"}, "kama-cross": {"name": "KAMAクロス", "nameEn": "KAMA Cross", "general": "効率比で平滑を適応させるKAMAの交差。", "operational": "価格と KAMA の交差として確定する（独自確定）：効率比 ER＝|終値−10本前終値|÷直近10本の終値変化絶対値の合計（分母ゼロは ER＝0）。平滑係数 SC＝(ER×(2/3−2/31)+2/31)²（fast 2、slow 30）。種値は11本目の終値とし、以後 KAMA＝前値＋SC×(終値−前値)。交差は厳密な符号変化のみで12本目から判定。variant は up／down。出典未確認。", "params": "（未確定）"}, "daily-ma-position": {"name": "日足MA位置", "nameEn": "Daily MA Position", "general": "日足集約した終値と日足MA（25日等）の位置関係を観察する。", "operational": "日足MA位置の観察として確定する（独自確定）：完全日（66本の定型セッションで、後続の日が存在する日）だけを日足として確定し、直近25完全日の終値の単純平均と、同じ最新完全日の終値との位置関係を観察する。各日の最初の足で評価し、位置（上／下）が前回の評価から変化したときだけ発火する（等しい場合は発火しない）。部分日は25日に数えず、25完全日が揃うまでは未判定（標準の566本アンカーでは常に未判定が正常）。日中の現在値との比較は行わない。初回評価は、25完全日が確定した翌日の1本目（完全日から始まる履歴では通算1651本目）。variant は above／below、状態は observation。出典未確認。", "params": "period=25（暫定）"}, "rsi-oversold": {"name": "RSI売られすぎ進入", "nameEn": "RSI Oversold Entry", "general": "RSI14が30未満へ進入する。", "operational": "既存実装（確定）：Wilder平滑。再発火は35への回復まで抑止（ヒステリシス）。", "params": "enter=30, rearm=35（確定・実装済）"}, "rsi-overbought": {"name": "RSI買われすぎ進入", "nameEn": "RSI Overbought Entry", "general": "RSI14が70超へ進入する。", "operational": "既存実装（確定）：再発火は65まで抑止。", "params": "enter=70, rearm=65（確定・実装済）"}, "rsi-center-cross": {"name": "RSI中心線クロス", "nameEn": "RSI Centerline Cross", "general": "RSIが50を抜ける交差。", "operational": "RSI14と50の交差として確定（厳密な符号変化のみ）。RSI初値は15本目、交差の判定は16本目から。variant は up／down。", "params": "level=50（暫定）"}, "rsi-zone-exit": {"name": "RSI圏域退出", "nameEn": "RSI Zone Exit", "general": "売られすぎ/買われすぎ圏からの退出（30/70への復帰）。", "operational": "RSI圏域からの退出を、進入とは独立のイベントとして確定する。占有（圏内滞在）の追跡は本ルール側の状態機械で行い、RSIが30以上へ戻れば売られすぎ退出、70以下へ戻れば買われすぎ退出とする（進入側の再発火解除35／65とは別物）。RSIの初値が既に圏内の場合は占有中として扱い、その後の復帰で退出が発火する。退出条件を満たした足が未完成足の場合は占有を保持し、次の完成足でなお条件を満たせば発火する。variant は oversold／overbought。", "params": "exit=30/70（暫定）"}, "stochastic-cross": {"name": "ストキャスティクスクロス", "nameEn": "Stochastic Cross", "general": "%Kと%Dの交差。", "operational": "ファスト・ストキャスティクスとして確定：%K(14)＝100×(終値−14本安値)/(14本高値−14本安値)、%D＝%KのSMA3。値幅ゼロの足並びでは %K は未判定（null）。%K初値は14本目、%D初値は16本目、交差の判定は17本目から。variant は bullish／bearish。", "params": "k=14, d=3（暫定）"}, "stochastic-zone": {"name": "ストキャスティクス圏域進入", "nameEn": "Stochastic Zone Entry", "general": "%Kまたは%Dが20未満/80超の圏域へ進入する。", "operational": "%Kの圏域進入として確定（%Dは使わない）。進入は20未満／80超への交差、再発火解除は25以上／75以下（RSI方式の踏襲：進入閾値から中心側へ5）。variant は oversold／overbought。%K初値は14本目、進入の判定は15本目から。", "params": "enter=20/80（暫定）"}, "stochastic-rsi-cross": {"name": "ストキャスティクスRSIクロス", "nameEn": "StochRSI Cross", "general": "RSIにストキャスティクス式を適用した指標の交差。", "operational": "StochRSIとして確定：RSI14の直近14値での正規化（初値28本目）、%K＝そのSMA3（初値30本目）、%D＝%KのSMA3（初値32本目）、交差の判定は33本目から。RSIが14値すべて一定の場合は分母ゼロで未判定（null）とし、nullを跨ぐ判定はしない。variant は bullish／bearish。出典未確認のため式は一般的な構成による独自確定。", "params": "period=14（暫定）"}, "williams-r-zone": {"name": "ウィリアムズ%R圏域進入", "nameEn": "Williams %R Zone Entry", "general": "%R=−100×(Hn−C)/(Hn−Ln) が −80/−20 の圏域へ進入する。", "operational": "ウィリアムズ%Rの圏域進入として確定：%R＝−100×(14本高値−終値)/(14本高値−14本安値)。%R＝%K−100 の同値関係があり、本ルールの進入は stochastic-zone の %K 進入と数学的に同一の事象になる（指標としての来歴が異なるため別ルールとして保持し、重複を明示する）。進入は −80未満／−20超への交差、再発火解除は −75以上／−25以下。variant は oversold／overbought。初値は14本目、進入の判定は15本目から。", "params": "period=14, enter=-80/-20（暫定）"}, "cci-zone": {"name": "CCI圏域進入", "nameEn": "CCI Zone Entry", "general": "CCIが±100の圏域へ進入する。", "operational": "CCI(20)の圏域進入として確定：TP＝(高値＋安値＋終値)/3、CCI＝(TP−SMA20(TP))／(0.015×同一20本窓の平均絶対偏差)。偏差ゼロは未判定（null）。進入は ±100 超／未満への交差、再発火解除は ±75 内側への復帰（独自確定）。初値は20本目、進入の判定は21本目から。variant は overbought／oversold。", "params": "period=20, enter=±100（暫定）"}, "cci-zero-cross": {"name": "CCIゼロクロス", "nameEn": "CCI Zero Cross", "general": "CCIがゼロを抜ける交差。", "operational": "CCI(20)のゼロ交差として確定（厳密な符号変化のみ）。初値は20本目、交差の判定は21本目から。variant は up／down。", "params": "（同上）"}, "roc-cross": {"name": "ROCゼロクロス", "nameEn": "ROC Zero Cross", "general": "変化率 ROC=100×(C−C[n])/C[n] のゼロクロス。", "operational": "ROC(12)＝100×(終値−12本前終値)／12本前終値 のゼロ交差として確定（比率基準、期間12は独自確定）。初値は13本目、交差の判定は14本目から。variant は up／down。", "params": "period=12（暫定）"}, "momentum-cross": {"name": "モメンタムクロス", "nameEn": "Momentum Cross", "general": "モメンタム（C−C[n]）のゼロクロス。", "operational": "モメンタム(12)＝終値−12本前終値 のゼロ交差として確定（差分基準、期間はROCと同一の12）。12本前終値が正である限り符号はROC(12)と常に一致し、本ルールの交差イベントは roc-cross と同一事象になる（重複を明示し、テストで一致を確認する）。初値は13本目、交差の判定は14本目から。variant は up／down。", "params": "period=10（暫定）"}, "qstick": {"name": "Qstick", "nameEn": "Qstick", "general": "(終値−始値) の移動平均。ローソク実体の方向の偏りを測る。", "operational": "Qstickのゼロ交差として確定：(終値−始値) のSMA8の符号転換（厳密な符号変化のみ）。初値は8本目、交差の判定は9本目から。variant は up／down。出典未確認のため式は一般的な構成による独自確定。", "params": "period=8（暫定）"}, "imi": {"name": "IMI（Intraday Momentum Index）", "nameEn": "IMI", "general": "RSI式を足内の (終値−始値) に適用した指標の圏域進入。", "operational": "IMI（Intraday Momentum Index）の圏域進入として確定：直近14本の (終値−始値) の陽線分合計／（陽線分＋陰線分）×100。分母ゼロ（全て同時線）は未判定。進入は70超／30未満への交差、再発火解除は65以下／35以上（RSI方式）。variant は overbought／oversold。初値は14本目、進入の判定は15本目から。出典未確認のため式は一般的な構成による独自確定。", "params": "period=14（暫定）"}, "cmo-zone": {"name": "CMO圏域進入", "nameEn": "CMO Zone Entry", "general": "Chande Momentum Oscillator の±50圏域進入。", "operational": "CMO(14)の圏域進入として確定：直近14本の終値差分について (上昇分合計−下落分合計)／(上昇分合計＋下落分合計)×100。分母ゼロ（横ばい）は未判定。進入は +50超／−50未満への交差、再発火解除は ±40内側への復帰。variant は overbought／oversold。初値は15本目、進入の判定は16本目から。出典未確認のため式は一般的な構成による独自確定。", "params": "period=14（暫定）"}, "trix-cross": {"name": "TRIXクロス", "nameEn": "TRIX Cross", "general": "三重平滑EMAの変化率とシグナル線の交差。", "operational": "TRIX（期間15の三重EMAの1本変化率、%表示）とそのEMA9信号線の交差として確定（信号線期間9はMACDの慣例に倣い本工程で固定）。三重EMAの初値は43本目（15+14+14）、TRIX初値は44本目、信号線初値は52本目、交差の判定は53本目から。等号は交差としない。variant は bullish／bearish。原典未確認のため式は一般的な構成による独自確定であり、出典確認済みとはしない。", "params": "period=15（暫定）"}, "ultimate-zone": {"name": "ウルティメット圏域進入", "nameEn": "Ultimate Oscillator Zone", "general": "3期間の買い圧力を加重した指標の圏域進入。", "operational": "ウルティメット・オシレーターの圏域進入として確定：BP＝終値−min(安値, 前終値)、TR＝max(高値, 前終値)−min(安値, 前終値)、UO＝100×(4×avg7＋2×avg14＋avg28)／7（avgN＝N本のΣBP/ΣTR）。ΣTRゼロは未判定。進入は70超／30未満、再発火解除は65／35。初値は29本目、進入の判定は30本目から。variant は overbought／oversold。出典未確認のため式は一般的な構成による独自確定。", "params": "periods=7/14/28（暫定）"}, "awesome-cross": {"name": "オーサムオシレーター", "nameEn": "Awesome Oscillator", "general": "中値のSMA5−SMA34のゼロクロスとソーサー形。", "operational": "オーサム・オシレーターのゼロ交差として確定：中値＝(高値＋安値)/2、AO＝SMA5(中値)−SMA34(中値)。初値は34本目、交差の判定は35本目から。variant は up／down。一般定義にあるソーサー形は本ルールの対象外。出典未確認のため独自確定。", "params": "fast=5, slow=34（暫定）"}, "fisher-cross": {"name": "フィッシャー変換クロス", "nameEn": "Fisher Transform Cross", "general": "価格を正規化しフィッシャー変換した値とシグナル線の交差。", "operational": "フィッシャー変換とその1本遅れ（トリガー線）の交差として確定（Ehlers型の一般的な構成による独自確定）：10本の最高・最安で正規化した x＝2×(終値−安値)/(高値−安値)−1（値幅ゼロでは x＝0）、平滑値 v＝0.33x＋0.67×前回v（±0.999でクランプ、初期値0）、変換値＝0.5×ln((1+v)/(1−v))。交差は変換値の増減転換と等価。初値は10本目、交差の判定は12本目から。variant は up／down。出典未確認。（lookbackと判定開始は第16節で11→12に訂正。変換値の初値10本目＋トリガー比較に必要な3値のため、判定開始は12本目が正しい。）", "params": "period=10（暫定）"}, "tsi-cross": {"name": "TSIクロス", "nameEn": "TSI Cross", "general": "二重平滑した価格変化の比率（True Strength Index）とシグナル線の交差。", "operational": "TSIとシグナル線の交差として確定：価格変化 PC の二重EMA平滑（25→13）を分子、|PC| の二重EMA平滑を分母とし TSI＝100×分子／分母（EMA初期化は本プロジェクト規約のSMAシード）。シグナル線はTSIのEMA9。分母ゼロは未判定。TSI初値は38本目、シグナル初値は46本目、交差の判定は47本目から。variant は bullish／bearish。出典未確認のため独自確定。", "params": "fast=13, slow=25（暫定）"}, "rvi-cross": {"name": "RVIクロス", "nameEn": "RVI Cross", "general": "相対活力指数（(終値−始値)/(高値−安値) の平滑比）とシグナル線の交差。", "operational": "RVI とシグナル線の交差として確定する：RVI は Relative Vigor Index であり、標準偏差を用いる Relative Volatility Index とは別指標。分子系列（終値−始値）と分母系列（高値−安値）を、それぞれ4本の重み (1,2,2,1)/6 で平滑し、直近10本の合計の比を RVI とする（分母ゼロは未判定）。シグナル線は RVI の同じ重みによる4本平滑。RVI の初値は13本目、シグナルは16本目、交差は厳密な符号変化のみで17本目から判定。variant は up／down。出典未確認（一般的な式による独自確定）。", "params": "period=10（暫定）"}, "demarker-zone": {"name": "デマーカー圏域進入", "nameEn": "DeMarker Zone Entry", "general": "高値・安値の更新幅に基づく指標の0.3/0.7圏域進入。", "operational": "デマーカー(14)の圏域進入として確定：DeMax＝高値更新幅（なければ0）、DeMin＝安値更新幅（なければ0）の各SMA14について DeM＝SMA(DeMax)／(SMA(DeMax)＋SMA(DeMin))。分母ゼロは未判定。進入は0.7超／0.3未満、再発火解除は0.65／0.35。初値は15本目、進入の判定は16本目から。variant は overbought／oversold。出典未確認のため独自確定。", "params": "period=14（暫定）"}, "bulls-bears-power": {"name": "ブル・ベアパワー", "nameEn": "Bulls / Bears Power", "general": "高値/安値とEMAの差で買い手・売り手の力を測る指標のゼロクロス。", "operational": "Elder型の力指標として確定：ブルパワー＝高値−EMA13、ベアパワー＝安値−EMA13。各パワーのゼロ交差をイベントとする。EMA13の初値は13本目、交差の判定は14本目から。等号は交差としない。variant は bulls／bears（どちらのパワーが交差したか）。原典未確認のため式は一般的な構成による独自確定であり、出典確認済みとはしない。", "params": "period=13（暫定）"}, "kst-cross": {"name": "KSTクロス", "nameEn": "KST Cross", "general": "4つのROCを平滑・加重した Know Sure Thing とシグナル線の交差。", "operational": "KSTとシグナル線の交差として確定：ROC(10/15/20/30)をSMA(10/10/10/15)で平滑し 1/2/3/4 で加重合計、シグナル線はSMA9。KST初値は45本目、シグナル初値は53本目、交差の判定は54本目から。本来は日足・週足用の指標であり、日中足への適用は独自適用。variant は bullish／bearish。出典未確認のため独自確定。", "params": "（未確定）"}, "coppock-cross": {"name": "コポッククロス", "nameEn": "Coppock Cross", "general": "長期ROCの加重移動平均のゼロクロス。本来は月足・長期用。", "operational": "コポック曲線のゼロ交差として確定：ROC(14)＋ROC(11) のWMA10（線形加重）。初値は24本目、交差の判定は25本目から。本来は月足・長期用の指標であり、日中足への適用は独自適用（目録記載どおり）。variant は up／down。出典未確認のため独自確定。", "params": "（未確定）"}, "connors-rsi-zone": {"name": "RSI(2)圏域進入", "nameEn": "RSI(2) Zone Entry", "general": "短期RSI(2)の極端圏（5未満/95超）への進入。", "operational": "目録の名称・一般定義どおり RSI(2) の圏域進入として確定する（3要素合成の ConnorsRSI そのものではない）。Wilder RSI(期間2)、進入は5未満／95超への交差（目録の一般定義に明記された極端圏）、再発火解除は10／90。初値は3本目、進入の判定は4本目から。variant は oversold／overbought。出典未確認のため式と解除閾値は独自確定。", "params": "period=2, enter=5/95（暫定）"}, "schaff-cross": {"name": "シャフ・トレンドサイクル", "nameEn": "Schaff Trend Cycle", "general": "MACDにストキャスティクスを二重適用した指標の交差・圏域。", "operational": "シャフ・トレンドサイクルの水準交差として確定（独自確定）：MACD(23,50)に10本ストキャスティクスと0.5平滑を二重に適用した STC について、25を上抜けたら bullish、75を下抜けたら bearish とする（シャフの代表的なシグナル水準）。値幅ゼロの窓では平滑更新を保留する。STC初値は68本目、交差の判定は69本目から。本来は日足用の指標であり、日中足への適用は独自適用。出典未確認。", "params": "（未確定）"}, "elder-force-cross": {"name": "フォース指数クロス", "nameEn": "Force Index Cross", "general": "価格変化×出来高のEMAのゼロクロス。", "operational": "フォース指数のゼロ交差として確定する：生値＝(終値−前足終値)×当足出来高 を EMA13（SMAシード）で平滑し、その厳密な符号変化。ADLには依存しない。variant は up／down。初値は14本目、交差の判定は15本目から。出来高は合成値。出典未確認（Elder の一般的な構成による独自確定）。", "params": "period=13（暫定）"}, "bollinger-break": {"name": "ボリンジャーバンド・ブレイク", "nameEn": "Bollinger Band Break", "general": "価格がボリンジャーバンド（SMA20±2σ）を抜ける/触れる。", "operational": "ボリンジャーバンド（SMA20±2×母標準偏差、既存feature sd20）に対するタッチと終値ブレイクを区別して確定する。状態は各側で 内側／タッチ／ブレイク を追跡し、遷移時に発火する（初値の足は状態の初期化のみ）。タッチは高値（安値）がバンドに達したが終値が内側、ブレイクは終値がバンド外。variant は upper-break／lower-break／upper-touch／lower-touch。バンド初値は20本目、遷移の判定は21本目から。", "params": "period=20, mult=2（暫定）"}, "bollinger-percentb": {"name": "%bクロス", "nameEn": "Bollinger %b Cross", "general": "%b=(C−下限)/(上限−下限) が0/0.5/1を抜ける。", "operational": "%b＝(終値−下限)／(上限−下限) が水準 0／0.5／1 を抜ける交差として確定する（厳密な符号変化のみ、水準は criteria に記録）。バンド幅ゼロは未判定（null）。variant は up／down。初値は20本目、交差の判定は21本目から。", "params": "levels=0/0.5/1（暫定）"}, "bollinger-squeeze": {"name": "バンドスクイーズ", "nameEn": "Bollinger Squeeze", "general": "バンド幅が直近で最小水準まで縮小した状態の観察。", "operational": "バンド幅率（（上限−下限）／SMA20）の分位によるスクイーズ観察として確定する。分位は当足を含む直近120本の有効値に対する中順位（未満の個数＋同値の個数×0.5）／120で、必要本数は120本すべて。分位20以下をスクイーズ状態とし、成立と解消を observation で記録する。variant は squeeze／release。バンド幅の初値は20本目、分位の判定開始は139本目。", "params": "lookback=120（暫定）"}, "donchian-breakout": {"name": "ドンチアンブレイクアウト", "nameEn": "Donchian Breakout", "general": "過去n本の最高値・最安値（ドンチアンチャネル）を抜ける。", "operational": "ドンチアンチャネルの終値ブレイクとして確定する。チャネルは当足を除く直前n本の最高値・最安値（第16節）。期間は20と55で、variant は upper-20／lower-20／upper-55／lower-55。判定開始は20期間が21本目、55期間が56本目。", "params": "period=20, variant turtle=55（暫定）"}, "channel-position": {"name": "チャネル内位置", "nameEn": "Channel Position", "general": "ドンチアンチャネル内での終値の相対位置（0〜1）の観察。", "operational": "ドンチアンチャネル（当足を含む20本）内での終値の相対位置 (終値−最安)／(最高−最安) の圏域進入として確定する（第16節：位置は当足込み）。進入は0.8以上／0.2以下、再発火解除は0.65／0.35（独自確定）。値幅ゼロは未判定。variant は upper-zone／lower-zone。位置の初値は20本目、進入の判定は21本目から。", "params": "period=20（暫定）"}, "keltner-break": {"name": "ケルトナーブレイク", "nameEn": "Keltner Break", "general": "EMA±ATR倍のケルトナーチャネルを抜ける。", "operational": "ケルトナーチャネルの終値ブレイクとして確定する（独自定義）：EMA20 ± 2×ATR10（Wilder）。前足の終値が内側で当足の終値が外側の交差のみ。variant は upper／lower。バンド初値は20本目、判定開始は21本目。出典未確認。", "params": "period=20, mult=2（暫定）"}, "atr-regime": {"name": "ATRレジーム変化", "nameEn": "ATR Regime Change", "general": "ATRの拡大・縮小（対自身の移動平均の乖離）の観察。", "operational": "ATRレジームの観察として確定する：比率＝ATR14／SMA50(ATR14)。比率が1.2を上抜けたら expansion、0.8を下抜けたら contraction、再発火解除は比率が1.0へ戻ること。ATR%（ATR／終値×100）を criteria に併記する（目録の一般定義どおり）。比率の初値は63本目（ATR初値は14本目、SMA50の初値はその49本後）、判定開始は64本目。", "params": "period=14（暫定）"}, "hv-percentile": {"name": "HV分位", "nameEn": "Historical Volatility Percentile", "general": "対数収益率の標準偏差（ヒストリカルボラティリティ）の分位位置の観察。", "operational": "HV分位の圏域進入として確定する：HV＝対数収益率20本の母標準偏差（5分足ベース、年率化なし）。分位は当足を含む直近120本のHVに対する中順位で、必要本数は120本すべて。進入は分位90以上／10以下、再発火解除は80／20。variant は high／low。HV初値は21本目、分位の判定開始は140本目。", "params": "period=20, lookback=120（暫定）"}, "nr-pattern": {"name": "狭幅足（NR7/NR4）", "nameEn": "Narrowest Range (NR7/NR4)", "general": "値幅が直近7本（4本）で最小の足。", "operational": "狭幅足として確定する：当足の値幅（高値−安値）が直近7本（4本）の中で厳密に最小（同値は最小とみなさない）。variant は nr7／nr4（両方に該当する足は両方発火）。判定開始はNR7が7本目、NR4が4本目。", "params": "n=7, variant n=4（暫定）"}, "inside-bar": {"name": "インサイドバー", "nameEn": "Inside Bar", "general": "高安が前足の範囲内に収まる足。", "operational": "インサイドバーとして確定する：高値≦前足高値 かつ 安値≧前足安値（等号は包含に含める）。パラメータなし、該当する足ごとに発火する。判定は2本目から。", "params": "（パラメータなし）"}, "outside-bar": {"name": "アウトサイドバー", "nameEn": "Outside Bar", "general": "高安が前足の範囲を上下に超える足。", "operational": "アウトサイドバーとして確定する：高値≧前足高値 かつ 安値≦前足安値、かつ少なくとも一方が厳密に超える。variant は当足の方向 bullish／bearish（終値＝始値は variant なし）。判定は2本目から。", "params": "（パラメータなし）"}, "range-expansion": {"name": "値幅拡大足", "nameEn": "Range Expansion Bar", "general": "値幅が直近平均の一定倍を超える足。", "operational": "値幅拡大足として確定する：当足のトゥルーレンジが、前足時点のATR14（当足を含まない参照ATR、第16節）の2倍以上。variant は当足の方向 up／down（終値と始値の比較、同値は up）。判定開始は15本目（ATR14の初値は14本目、その翌足から参照できる）。", "params": "mult=1.5（暫定）"}, "mass-index-bulge": {"name": "マスインデックス膨張", "nameEn": "Mass Index Bulge", "general": "値幅のEMA比の合計が閾値を超えて戻る反転示唆。", "operational": "マスインデックスの膨張（bulge）観察として確定する：MI＝値幅のEMA9 ÷ そのEMA9のEMA9 の比を25本合計する。MI が 27 を超えた履歴を持ち、その後 26.5 を下回った足で1回発火する（非方向性、等号は超えた／下回ったに含めない）。EMAの初値はSMAシード（既存規約）。値幅ゼロが続くと分母ゼロで未判定。MI の初値は41本目、発火はその翌足以降。日中足（5分足）への適用は独自適用。出典未確認。", "params": "period=25, level=27（暫定）"}, "chaikin-volatility": {"name": "チャイキン・ボラティリティ", "nameEn": "Chaikin Volatility", "general": "高安幅のEMAの変化率。", "operational": "チャイキン・ボラティリティのゼロ交差として確定する：CV＝100×(値幅のEMA10 − 10本前の同EMA)／10本前の同EMA。出来高もADL／CMFも用いない（第17節）。分母ゼロは未判定。variant は up（拡大）／down（縮小）、非方向性の観察。CV の初値は20本目、交差の判定は21本目から。出典未確認（Chaikin の変化率方式による独自確定）。", "params": "period=10（暫定）"}, "vwap-cross": {"name": "VWAPクロス", "nameEn": "VWAP Cross", "general": "価格が当日VWAP（出来高加重平均価格の近似）を抜ける。", "operational": "終値と当日VWAPの交差として確定する：当日VWAPは当日の典型価格×出来高の累積 ÷ 出来高累積（真の約定価格VWAPではなく、代表価格と合成出来高による近似）。日次リセットは day の変化点で行い、昼休みではリセットしない。交差は同一日内のみ（日をまたがない）、厳密な符号変化のみ。variant は up／down。判定は各日の2本目から。", "params": "（パラメータなし）"}, "vwap-deviation": {"name": "VWAP乖離", "nameEn": "VWAP Deviation", "general": "価格のVWAPからの乖離率の観察。", "operational": "VWAP乖離の圏域進入として確定する：乖離率＝100×(終値−当日VWAP)／当日VWAP（単位は%）。進入は +1%以上／−1%以下、再発火解除は絶対値0.5%未満への回帰。同一日内のみ。variant は above／below、状態は observation。当日VWAPの初値は各日の1本目、進入の判定は各日の2本目から。近似VWAPである留保は vwap-cross と同じ。", "params": "（未確定）"}, "opening-range-break": {"name": "寄付きレンジブレイク", "nameEn": "Opening Range Breakout", "general": "寄付き後n本の高安レンジを抜ける。", "operational": "寄付きレンジブレイクとして確定する：各日の最初の確定6本（09:00〜09:25）の最高値・最安値でレンジを作り、7本目の確定足以降に終値がレンジを厳密に超えたら発火する（等号はブレイクではない）。方向ごとに各日1回まで（再発火抑止）。その日の最初の足の時刻が 09:00（minute 540）でない日は寄付きが不明として判定しない。状態は翌日に持ち越さない。判定はその日の最後の足まで。variant は upper／lower。判定開始は各日の7本目。出典未確認（独自確定）。", "params": "bars=6（暫定）"}, "pivot-touch": {"name": "ピボット接触", "nameEn": "Pivot Point Touch", "general": "前日の日足から計算したピボット/支持・抵抗水準への接触の観察。", "operational": "フロアピボットへの接触として確定する（独自確定）：直近の完全日（当日より前の最新完全日）の日足 H/L/C から P＝(H+L+C)/3、R1＝2P−L、S1＝2P−H、R2＝P+(H−L)、S2＝P−(H−L) を算出し、当日の各足の高安の範囲に水準が含まれる（等号を含む）ときに接触とする。水準ごとに各日1回まで。当日の高安で水準を再計算しない。足内の接触順序・約定は推定しない。前日が部分日なら、それより前の最新完全日を用いる。判定は、完全日の翌日の1本目（通算67本目）から。variant は P／R1／S1／R2／S2。出典未確認（式は伝統的なフロアピボット）。", "params": "（パラメータなし）"}, "fib-retracement": {"name": "フィボナッチ押し目", "nameEn": "Fibonacci Retracement Touch", "general": "確定スイングに対する38.2%/50%/61.8%押し目水準への到達。", "operational": "確定スイングへのフィボナッチ押し目（戻り）の観察として確定する（独自確定）：波形基盤（waveforms、zigzagScale=2、ATR方式は実行時の指定に従い既定は現在足）の「両端の確定Pivotからなる完成Swing」のうち、最も新しい1本だけを監視対象とする。上昇Swing A→B（Bが高値）では水準は B−r×(B−A)、下降Swingでは同じ式が戻り水準を与える。r は 0.382／0.5／0.618 で、0.5 は数学的なフィボナッチ比率ではなく慣用的な50%戻しとして扱う。水準が使えるのは Swing の末端ピボットの confirmedIndex より後の足からであり、確定した足自身での到達は判定しない（確認前に水準を通過していても遡って発火しない）。足の高安の範囲に水準が含まれるとき（等号を含む）に、状態 observation の接触イベントを発火する。これは接触した可能性の観察であり、足内の接触順序・実売買・反転の成否は推定しない。反転確認は本ルールのイベントではない。方向・Swing・比率ごとに最大1回まで発火し、新しいSwingが完成すれば旧Swingの未発火水準は監視から外れる。同一足で複数水準に接触した場合は順序を付けず並列の観察イベントとする。variant は比率（0.382／0.5／0.618）、方向は上昇Swingが bullish-traditional、下降Swingが bearish-traditional（伝統的な文脈の表示であり予測ではない）。sessionPolicy=continuous のため日跨ぎSwingも対象とし、セッション跨ぎ属性を記録する。未確定ピボット（provisional）は使わない。終値近接やATR幅による許容差は追加しない。出典未確認（比率の一般的利用と本アプリでの操作的な採用は区別する）。", "params": "levels=0.382/0.5/0.618（暫定）"}, "volume-spike": {"name": "出来高急増", "nameEn": "Volume Spike", "general": "出来高が自身の移動平均の一定倍を超える。", "operational": "出来高急増として確定する：当足の出来高が、当足を含まない直前20本の出来高平均の2倍以上（等号を含む）。基準窓に欠測（出来高null）があれば未判定。出来高は生成器の合成値であり、現実の売買の証拠ではない。判定開始は21本目。", "params": "mult=2, period=20（暫定）"}, "volume-dryup": {"name": "出来高枯渇", "nameEn": "Volume Dry-up", "general": "出来高が直近で最小水準まで減少した状態の観察。", "operational": "出来高枯渇の観察として確定する：出来高の分位（当足を含む直近60本、中順位、必要本数は有効値60本すべて）が10以下で枯渇状態とし、成立と解消を observation で記録する。variant は dryup／release。出来高は合成値。分位の判定開始は60本目。", "params": "lookback=60（暫定）"}, "obv-slope-turn": {"name": "OBV傾き転換", "nameEn": "OBV Slope Turn", "general": "OBV（上昇足で出来高を加え下落足で引く累計）の傾きの符号転換。", "operational": "OBVの傾き転換として確定する：OBV は隣接終値の差の符号×当足出来高の累積（符号0は加減なし。ローソク足の陽陰では代替しない）。傾き＝OBV と10本前のOBVの差、その厳密な符号変化を転換とする。variant は up／down。傾きの初値は11本目、転換の判定は12本目から。出来高は合成値。", "params": "smooth=10（暫定）"}, "obv-break": {"name": "OBVブレイク", "nameEn": "OBV Breakout", "general": "OBV自身の直近高値・安値を更新する。", "operational": "OBVブレイクとして確定する：OBV が当足を除く直前20本のOBV最高値・最安値を更新する。variant は upper／lower。出来高は合成値。判定開始は21本目。", "params": "period=20（暫定）"}, "adl-slope-turn": {"name": "A/Dライン傾き転換", "nameEn": "Accumulation/Distribution Slope", "general": "A/Dライン（終値位置×出来高の累計）の傾き転換。", "operational": "A/Dラインの傾き転換として確定する：ADL は終値位置係数 ((終値−安値)−(高値−終値))／(高値−安値)（高値＝安値では係数0）×出来高の累積。傾きと転換はOBV傾き転換と同じ方式（10本差の厳密な符号変化）。variant は up／down。傾きの初値は11本目、転換の判定は12本目から。出来高は合成値。", "params": "smooth=10（暫定）"}, "cmf-zone": {"name": "CMF圏域進入", "nameEn": "Chaikin Money Flow Zone", "general": "Chaikin Money Flow（A/Dの期間比）のゼロ/±0.1圏域。", "operational": "CMFの圏域進入として確定する：CMF(20)＝窓内マネーフロー出来高（終値位置係数×出来高）の合計 ÷ 窓内出来高合計（当足を含む20本）。出来高合計ゼロは未判定。進入は +0.1 超／−0.1 未満、再発火解除はゼロへの回帰。variant は positive／negative。CMF の初値は20本目、進入の判定は21本目から。出来高は合成値。", "params": "period=21（暫定）"}, "mfi-zone": {"name": "MFI圏域進入", "nameEn": "MFI Zone Entry", "general": "Money Flow Index（出来高加重RSI）の20/80圏域進入。", "operational": "MFIの圏域進入として確定する：MFI(14)＝100−100/(1＋正フロー合計÷負フロー合計)。フローは典型価格 (H+L+C)/3 ×出来高で、符号は当足と前足の典型価格の比較（同値はどちらにも数えない）。正負とも合計ゼロの窓は未判定、負フローゼロで正フローありは100。出来高nullを含む窓は未判定。進入は20未満／80超、再発火解除は30／70。variant は oversold／overbought。MFI の初値は15本目、進入の判定は16本目から。出来高は合成値。出典未確認（一般的な式による独自確定）。", "params": "period=14, enter=20/80（暫定）"}, "eom-cross": {"name": "EOMクロス", "nameEn": "Ease of Movement Cross", "general": "価格移動距離/出来高で正規化した指標のゼロクロス。", "operational": "EOMのゼロ交差として確定する：生値＝(中値−前足中値)×(高値−安値)÷出来高（中値は (H+L)/2）。出来高ゼロ／null は未判定、値幅ゼロは生値0。EMA14（SMAシード）で平滑し厳密な符号変化を交差とする。variant は up／down。初値は15本目、交差の判定は16本目から。出来高は合成値。出典未確認（一般的な式による独自確定）。", "params": "period=14（暫定）"}, "nvi-pvi-turn": {"name": "NVI/PVI転換", "nameEn": "NVI / PVI Turn", "general": "出来高減少日（増加日）のみ価格変化を累積する指数とそのMAの交差。", "operational": "NVI／PVIとそのMAの交差として確定する（独自確定）：初期値100。NVI は出来高が前足より減少した足でのみ終値比（終値÷前足終値）を乗じて更新し、PVI は増加した足でのみ更新する。出来高同値はどちらも更新しない。出来高nullの足はどちらも更新しない。MA は各指数の EMA50（日足原型の EMA250 を5分足へ適用する独自適用）。交差は厳密な符号変化のみ。variant は nvi-up／nvi-down／pvi-up／pvi-down。MA の初値は50本目、交差の判定は51本目から。出来高は合成値。出典未確認。", "params": "（未確定）"}, "updown-volume-ratio": {"name": "上昇/下落出来高比率", "nameEn": "Up/Down Volume Ratio", "general": "直近n本の上昇足出来高と下落足出来高の比率の観察。", "operational": "上昇／下落出来高比率の圏域進入として確定する：直近10本について、終値が前足より高い足の出来高合計 ÷ 低い足の出来高合計（同値の足はどちらにも数えない）。下落側合計ゼロは未判定。進入は比率2以上／0.5以下、再発火解除は1.0への回帰。variant は up-dominant／down-dominant。比率の初値は11本目、進入の判定は12本目から。出来高は合成値。", "params": "period=10（暫定）"}, "divergence-rsi": {"name": "RSIダイバージェンス", "nameEn": "RSI Divergence", "general": "価格の極値とRSIの極値の方向が食い違う形。", "operational": "方式A（プロジェクトノート第44節で確定）：波形基盤（waveforms、zigzagScale=2、ATR方式は実行時の指定に従う）の確定ピボット列について、同種ピボットの直前対だけを比較する。通常型のみを対象とし、隠れ型は実装しない。安値ピボット対 P1・P2（間に反対側の高値ピボットを挟むことを許す）では P2.price < P1.price かつ F.rsi14[P2発生足] > F.rsi14[P1発生足] のとき強気（bullish）、高値ピボット対では P2.price > P1.price かつ F.rsi14[P2発生足] < F.rsi14[P1発生足] のとき弱気（bearish）とする。価格はピボット価格そのものを用い（ピボットは終値系列のZigZagによる確定極値であり、足の高値・安値への置換はしない）、RSIはピボット発生足の F.rsi14（期間14、Wilder）を用い、ピボット確認足のRSIは使わない。等号は価格・RSIとも不成立（厳密な不等号）。最小・最大間隔、価格差／RSI差の追加閾値、RSI圏域条件、追加のトレンド条件は設けない。RSIが欠測（null）または非有限の対は判定不能としてスキップし、より古い同種ピボットで代替しない（次の対は P2 を前側として評価する）。未確定ピボット（provisional）は使わない。検出は後側ピボットの confirmedIndex の足でのみ行い、startIndex=P1発生足、endIndex=P2発生足、detectedIndex=P2確認足とし、状態は confirmed のみ、history は確認足への単一遷移とする。variant は bullish／bearish、direction は伝統的解釈（bullish-traditional／bearish-traditional）であり、予測・売買推奨ではない。他ルールとの併発は許容する。sessionPolicy=continuous とし、日跨ぎ・昼跨ぎを許す。方式B（指標側の極値を独立に検出する方法）は採用しない。WILDER1978で確認できるのはRSIの書誌と式までであり、ピボット対の規約は本プロジェクト独自の操作規約である。", "params": "zigzagScale=2、RSI期間14"}, "divergence-macd": {"name": "MACDダイバージェンス", "nameEn": "MACD Divergence", "general": "価格の極値とMACD（またはヒストグラム）の極値の食い違い。", "operational": "方式A（プロジェクトノート第45節で確定し、第44節のRSI版を継承）：波形基盤（waveforms、zigzagScale=2、ATR方式は実行時の指定に従う）の確定ピボット列について、同種ピボットの直前対だけを比較する。通常型のみを対象とし、隠れ型は実装しない。安値ピボット対 P1・P2（間に反対側の高値ピボットを挟むことを許す）では P2.price < P1.price かつ F.macd[P2発生足] > F.macd[P1発生足] のとき強気（bullish）、高値ピボット対では P2.price > P1.price かつ F.macd[P2発生足] < F.macd[P1発生足] のとき弱気（bearish）とする。価格はピボット価格そのものを用い（ピボットは終値系列のZigZagによる確定極値であり、足の高値・安値への置換はしない）、指標はピボット発生足のMACD線 F.macd（終値のEMA12−EMA26）を用い、ピボット確認足の値は使わない。MACD線はシグナル線（MACD線のEMA9）でもヒストグラム（MACD線−シグナル線）でもなく、それらを用いるルール（macd-signal-cross、macd-histogram-turn等）とは判定が別物である。等号は価格・指標とも不成立（厳密な不等号）。最小・最大間隔、価格差／指標差の追加閾値、圏域条件、追加のトレンド条件は設けない。MACDが欠測（null）または非有限の対は判定不能としてスキップし、より古い同種ピボットで代替しない（次の対は P2 を前側として評価する）。未確定ピボット（provisional）は使わない。検出は後側ピボットの confirmedIndex の足でのみ行い、startIndex=P1発生足、endIndex=P2発生足、detectedIndex=P2確認足とし、状態は confirmed のみ、history は確認足への単一遷移とする。variant は bullish／bearish、direction は伝統的解釈（bullish-traditional／bearish-traditional）であり、予測・売買推奨ではない。他のダイバージェンス指標（RSI版を含む）との同時成立は許容し、独立した証拠や勝率とは解釈しない。他ルールとの併発も許容する。sessionPolicy=continuous とし、日跨ぎ・昼跨ぎを許す。方式B（指標側の極値を独立に検出する方法）は採用しない。APPEL1979で確認できるのはMACDの書誌と式までであり、ピボット対の規約は本プロジェクト独自の操作規約である。", "params": "zigzagScale=2、MACD線（EMA12−EMA26）"}, "divergence-stochastic": {"name": "ストキャスティクス・ダイバージェンス", "nameEn": "Stochastic Divergence", "general": "価格の極値とストキャスティクスの極値の食い違い。", "operational": "方式A（プロジェクトノート第45節で確定し、第44節のRSI版を継承）：波形基盤（waveforms、zigzagScale=2、ATR方式は実行時の指定に従う）の確定ピボット列について、同種ピボットの直前対だけを比較する。通常型のみを対象とし、隠れ型は実装しない。安値ピボット対 P1・P2（間に反対側の高値ピボットを挟むことを許す）では P2.price < P1.price かつ F.stochK[P2発生足] > F.stochK[P1発生足] のとき強気（bullish）、高値ピボット対では P2.price > P1.price かつ F.stochK[P2発生足] < F.stochK[P1発生足] のとき弱気（bearish）とする。価格はピボット価格そのものを用い（ピボットは終値系列のZigZagによる確定極値であり、足の高値・安値への置換はしない）、指標はピボット発生足のFast %K F.stochK（期間14：直近14本の高値・安値に対する終値の位置、（終値−14本安値）／（14本高値−14本安値）×100）を用い、ピボット確認足の値は使わない。Fast %K は %D（%Kの3本単純移動平均）ではなく、%Dによる平滑化後の判定とは別物である（stochastic-cross等は %Kと%Dの交差を見る別ルール）。直近14本の値幅がゼロの足では %K は欠測（null）になる。%Kが0や100に張り付く飽和状態では、対の両側が等値になれば厳密な不等号を満たさず発火しない（件数を目的とした閾値の追加や%Dへの切替はしない）。等号は価格・指標とも不成立（厳密な不等号）。最小・最大間隔、価格差／指標差の追加閾値、圏域条件、追加のトレンド条件は設けない。%Kが欠測（null）または非有限の対は判定不能としてスキップし、より古い同種ピボットで代替しない（次の対は P2 を前側として評価する）。未確定ピボット（provisional）は使わない。検出は後側ピボットの confirmedIndex の足でのみ行い、startIndex=P1発生足、endIndex=P2発生足、detectedIndex=P2確認足とし、状態は confirmed のみ、history は確認足への単一遷移とする。variant は bullish／bearish、direction は伝統的解釈（bullish-traditional／bearish-traditional）であり、予測・売買推奨ではない。他のダイバージェンス指標（RSI版を含む）との同時成立は許容し、独立した証拠や勝率とは解釈しない。他ルールとの併発も許容する。sessionPolicy=continuous とし、日跨ぎ・昼跨ぎを許す。方式B（指標側の極値を独立に検出する方法）は採用しない。LANE1950Sで確認できるのはストキャスティクスの書誌と式までであり、ピボット対の規約は本プロジェクト独自の操作規約である。", "params": "zigzagScale=2、Fast %K（14）"}, "divergence-obv": {"name": "OBVダイバージェンス", "nameEn": "OBV Divergence", "general": "価格の極値とOBVの極値の食い違い。", "operational": "価格終値ベースZigZag（規模2）の確定ピボット列で、直前同種の確定対だけを評価する（方式A）。強気は安値対で P2.price < P1.price かつ OBV（発生足値）が O2 > O1、弱気は高値対で P2.price > P1.price かつ O2 < O1（いずれも厳密）。確認足のOBV値を比較値に代用しない。間隔・価格差・OBV差の追加閾値、圏域・トレンド条件なし。隠れ型・方式Bは対象外。", "params": "zigzagScale=2。指標は F.obv（発生足値）。追加の間隔・差・圏域・トレンド条件なし"}, "squeeze-breakout": {"name": "スクイーズブレイクアウト", "nameEn": "Squeeze Breakout", "general": "ボリンジャーバンドがケルトナー内に収まる収束（TTMスクイーズ）の解消と初動。", "operational": "既存のボリンジャーバンド（SMA20±2×母標準偏差）とケルトナーチャネル（EMA20±2×Wilder ATR10）を再利用する。確定足 t で両バンドが全て有限・整合し KC幅>0 なら評価でき、スクイーズ Q[t] は BL[t]>=KL[t] かつ BU[t]<=KU[t]（等号は内包に含む。BB幅ゼロは KC幅が正なら許容）。解消は隣接する有効確定足で Q[t−1]=true かつ Q[t]=false の場合のみ認定する。今回は方向付きの解消足だけを対象とし、解消足で C[t−1]<=BU[t−1] かつ C[t]>BU[t] なら上方向、C[t−1]>=BL[t−1] かつ C[t]<BL[t] なら下方向とする。前足が同側バンド外にあった場合、当足終値がバンド内・境界の場合、単なる内包解消は発火しない。各スクイーズ区間につき最大1イベントで、条件不足なら区間は無発火で終わる。遅れて起こる突破は対象外。TTMスクイーズのモメンタム／ヒストグラム判定とは別物であり、既存の分位型 bollinger-squeeze・keltner-break とも別条件である（プロジェクト独自の操作的定義）。", "params": "BB=SMA20±2×母標準偏差、KC=EMA20±2×Wilder ATR10、内包は等号含む、解消足の終値突破のみ（遅延突破は対象外）"}, "trend-pullback-rsi": {"name": "トレンド押し目（RSI）", "nameEn": "Trend Pullback (RSI)", "general": "上昇トレンド中のRSI押し目圏からの復帰など、トレンド条件とオシレーター条件の合流。", "operational": "RSI14の圏域退出とパーフェクトオーダーの共存を、特徴量から再導出する合流（方式F）。強気は、隣接する有効な確定足で R[t−1]<30 かつ R[t]>=30（圏域退出）となり、回復足 t で強気パーフェクトオーダー（C[t]>EMA5[t]>EMA25[t]>EMA75[t]）が成立し、かつ前足 t−1 でも EMA5>EMA25>EMA75 の順序が同方向に成立している場合。弱気は鏡像（R[t−1]>70 かつ R[t]<=70、C<EMA5<EMA25<EMA75、前足も EMA5<EMA25<EMA75）。前足の終値位置は問わない。圏域滞在全体でトレンド継続を証明する定義ではなく、既存 rsi-zone-exit の再発火解除（35／65）とは別物である。欠測・未確定を跨いだ退出や遅延合流は含めない。下位ルールのイベント出力・ON／OFFには依存しない。", "params": "RSI14の圏域退出（30／70、隣接有効足）＋当足・前足のパーフェクトオーダー共存（前足は終値位置を問わない）"}, "bollinger-rsi-confluence": {"name": "ボリンジャー×RSI合流", "nameEn": "Bollinger x RSI Confluence", "general": "バンド下限到達とRSI売られすぎ圏が同時期に重なる合流。", "operational": "ボリンジャーバンド到達とRSI圏域の同一足での状態共存を、特徴量から再導出する合流（方式F）。強気は当足安値がBB下限以下（等号を含む到達）かつ RSI14<30（厳密）、弱気は当足高値がBB上限以上かつ RSI14>70。BB幅>0 を必須とする。終値がバンド外にある到達も含み、既存 bollinger-break のタッチ分類とは異なる。終値確定後の当足バンドとの比較であり、足内の到達順やリアルタイムの約定は示さない。発火は状態共存への移行時のみ（初観測を含む共通規約）。下位ルールのイベント出力・ON／OFFには依存しない。", "params": "BB=SMA20±2×母標準偏差（幅>0）、強気=安値が下限以下かつRSI14<30、弱気=高値が上限以上かつRSI14>70（同一足の状態共存）"}, "pattern-divergence": {"name": "形状×ダイバージェンス", "nameEn": "Pattern x Divergence", "general": "ダブルボトム等の形状成立とダイバージェンスが重なる合流。", "operational": "イベント参照型の合流（方式E）。double-bottom の confirmed 記録と divergence-rsi の強気（通常型）記録、double-top の confirmed 記録と divergence-rsi の弱気（通常型）記録について、形状の2底／2峰（P1・P2）とRSI側の直前同種ピボット対が、種別・発生足・価格・P2確認足の固定識別情報で完全一致する場合のみ合流とする。発火時刻 t は、形状の confirmed への実遷移時刻 Ts（ネックライン突破の確定足。骨格完成・候補生誕・旧 detectedIndex とは区別する）と RSI 側の確定時刻 Td（P2の確認足）の遅い方 max(Ts, Td)。単なる検出足の近接・区間の重なり・別対の近接では合流しない。固定近接窓は追加しない。依存記録は内部評価（方式E基盤）から得て、下位ルールの表示ON／OFFに依存しない。", "params": "依存は double-bottom／double-top（scale=2）と divergence-rsi の確定記録のみ。同一確定ピボット対の完全一致を必須とし、発火は max（形状のconfirmed遷移時刻， P2確認足）"}, "engulfing-confluence": {"name": "包み足×圏域合流", "nameEn": "Engulfing x Zone Confluence", "general": "包み足とRSI圏域進入等の合流。", "operational": "包み足とRSI圏域状態の同一足の合流（方式F）。強気は、既存 bullish-engulfing の confirmed 必須条件と完全に同一の包み足判定（前足・当足とも確定、前足が陰線・当足が陽線、当足実体が前実体を完全に包含し、包含の等号は可。approximate は除外）をOHLCから再導出し、同じ完成足 t で RSI14<30 を伴う場合。弱気は bearish-engulfing と同一判定の鏡像で RSI14>70。圏域進入イベントや過去3本以内の成立は要求せず、同足の圏域状態を採用する。下位ルールのイベント出力・ON／OFFには依存せず、既存包み足コードも変更しない。", "params": "既存包み足 confirmed の必須条件と同一の包含判定（完全包含・等号可、approximate除外）＋同一足のRSI14圏域状態（強気<30／弱気>70）"}, "breakout-retest": {"name": "ブレイク後リテスト", "nameEn": "Breakout Retest", "general": "レンジブレイク後に旧上限へ戻って反発する形。", "operational": "イベント参照型（方式E）。confirmed な rectangle-break ごとに、上抜けなら旧上限 M=U、下抜けなら旧下限 M=D を固定し（確定足 b の終値が M を厳密に突破していることを確認）、許容幅 e=0.5×ATR14[b] を確定時に固定して再計算しない。監視は b+1〜b+30（日・昼跨ぎ continuous）。強気は前足終値 > M+e、当足安値が閉区間 [M−e, M+e] 内、当足終値 > M+e を全て満たす一足型のみ（弱気は鏡像）。接触帯の端は等号可、外側終値は厳密。ブレイク足での接触は数えず、複数足反発・帯への非到達・帯を超えるヒゲ侵入・単なる旧水準突破は対象外。初回成立で監視終了。失敗終値（強気で終値 < M−e、弱気で > M+e）で内部終了し、深いヒゲだけでは終了しない。欠測・非有限・未確定足を含む隣接比較は行わず、観測断絶で当該監視を打ち切る（再開しない）。", "params": "依存は rectangle-break の confirmed 記録のみ。M は旧上限（上抜け）／旧下限（下抜け）で固定、許容幅 e=0.5×ATR14[b] を確定時に固定、監視は b+1〜b+30 の一足型"}, "perfect-order-pullback": {"name": "パーフェクトオーダー押し目", "nameEn": "Perfect Order Pullback", "general": "パーフェクトオーダー継続中に短期MAまで押して復帰する形。", "operational": "パーフェクトオーダー継続中の一足の押し・戻りを、特徴量から再導出する合流（方式F）。初回は一足内の接近と終値復帰に限定する。前足・当足のいずれも完全整列（強気は C>EMA5>EMA25>EMA75、弱気は逆）を満たし、前足確定時の EMA5[t−1] を事前に既知の水準 M とする。強気は L[t]<=M かつ C[t]>M、弱気は H[t]>=M かつ C[t]<M。接触は等号を許容し、終値の回復は厳密とする。前足・当足のEMA順序と終値位置を検査するが、足内のEMA順序・到達順・約定は主張しない。複数足の押しや整列崩壊後の復帰は別候補として扱わない。下位ルールのイベント出力・ON／OFFには依存しない。", "params": "前足・当足ともパーフェクトオーダー成立を必須とし、前足EMA5を水準Mとして当足安値の接触（等号可）と終値の厳密回復を見る（一足型）"}, "morning-evening-star-windowless": {"name": "明けの明星・宵の明星（窓なし型・独自）", "nameEn": "Morning/Evening Star (Windowless)", "general": "窓を使わず、実体の位置と切り込みだけで判定する独自仕様の明星形。原型の成立ではない。", "operational": "独自仕様として確定：第1足は大実体（実体比>=0.5）、第2足は小幅（実体比<=0.3）で終値が第1足終値の外側、第3足は逆方向で第1足実体へ50%以上切り込む。切り込み35%以上または星の実体比<=0.45 を近似とする。直前文脈は補助条件。原型の成立ではない。", "params": "penetrationMin=0.5, starBodyRatioMax=0.3（暫定）"}, "doji-star-windowless": {"name": "寄せ十字星（窓なし型・独自）", "nameEn": "Doji Star (Windowless)", "general": "窓を使わず、大実体の直後に十字が続く形を独自仕様として判定する。原型の成立ではない。", "operational": "独自仕様として確定：第1足は大実体（実体比>=0.5）、第2足は十字（実体比<=0.1）で、その終値が第1足終値の外側にあることを必須とする（星の位置条件は明星（窓なし型）の確定済み定義に揃えた）。近似は第2足の実体比<=0.2。variant は morning／evening。原型の成立ではない。", "params": "bodyRatioMax=0.1（暫定）"}, "piercing-line-windowless": {"name": "切り込み足（窓なし型・独自）", "nameEn": "Piercing Pattern (Windowless)", "general": "陰線の実体へ陽線が半分以上切り込む2足型。窓（ギャップ）を必須とする原型とは別に、連続足でも判定できるよう切り込み率のみで定義する独自型。", "operational": "独自仕様として確定：伝統的な始値条件（前足の安値・高値の外側で寄ること）は連続足（O[t]=C[t-1]）では成立しないため判定に含めない。第1足は大実体（実体比>=0.5）、第2足は逆方向で第1足実体へ50%以上切り込み、かつ第1足の始値を超えない（包み足と区別する）。切り込み35%以上を近似とする。直前文脈（前10本の終値回帰傾き）は補助条件。原型の成立ではない。", "params": "penetrationMin=0.5（暫定）"}, "dark-cloud-cover-windowless": {"name": "かぶせ線（窓なし型・独自）", "nameEn": "Dark Cloud Cover (Windowless)", "general": "陽線の実体へ陰線が半分以上かぶせる2足型。窓を必須とする原型とは別の独自型（切り込み足の窓なし型と対称）。", "operational": "独自仕様として確定：伝統的な始値条件（前足の安値・高値の外側で寄ること）は連続足（O[t]=C[t-1]）では成立しないため判定に含めない。第1足は大実体（実体比>=0.5）、第2足は逆方向で第1足実体へ50%以上切り込み、かつ第1足の始値を超えない（包み足と区別する）。切り込み35%以上を近似とする。直前文脈（前10本の終値回帰傾き）は補助条件。原型の成立ではない。", "params": "penetrationMin=0.5（暫定）"}, "breakaway-windowless": {"name": "離脱足（窓なし型・独自）", "nameEn": "Breakaway (Windowless)", "general": "強い実体の後に逆方向へ3本進み、最終足が第1足の実体内へ切り戻す5本型。窓（ギャップ）を必須とする原型とは別に、連続足でも判定できるよう実体と終値の進行のみで定義する独自型。", "operational": "独自仕様として確定：第1足は大実体（実体比>=0.5）、中間3本は終値が逆方向へ単調に進行、最終足は逆方向で第1足実体内に切り込む（侵入度 (0, 1)）。近似は最終足終値が第1足終値の外側0.25倍以内。原型の成立ではない。", "params": "（未確定）"}};
 /* ===== 接続・表示コード (この実験室専用。エンジン本体には触れない) ===== */
 'use strict';
-const LAB_VERSION = '0.1';
+const LAB_VERSION = '0.2';
 
 /* PICKLOGIC-START */
-const WINDOW_BARS = 132; // 表示窓: 直近2日分 (66本/日)
+/* 人気度 (暫定分類): 一般的な教材・証券会社の標準搭載指標をもとに3段階。
+   個別の順位付けではなく、広く知られた指標群かどうかだけを見る。 */
+const POP_A_FAMILIES = ['macd', 'rsi', 'ichimoku', 'bollinger', 'stochastic'];
+const POP_A_IDS = ['ema-cross', 'sma-cross-bullish', 'sma-cross-bearish', 'price-ma-cross',
+  'perfect-order', 'adx-trend-state', 'dmi-cross', 'double-top', 'double-bottom',
+  'head-and-shoulders', 'triangle', 'rectangle-break'];
+const POP_B_FAMILIES = ['cci', 'williams-r', 'mfi', 'obv', 'vwap', 'donchian', 'keltner',
+  'divergence', 'sar', 'dmi'];
+const POP_B_IDS = ['bullish-engulfing', 'bearish-engulfing', 'hammer-context',
+  'shooting-star-context', 'morning-evening-star-windowless', 'three-soldiers', 'harami',
+  'triple-top', 'triple-bottom', 'wedge', 'flag-pennant', 'trendline-break',
+  'parabolic-sar-flip', 'supertrend-flip', 'donchian-breakout', 'volume-spike'];
+function popularityTier(ev) {
+  if (POP_A_FAMILIES.includes(ev.family) || POP_A_IDS.includes(ev.ruleId)) return 3;
+  if (POP_B_FAMILIES.includes(ev.family) || POP_B_IDS.includes(ev.ruleId)) return 2;
+  return 1;
+}
+/* 同じ現象の説明になりやすいもののグループ (重複整理用) */
+function phenomenonGroup(ev) {
+  if (ev.family === 'moving-average' || ['gmma-cross', 'hull-cross', 'kama-cross'].includes(ev.ruleId)) return 'ma-cross';
+  if (ev.family === 'divergence' || ev.ruleId === 'pattern-divergence') return 'divergence';
+  if (ev.family === 'bollinger' || ev.ruleId === 'bollinger-rsi-confluence') return 'bollinger';
+  if (ev.family === 'rsi') return 'rsi';
+  if (ev.family === 'macd') return 'macd';
+  return ev.family || ev.category;
+}
+/* 明瞭度: score は「判定基準への適合度」(0-100、評価可能な基準で正規化)。
+   coverage (評価できた基準の割合) を掛け、評価不足のものを割り引く。 */
+function clarityOf(ev) {
+  if (ev.score == null) return null;
+  return ev.score * (ev.coverage == null ? 1 : ev.coverage);
+}
 /* 代表イベントの選択 (接続側の表示都合のみ。判定そのものは変更しない)
-   方針: 表示窓内の confirmed を対象に、検出器の score に
-   カテゴリの多様性ボーナスを加えて順位付けし、
-   同一ルール・近接位置の重複を避けて最大3件を選ぶ。 */
+   優先度 = 人気度(段階×15) + 明瞭度(×0.35) + 直近性(×20) */
 function pickEvents(events, totalBars) {
-  const from = Math.max(0, totalBars - WINDOW_BARS);
-  const bonus = { composite: 40, waveform: 35, indicator: 25, trend: 25, candlestick: 5 };
-  const rank = e => (e.score || 0) + (bonus[e.category] || 10) + Math.min(20, Math.max(0, e.endIndex - e.startIndex));
-  let cand = events.filter(e => e.state === 'confirmed' && e.detectedIndex >= from);
-  if (cand.length === 0) cand = events.filter(e => e.state === 'confirmed');
-  cand = cand.slice().sort((a, b) => rank(b) - rank(a) || b.detectedIndex - a.detectedIndex);
+  const last = Math.max(0, totalBars - 1);
+  const cand = events.filter(e => e.state === 'confirmed' && clarityOf(e) != null)
+    .map(e => ({
+      e,
+      prio: popularityTier(e) * 15 + clarityOf(e) * 0.35 + (last ? e.detectedIndex / last : 1) * 20,
+    }))
+    .sort((a, b) => b.prio - a.prio || b.e.detectedIndex - a.e.detectedIndex);
   const picks = [];
   for (const pass of [0, 1, 2]) {
-    for (const e of cand) {
+    for (const c of cand) {
       if (picks.length >= 3) break;
-      if (picks.includes(e)) continue;
+      const e = c.e;
       if (picks.some(p => p.ruleId === e.ruleId)) continue;
-      if (pass === 0 && picks.some(p => p.category === e.category)) continue;
-      if (pass <= 1 && picks.some(p => Math.abs(p.detectedIndex - e.detectedIndex) < 8)) continue;
+      if (pass === 0 && picks.some(p => phenomenonGroup(p) === phenomenonGroup(e))) continue;
+      if (pass <= 1 && picks.some(p => Math.abs(p.detectedIndex - e.detectedIndex) < 5 && p.direction === e.direction)) continue;
       picks.push(e);
     }
     if (picks.length >= 3) break;
   }
-  return picks.sort((a, b) => a.detectedIndex - b.detectedIndex);
+  const reasons = new Map();
+  for (const e of picks) {
+    const r = [];
+    const tier = popularityTier(e);
+    r.push(tier === 3 ? '広く使われるテクニカル' : tier === 2 ? 'よく知られたテクニカル' : '検出されたテクニカル');
+    const away = last - e.detectedIndex;
+    r.push(away <= 5 ? '直近で成立' : `終端から${away}本前`);
+    r.push(`明瞭度：適合度${e.score}・coverage ${e.coverage == null ? '—' : e.coverage.toFixed(2)}`);
+    reasons.set(e.eventId, r);
+  }
+  return { picks: picks.sort((a, b) => a.detectedIndex - b.detectedIndex), reasons };
 }
 /* PICKLOGIC-END */
 
-const state = { seed: null, bars: [], events: [], picks: [], selected: 0 };
+/* CSVLOGIC-START */
+/* 日足CSVのパーサ (純粋関数)。検証で弾いた行は数えて報告し、補完はしない。 */
+function parseCSV(text) {
+  const splitLine = l => {
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      if (q) { if (c === '"') { if (l[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ',' || c === '\t' || c === ';') { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur); return out.map(s => s.trim());
+  };
+  const lines = String(text).replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) return { fatal: true, messages: ['CSVの行が不足しています（ヘッダ＋1行以上が必要です）。'], rows: [] };
+  const header = splitLine(lines[0]).map(h => h.toLowerCase().replace(/[\s_]+/g, ''));
+  const find = aliases => { for (const a of aliases) { const i = header.indexOf(a); if (i >= 0) return i; } return -1; };
+  const idx = {
+    date: find(['date', '日付', '日時', '年月日', 'day', 'time', 'timestamp']),
+    open: find(['open', '始値', 'o']),
+    high: find(['high', '高値', 'h']),
+    low: find(['low', '安値', 'l']),
+    close: find(['close', '終値', 'c', 'closingprice']),
+    adj: find(['adjclose', '調整後終値']),
+    volume: find(['volume', '出来高', 'vol']),
+  };
+  if (idx.date < 0 || idx.open < 0 || idx.high < 0 || idx.low < 0 || (idx.close < 0 && idx.adj < 0)) {
+    return { fatal: true, rows: [], messages: [`必要な列（日付・始値・高値・安値・終値）が見つかりませんでした。検出した列: ${header.join(', ')}`] };
+  }
+  const messages = [];
+  let usedAdj = false;
+  if (idx.close < 0) { idx.close = idx.adj; usedAdj = true; messages.push('Close（終値）列がないため、Adj Close（調整後終値）列を終値として使用しました。'); }
+  const num = s => {
+    if (s == null || s === '') return null;
+    const v = parseFloat(String(s).replace(/[,"'¥円\s]/g, ''));
+    return Number.isFinite(v) ? v : null;
+  };
+  const byDate = new Map();
+  let skipped = 0, invalid = 0, dup = 0, inputDescending = null;
+  let prevKey = null;
+  for (let li = 1; li < lines.length; li++) {
+    const cells = splitLine(lines[li]);
+    const raw = (cells[idx.date] || '');
+    const dm = raw.slice(0, 10).replace(/\//g, '-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/) || raw.replace(/\D/g, '').slice(0, 8).match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (!dm) { skipped++; continue; }
+    const iso = `${dm[1]}-${String(dm[2]).padStart(2, '0')}-${String(dm[3]).padStart(2, '0')}`;
+    if (prevKey != null && inputDescending === null && iso !== prevKey) inputDescending = iso < prevKey;
+    prevKey = iso;
+    const o = num(cells[idx.open]), h = num(cells[idx.high]), l = num(cells[idx.low]), c = num(cells[idx.close]);
+    if (o == null || h == null || l == null || c == null) { skipped++; continue; }
+    if (!(l > 0 && l <= Math.min(o, c) && h >= Math.max(o, c))) { invalid++; continue; }
+    const v = idx.volume >= 0 ? num(cells[idx.volume]) : null;
+    if (byDate.has(iso)) dup++;
+    byDate.set(iso, { date: iso, open: o, high: h, low: l, close: c, volume: v != null && v > 0 ? v : null });
+  }
+  const rows = [...byDate.values()].sort((a, b) => a.date < b.date ? -1 : 1);
+  if (inputDescending) messages.push('日付が降順だったため、昇順に並べ替えて解析します。');
+  let hasVolume = rows.some(r => r.volume != null);
+  if (idx.volume < 0) messages.push('出来高の列がありません。出来高なしとして解析します。');
+  else if (!hasVolume) messages.push('出来高が全行で空または0のため、出来高なしとして解析します。');
+  if (skipped) messages.push(`日付や数値を読み取れず除外した行: ${skipped}行`);
+  if (invalid) messages.push(`OHLCの整合性が取れず除外した行: ${invalid}行`);
+  if (dup) messages.push(`日付が重複した行: ${dup}行（最後の値を採用）`);
+  return { fatal: false, rows, messages, stats: { totalRows: lines.length - 1, used: rows.length, skipped, invalid, dup, usedAdj, hasVolume } };
+}
+/* CSVLOGIC-END */
 
-function fmtTime(bar) {
-  if (!bar) return '';
-  const day = bar.day === 0 ? '当日' : `${-bar.day}日前`;
-  if (bar.minute == null) return day;
-  const hh = String(Math.floor(bar.minute / 60)).padStart(2, '0');
-  const mm = String(bar.minute % 60).padStart(2, '0');
-  return `${day} ${hh}:${mm}`;
-}
-function fmtNum(x) {
-  if (x == null || !Number.isFinite(x)) return '—';
-  return Math.abs(x) >= 100 ? x.toFixed(1) : Math.abs(x) >= 1 ? x.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : x.toPrecision(3);
-}
-function dictFor(ev) {
-  return DICT[ev.ruleId] || DICT[ev.catalogRuleId] || null;
-}
+/* 日足モードで適用しないルール (接続側の判断。エンジンは変更しない)
+   - 日中前提の概念 (VWAP・寄付きレンジ) と、日次集計が前提の2件は、
+     1本=1日というデータでは前提が崩れるため対象から外す。 */
+const DAILY_EXCLUDE = ['vwap-cross', 'vwap-deviation', 'opening-range-break', 'daily-ma-position', 'pivot-touch'];
+/* 出来高がない場合に適用しないルール (出来高系カテゴリ＋出来高を使う2件) */
+const VOLUME_RULES = ['volume-spike', 'volume-dryup', 'obv-slope-turn', 'obv-break', 'adl-slope-turn',
+  'cmf-zone', 'mfi-zone', 'eom-cross', 'nvi-pvi-turn', 'updown-volume-ratio', 'elder-force-cross', 'divergence-obv'];
+
+const ZOOM_LEVELS = [24, 48, 96, 192, 384, 768, 1536];
+const state = {
+  source: 'gen', timeframe: '5m', seed: null, fileName: '',
+  bars: [], labels: [], events: [], picks: [], pickReasons: new Map(),
+  selected: null, mode: 'main',
+  viewCount: 48, viewEnd: 0,
+  customRules: new Set(), excludedCount: 0,
+};
+try {
+  const saved = localStorage.getItem('chartlab-custom-rules');
+  if (saved) state.customRules = new Set(JSON.parse(saved));
+} catch (e) { /* 保存が使えない環境ではメモリ内のみ */ }
+
+const $ = id => document.getElementById(id);
+function dictFor(ev) { return DICT[ev.ruleId] || DICT[ev.catalogRuleId] || null; }
 function ruleName(ev) {
   const d = dictFor(ev);
   const cat = ruleCatalog().find(r => r.id === ev.ruleId);
   return (d && d.name) || (cat && cat.name) || ev.ruleId;
 }
+function fmtNum(x) {
+  if (x == null || !Number.isFinite(x)) return '—';
+  return Math.abs(x) >= 100 ? x.toFixed(1) : Math.abs(x) >= 1 ? x.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : x.toPrecision(3);
+}
+function labelAt(i) { return state.labels[i] || ''; }
 
-function run(seed) {
-  state.seed = seed;
-  document.getElementById('seed').value = seed;
-  const gen = generate(seed); // 生成器 (正本・無変更)
-  const adapted = adaptBars(gen.bars, { config: gen.config }); // 検出器の入力変換
-  state.bars = adapted.bars;
-  const out = runDetector(state.bars); // 判定エンジン (正本・無変更)
-  state.events = out.events;
-  state.picks = state.events.length ? pickEvents(state.events, state.bars.length) : [];
-  state.selected = 0;
-  render();
+function setData({ bars, labels, events, picks, pickReasons }) {
+  state.bars = bars; state.labels = labels; state.events = events;
+  state.picks = picks; state.pickReasons = pickReasons;
+  state.selected = picks[0] || null;
+  state.viewEnd = bars.length - 1;
+  renderAll();
 }
 
-function render() {
+function runGenerated(seed) {
+  state.source = 'gen'; state.timeframe = '5m'; state.seed = seed; state.fileName = '';
+  state.excludedCount = 0;
+  $('seed').value = seed;
+  const gen = generate(seed); // 生成器 (正本・無変更)
+  const adapted = adaptBars(gen.bars, { config: gen.config });
+  const bars = adapted.bars;
+  const labels = bars.map(b => {
+    const day = b.day === 0 ? '当日' : `${-b.day}日前`;
+    if (b.minute == null) return day;
+    return `${day} ${String(Math.floor(b.minute / 60)).padStart(2, '0')}:${String(b.minute % 60).padStart(2, '0')}`;
+  });
+  const out = runDetector(bars); // 判定エンジン (正本・無変更)
+  const { picks, reasons } = pickEvents(out.events, bars.length);
+  setData({ bars, labels, events: out.events, picks, pickReasons: reasons });
+}
+
+function runCSV(parsed, fileName) {
+  state.source = 'csv'; state.timeframe = '1d'; state.fileName = fileName;
+  const rows = parsed.rows;
+  const noVol = !parsed.stats.hasVolume;
+  const raw = rows.map((r, i) => ({ day: i, minute: null, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume, complete: true }));
+  const adapted = adaptBars(raw, noVol ? { config: { volume: false } } : {});
+  const bars = adapted.bars;
+  const labels = rows.map(r => r.date);
+  const exclude = new Set(DAILY_EXCLUDE);
+  if (noVol) for (const id of VOLUME_RULES) exclude.add(id);
+  const enabled = ruleCatalog().map(r => r.id).filter(id => !exclude.has(id));
+  state.excludedCount = exclude.size;
+  const out = runDetector(bars, { enabled });
+  const { picks, reasons } = pickEvents(out.events, bars.length);
+  setData({ bars, labels, events: out.events, picks, pickReasons: reasons });
+}
+
+/* ---------- 表示 ---------- */
+function viewStart() {
+  const maxStart = Math.max(0, state.bars.length - state.viewCount);
+  return Math.min(Math.max(0, state.viewEnd - state.viewCount + 1), maxStart);
+}
+function jumpToEvent(ev) {
+  state.selected = ev;
+  state.viewEnd = Math.min(state.bars.length - 1, ev.detectedIndex + 4);
+  renderAll();
+  $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function renderAll() {
   const { bars, events, picks } = state;
   const last = bars[bars.length - 1];
-  document.getElementById('summary').textContent =
-    `seed ${state.seed} ／ 足 ${bars.length}本 ／ 終値 ${last ? Math.round(last.close).toLocaleString() : '—'}円 ／ 検出 ${events.length.toLocaleString()}件 ／ 代表 ${picks.length}件`;
-  const list = document.getElementById('picks');
-  list.innerHTML = '';
-  if (events.length === 0) {
-    list.innerHTML = '<p class="empty">検出結果は0件でした。このseedではテクニカルは検出されませんでした。</p>';
-  } else if (picks.length === 0) {
-    list.innerHTML = '<p class="empty">検出はありましたが、代表として表示できる確定イベントがありませんでした。</p>';
-  }
-  picks.forEach((ev, i) => {
-    const b = document.createElement('button');
-    b.className = 'pick' + (i === state.selected ? ' sel' : '');
-    b.innerHTML = `<span class="pick-name">${ruleName(ev)}</span>` +
-      `<span class="pick-meta">${ev.variant || ''} ／ ${fmtTime(bars[ev.detectedIndex])} ／ score ${ev.score ?? '—'}</span>`;
-    b.addEventListener('click', () => { state.selected = i; render(); });
-    list.appendChild(b);
-  });
-  renderDetail();
-  drawChart();
+  const tf = state.timeframe === '5m' ? '5分足' : '日足';
+  $('tf-badge').textContent = state.source === 'gen' ? '5分足・生成' : '日足・実株価CSV';
+  $('btn-back-gen').style.display = state.source === 'csv' ? '' : 'none';
+  $('summary').textContent = state.source === 'gen'
+    ? `seed ${state.seed} ／ ${tf} ／ 足 ${bars.length}本 ／ 終値 ${last ? Math.round(last.close).toLocaleString() : '—'}円 ／ 検出 ${events.length.toLocaleString()}件 ／ 代表 ${picks.length}件`
+    : `${state.fileName} ／ ${tf} ／ 足 ${bars.length}本（${state.labels[0] || ''}〜${state.labels[state.labels.length - 1] || ''}） ／ 終値 ${last ? fmtNum(last.close) : '—'} ／ 検出 ${events.length.toLocaleString()}件 ／ 代表 ${picks.length}件 ／ 日足で適用外 ${state.excludedCount}件`;
+  renderPicks(); renderCustom(); renderAllList(); renderDetail(); drawChart(); renderViewControls();
 }
-
+function renderViewControls() {
+  const s = $('view-slider');
+  s.max = Math.max(0, state.bars.length - state.viewCount);
+  s.value = viewStart();
+  const st = viewStart(), en = Math.min(state.bars.length, st + state.viewCount);
+  $('view-info').textContent = `${st + 1}〜${en}本目 ／ ${labelAt(st)} 〜 ${labelAt(en - 1)}`;
+}
+function eventRow(ev, selectedEv) {
+  const b = document.createElement('button');
+  b.className = 'row' + (selectedEv && ev.eventId === selectedEv.eventId ? ' sel' : '');
+  b.innerHTML = `<span>${ruleName(ev)}${ev.variant ? `（${ev.variant}）` : ''}</span>` +
+    `<span class="rmeta">${labelAt(ev.detectedIndex)} ／ ${ev.state} ／ ${ev.score ?? '—'}</span>`;
+  b.addEventListener('click', () => jumpToEvent(ev));
+  return b;
+}
+function renderPicks() {
+  const list = $('picks'); list.innerHTML = '';
+  const { events, picks } = state;
+  if (events.length === 0) {
+    list.innerHTML = '<p class="empty">検出結果は0件でした。</p>'; return;
+  }
+  if (picks.length === 0) {
+    list.innerHTML = '<p class="empty">検出はありましたが、代表として表示できる確定イベントがありませんでした。全件・辞書モードで確認できます。</p>'; return;
+  }
+  for (const ev of picks) {
+    const b = document.createElement('button');
+    b.className = 'pick' + (state.selected && ev.eventId === state.selected.eventId ? ' sel' : '');
+    const reasons = state.pickReasons.get(ev.eventId) || [];
+    b.innerHTML = `<span class="pick-name">${ruleName(ev)}${ev.variant ? `（${ev.variant}）` : ''}</span>` +
+      `<span class="pick-meta">${labelAt(ev.detectedIndex)} ／ score ${ev.score ?? '—'}</span>` +
+      (reasons.length ? `<span class="reasons">選出理由：${reasons.join(' ／ ')}</span>` : '');
+    b.addEventListener('click', () => jumpToEvent(ev));
+    list.appendChild(b);
+  }
+}
 function renderDetail() {
-  const box = document.getElementById('detail');
-  const ev = state.picks[state.selected];
-  if (!ev) { box.innerHTML = ''; return; }
+  const box = $('detail');
+  const ev = state.selected;
+  if (!ev) { box.innerHTML = '<p class="empty">テクニカルを選ぶと、ここに解説を表示します。</p>'; return; }
   const d = dictFor(ev);
   const crit = (ev.criteria || []).filter(c => c.pass !== null && c.pass !== undefined)
     .map(c => `<li>${c.name}： ${fmtNum(c.measured)}（閾値 ${fmtNum(c.threshold)}）${c.pass ? ' ✓' : ' ✗'}</li>`).join('');
+  const reasons = state.pickReasons.get(ev.eventId);
   box.innerHTML =
     `<h2>${ruleName(ev)}${ev.variant ? `（${ev.variant}）` : ''}</h2>` +
-    `<p class="meta">${ev.category} ／ ${ev.family} ／ ${ev.state} ／ 検出 ${fmtTime(state.bars[ev.detectedIndex])} ／ score ${ev.score ?? '—'} ／ coverage ${ev.coverage ?? '—'}</p>` +
+    `<p class="meta">${ev.category} ／ ${ev.family} ／ ${ev.state} ／ 検出 ${labelAt(ev.detectedIndex)} ／ score ${ev.score ?? '—'} ／ coverage ${ev.coverage ?? '—'} ／ データ時間足 ${state.timeframe === '5m' ? '5分足' : '日足'}</p>` +
+    (reasons ? `<p class="reasons">選出理由：${reasons.join(' ／ ')}</p>` : '') +
     `<h3>検出理由</h3><p>${ev.explanation || '（説明なし）'}</p>` +
     (crit ? `<h3>判定の内訳</h3><ul>${crit}</ul>` : '') +
     (d ? `<h3>辞典の解説</h3><p>${d.general || ''}</p>` +
@@ -6800,17 +7056,17 @@ function renderDetail() {
       (d.params ? `<p class="meta">パラメータ： ${d.params}</p>` : '') : '') +
     `<p class="eid">${ev.eventId}</p>`;
 }
-
 function drawChart() {
-  const cv = document.getElementById('chart');
+  const cv = $('chart');
   const dpr = window.devicePixelRatio || 1;
   const W = cv.clientWidth, H = cv.clientHeight;
-  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  if (!W) return;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = W * dpr; cv.height = H * dpr; }
   const ctx = cv.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  const bars = state.bars.slice(-WINDOW_BARS);
-  const offset = state.bars.length - bars.length;
+  const start = viewStart();
+  const bars = state.bars.slice(start, start + state.viewCount);
   if (!bars.length) return;
   const volH = Math.floor(H * 0.16), priceH = H - volH - 18;
   let lo = Infinity, hi = -Infinity, vmax = 0;
@@ -6822,13 +7078,15 @@ function drawChart() {
   for (let i = 0; i <= 3; i++) {
     const p = lo + (hi - lo) * i / 3, yy = y(p);
     ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke();
-    ctx.fillText(String(Math.round(p)), 2, yy - 2);
+    ctx.fillText(fmtNum(p), 2, yy - 2);
   }
-  const sel = state.picks[state.selected];
+  const sel = state.selected;
   if (sel) {
-    const x0 = (sel.startIndex - offset) * step, x1 = (sel.endIndex - offset + 1) * step;
-    ctx.fillStyle = 'rgba(255,176,0,.20)';
-    ctx.fillRect(Math.max(0, x0), 0, Math.min(W, x1) - Math.max(0, x0), priceH + 12);
+    const x0 = (sel.startIndex - start) * step, x1 = (sel.endIndex - start + 1) * step;
+    if (x1 > 0 && x0 < W) {
+      ctx.fillStyle = 'rgba(255,176,0,.20)';
+      ctx.fillRect(Math.max(0, x0), 0, Math.min(W, x1) - Math.max(0, x0), priceH + 12);
+    }
   }
   bars.forEach((b, i) => {
     const x = i * step + step / 2, up = b.close >= b.open;
@@ -6843,7 +7101,7 @@ function drawChart() {
     }
   });
   if (sel) {
-    const i = sel.detectedIndex - offset;
+    const i = sel.detectedIndex - start;
     if (i >= 0 && i < bars.length) {
       const x = i * step + step / 2, b = bars[i];
       ctx.strokeStyle = '#ffb000'; ctx.lineWidth = 2;
@@ -6853,20 +7111,133 @@ function drawChart() {
       ctx.beginPath(); ctx.moveTo(x, y(b.high) - 2); ctx.lineTo(x - 4, y(b.high) - 10); ctx.lineTo(x + 4, y(b.high) - 10); ctx.fill();
     }
   }
+  renderViewControls();
 }
 
-document.getElementById('btn-random').addEventListener('click', () => {
-  run(Math.floor(Math.random() * 999999) + 1);
+/* ---------- カスタム / 全件 ---------- */
+function saveCustom() {
+  try { localStorage.setItem('chartlab-custom-rules', JSON.stringify([...state.customRules])); } catch (e) { /* 保存不可でも動作は続ける */ }
+}
+function renderCustom() {
+  const q = ($('rule-search').value || '').toLowerCase();
+  const list = $('rule-list'); list.innerHTML = '';
+  const byCat = new Map();
+  for (const r of ruleCatalog()) {
+    if (q && !(r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q))) continue;
+    if (!byCat.has(r.category)) byCat.set(r.category, []);
+    byCat.get(r.category).push(r);
+  }
+  for (const [cat, rules] of byCat) {
+    const h = document.createElement('p'); h.className = 'rule-group'; h.textContent = cat;
+    list.appendChild(h);
+    for (const r of rules) {
+      const lab = document.createElement('label'); lab.className = 'rule-item';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.customRules.has(r.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) state.customRules.add(r.id); else state.customRules.delete(r.id);
+        saveCustom(); renderCustom();
+      });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(`${r.name} (${r.id})`));
+      list.appendChild(lab);
+    }
+  }
+  $('custom-count').textContent = state.customRules.size
+    ? `選択中 ${state.customRules.size}件（ブラウザに保存されます）`
+    : 'テクニカルを選ぶと、その検出結果が下に表示されます。選択はブラウザに保存されます。';
+  const box = $('custom-events'); box.innerHTML = '';
+  if (!state.customRules.size) return;
+  const evs = state.events.filter(e => state.customRules.has(e.ruleId)).slice(-50).reverse();
+  if (!evs.length) { box.innerHTML = '<p class="empty">選択したテクニカルの検出はありませんでした。</p>'; return; }
+  for (const ev of evs) box.appendChild(eventRow(ev, state.selected));
+}
+function renderAllList() {
+  const q = ($('all-search').value || '').toLowerCase();
+  const cat = $('all-category').value, st = $('all-state').value;
+  let evs = state.events;
+  if (cat) evs = evs.filter(e => e.category === cat);
+  if (st) evs = evs.filter(e => e.state === st);
+  if (q) evs = evs.filter(e => ruleName(e).toLowerCase().includes(q) || e.ruleId.toLowerCase().includes(q));
+  $('all-count').textContent = `該当 ${evs.length.toLocaleString()}件（新しい順に最大200件を表示）`;
+  const box = $('all-list'); box.innerHTML = '';
+  for (const ev of evs.slice(-200).reverse()) box.appendChild(eventRow(ev, state.selected));
+}
+
+/* ---------- 操作 ---------- */
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('sel', b.dataset.mode === mode));
+  $('mode-main').style.display = mode === 'main' ? '' : 'none';
+  $('mode-custom').style.display = mode === 'custom' ? '' : 'none';
+  $('mode-all').style.display = mode === 'all' ? '' : 'none';
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('btn-new').addEventListener('click', () => runGenerated(Math.floor(Math.random() * 999999) + 1));
+$('btn-regen').addEventListener('click', () => { if (state.source === 'gen') runGenerated(state.seed); });
+$('btn-seed').addEventListener('click', () => {
+  const v = parseInt($('seed').value, 10);
+  if (Number.isInteger(v)) runGenerated(v);
 });
-document.getElementById('btn-seed').addEventListener('click', () => {
-  const v = parseInt(document.getElementById('seed').value, 10);
-  if (Number.isInteger(v)) run(v);
+$('btn-back-gen').addEventListener('click', () => runGenerated(state.seed || 42));
+$('btn-pan-left').addEventListener('click', () => { state.viewEnd = Math.max(state.viewCount - 1, state.viewEnd - Math.floor(state.viewCount / 2)); drawChart(); });
+$('btn-pan-right').addEventListener('click', () => { state.viewEnd = Math.min(state.bars.length - 1, state.viewEnd + Math.floor(state.viewCount / 2)); drawChart(); });
+$('view-slider').addEventListener('input', e => { state.viewEnd = parseInt(e.target.value, 10) + state.viewCount - 1; drawChart(); });
+function zoom(dir) {
+  const i = ZOOM_LEVELS.indexOf(state.viewCount);
+  const ni = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, i + dir));
+  state.viewCount = ZOOM_LEVELS[ni];
+  drawChart();
+}
+$('btn-zoom-in').addEventListener('click', () => zoom(-1));
+$('btn-zoom-out').addEventListener('click', () => zoom(1));
+(function initDrag() {
+  const cv = $('chart'); let dragX = null, dragStart = 0;
+  cv.addEventListener('pointerdown', e => { dragX = e.clientX; dragStart = viewStart(); });
+  cv.addEventListener('pointermove', e => {
+    if (dragX == null) return;
+    const step = cv.clientWidth / state.viewCount;
+    const shift = Math.round((dragX - e.clientX) / step);
+    const ns = Math.min(Math.max(0, state.bars.length - state.viewCount), Math.max(0, dragStart + shift));
+    state.viewEnd = ns + state.viewCount - 1;
+    drawChart();
+  });
+  const end = () => { dragX = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointerleave', end);
+})();
+$('rule-search').addEventListener('input', renderCustom);
+$('rule-clear').addEventListener('click', () => { state.customRules.clear(); saveCustom(); renderCustom(); });
+$('all-search').addEventListener('input', renderAllList);
+$('all-category').addEventListener('change', renderAllList);
+$('all-state').addEventListener('change', renderAllList);
+$('csv-file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if ((text.match(/\uFFFD/g) || []).length > 5) text = new TextDecoder('shift_jis').decode(buf);
+  const parsed = parseCSV(text);
+  if (parsed.fatal || parsed.rows.length < 30) {
+    $('csv-msg').textContent = '読み込みできませんでした：' + (parsed.messages.join(' ') || '') +
+      (parsed.rows ? `（有効な行が${parsed.rows.length}件しかなく、判定に必要な履歴が不足しています）` : '');
+    return;
+  }
+  $('csv-msg').textContent = `「${file.name}」を読み込みました。有効 ${parsed.stats.used}行 ／ 全 ${parsed.stats.totalRows}行。\n` + parsed.messages.join('\n') +
+    '\n注意：判定エンジンは本来5分足前提で設計されています。日足への適用は実験的な接続で、結果は参考表示です。日中前提のルール（VWAP・寄付きレンジ等）と日次集計前提のルールは適用外にしています。株式分割などの調整有無はファイルからは判別できないため、補完していません。';
+  runCSV(parsed, file.name);
 });
-document.getElementById('btn-regen').addEventListener('click', () => run(state.seed));
 window.addEventListener('resize', () => drawChart());
-document.getElementById('versions').textContent =
+
+/* カテゴリ選択肢を用意して初回生成 */
+(function initCategories() {
+  const cats = [...new Set(ruleCatalog().map(r => r.category))];
+  for (const c of cats) {
+    const o = document.createElement('option'); o.value = c; o.textContent = c;
+    $('all-category').appendChild(o);
+  }
+})();
+$('versions').textContent =
   `生成エンジン price-engine v0.1 ／ 検出器 detector ${DETECTOR_VERSION} ／ 定義集 defs ${DEFS_VERSION}（候補版） ／ 実験室 v${LAB_VERSION}`;
-run(Math.floor(Math.random() * 999999) + 1);
+runGenerated(Math.floor(Math.random() * 999999) + 1);
 
 </script>
 </body>
