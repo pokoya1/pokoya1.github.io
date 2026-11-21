@@ -72,6 +72,15 @@
   .stepper input { width: 76px; text-align: center; }
   .note { font-size: 12px; color: #8fa1c4; line-height: 1.7; }
   .guarantee { font-size: 22px; font-weight: 800; color: #8ae2f0; }
+  .ohlrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .ohlrow .cell .v { font-size: 14px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .tabs button.active { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 700; }
+  table.trades th.sortable { cursor: pointer; user-select: none; }
+  table.trades th.sortable:hover { color: #bcd0f5; }
+  table.trades tr.detail td { text-align: left; background: #0d1526; color: #aebadd; font-size: 12px; }
+  .mini { padding: 5px 10px; font-size: 12.5px; }
+  select.pagesize { padding: 5px 8px; font-size: 13px; }
   footer { margin-top: 18px; }
 </style>
 </head>
@@ -99,7 +108,7 @@
           </select>
         </label>
       </div>
-      <p class="note">初期資金は 3,000,000円。売買単位は10株、成行のみ・買い建てと売却のみです。同じシードでは同じ1日が再現されます。</p>
+      <p class="note">初期資金は 3,000,000円。売買単位は100株、成行のみ・買い建てと売却のみです。同じシードでは同じ1日が再現されます。</p>
       <div class="row">
         <button class="primary" id="startBtn" type="button">ゲーム開始</button>
         <button id="resumeBtn" type="button" disabled>保存データから再開</button>
@@ -130,6 +139,12 @@
           <span class="badge stop hidden" id="stateBadge"></span>
           <div class="note" id="dayLabel"></div>
         </div>
+      </div>
+      <div class="ohlrow">
+        <div class="cell"><div class="k">当日始値</div><div class="v yen" id="ohlOpen">-</div></div>
+        <div class="cell"><div class="k">当日高値</div><div class="v yen" id="ohlHigh">-</div></div>
+        <div class="cell"><div class="k">当日安値</div><div class="v yen" id="ohlLow">-</div></div>
+        <div class="cell"><div class="k">現在値</div><div class="v yen" id="ohlCurrent">-</div></div>
       </div>
       <div style="position:relative">
         <canvas id="chart" height="250"></canvas>
@@ -197,12 +212,13 @@
         </div>
       </div>
       <div class="row" style="margin-top:10px">
-        <span class="note">数量（単位＝10株）</span>
+        <span class="note">数量（100株単位）</span>
         <div class="stepper">
           <button id="minusBtn" type="button">−</button>
-          <input type="number" id="unitsInput" value="1" min="1" step="1">
+          <input type="number" id="sharesInput" value="100" min="0" step="100">
           <button id="plusBtn" type="button">＋</button>
         </div>
+        <span class="note">株</span>
         <button id="maxBuyBtn" type="button">買える最大</button>
         <button id="maxSellBtn" type="button">売れる最大</button>
       </div>
@@ -240,12 +256,95 @@
       </div>
     </div>
     <div class="card">
-      <h2>約定履歴</h2>
-      <div style="overflow-x:auto">
-        <table class="trades">
-          <thead><tr><th>時刻</th><th>売買</th><th>株数</th><th>価格</th><th>手数料</th><th>実現損益</th></tr></thead>
-          <tbody id="tradesBody"></tbody>
-        </table>
+      <div class="row spread">
+        <h2 style="margin:0">取引履歴</h2>
+        <button class="mini" id="historyToggle" type="button">履歴を閉じる</button>
+      </div>
+      <div id="historyWrap">
+        <div class="tabs">
+          <button id="tabPnl" type="button" class="active">取引別損益</button>
+          <button id="tabFills" type="button">約定履歴</button>
+          <button id="tabOrders" type="button">注文履歴</button>
+        </div>
+
+        <div id="pnlPanel">
+          <p class="note" id="pnlSummary"></p>
+          <div class="row">
+            <label>表示件数
+              <select class="pagesize" id="sizePnl">
+                <option value="10" selected>10件</option><option value="25">25件</option>
+                <option value="50">50件</option><option value="0">全件</option>
+              </select>
+            </label>
+            <span class="note" id="countPnl"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="trades">
+              <thead><tr>
+                <th class="sortable" data-table="pnl" data-key="tkey" data-type="number">決済時刻</th>
+                <th class="sortable" data-table="pnl" data-key="shares" data-type="number">株数</th>
+                <th class="sortable" data-table="pnl" data-key="proceeds" data-type="number">売却受取</th>
+                <th class="sortable" data-table="pnl" data-key="cost" data-type="number">取得費</th>
+                <th class="sortable" data-table="pnl" data-key="pnl" data-type="number">実現損益</th>
+                <th>種別</th><th>明細</th>
+              </tr></thead>
+              <tbody id="pnlBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="fillsPanel" class="hidden">
+          <div class="row">
+            <label>表示件数
+              <select class="pagesize" id="sizeFills">
+                <option value="10" selected>10件</option><option value="25">25件</option>
+                <option value="50">50件</option><option value="0">全件</option>
+              </select>
+            </label>
+            <span class="note" id="countFills"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="trades">
+              <thead><tr>
+                <th class="sortable" data-table="fills" data-key="tkey" data-type="number">時刻</th>
+                <th>売買</th>
+                <th class="sortable" data-table="fills" data-key="shares" data-type="number">株数</th>
+                <th class="sortable" data-table="fills" data-key="price" data-type="number">価格</th>
+                <th class="sortable" data-table="fills" data-key="amount" data-type="number">代金</th>
+                <th class="sortable" data-table="fills" data-key="fee" data-type="number">手数料</th>
+                <th class="sortable" data-table="fills" data-key="pnl" data-type="number">実現損益</th>
+                <th>種別</th>
+              </tr></thead>
+              <tbody id="fillsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="ordersPanel" class="hidden">
+          <p class="note" id="ordersNote"></p>
+          <div class="row">
+            <label>表示件数
+              <select class="pagesize" id="sizeOrders">
+                <option value="10" selected>10件</option><option value="25">25件</option>
+                <option value="50">50件</option><option value="0">全件</option>
+              </select>
+            </label>
+            <span class="note" id="countOrders"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="trades">
+              <thead><tr>
+                <th class="sortable" data-table="orders" data-key="tkey" data-type="number">時刻</th>
+                <th>売買</th>
+                <th class="sortable" data-table="orders" data-key="shares" data-type="number">株数</th>
+                <th>状態</th>
+                <th class="sortable" data-table="orders" data-key="price" data-type="number">価格</th>
+                <th>理由</th>
+              </tr></thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -253,7 +352,7 @@
   <footer>
     <p class="note">
       試作版（工程6-2）：価格は価格生成エンジンの合成データです。テクニカルイベントの選別・反省ノートは後工程（6-3）で扱います。
-      取引計算は工程6-1bの取引・時計エンジン（契約 改訂4／境界テスト全48件合格）によります。
+      取引計算は工程6-1bの取引・時計エンジン（契約 改訂5／自動テスト全51件合格）によります。
     </p>
   </footer>
 </div>
@@ -381,7 +480,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   initialCash: 3000000,
   feeRate: 0.0003,
   budgetSeconds: 60,
-  unitShares: 10,
+  unitShares: 100,
 });
 
 // dayData shape (adapter output):
@@ -471,6 +570,8 @@ class TradingEngine {
     this.positionCostYen = 0; // acquisition cost incl. buy fees (see _fill)
     this.realizedPnlYen = 0;
     this.trades = [];
+    this.orders = []; // order journal: every submit attempt, filled or rejected (never fabricated)
+    this.orderCount = 0;
     this.peakEquity = this.settings.initialCash;
     this.minUnrealizedPnl = 0;
     this.orderSeq = 0;
@@ -548,6 +649,8 @@ class TradingEngine {
       peakEquity: this.peakEquity,
       maxUnrealizedLoss: -this.minUnrealizedPnl,
       trades: this.trades.map((t) => ({ ...t })),
+      orders: this.orders.map((o) => ({ ...o })),
+      settings: { ...this.settings },
     };
   }
 
@@ -564,7 +667,7 @@ class TradingEngine {
         !Number.isInteger(this.positionCostYen)) {
       throw new Error('invariant: yen amounts must stay integer');
     }
-    if (this.positionShares < 0 || this.positionShares % this.settings.unitShares !== 0) {
+    if (this.positionShares < 0) {
       throw new Error('invariant: position shares');
     }
     if ((this.positionShares === 0) !== (this.positionCostYen === 0)) {
@@ -757,18 +860,24 @@ class TradingEngine {
 
   _submit({ side, units, clientOrderId }) {
     // Double-submission lock (7.5): a clientOrderId that already filled
-    // returns its original result and never fills twice. Rejections are
-    // not memoized — a corrected order may be resubmitted (section 8).
+    // returns its original result and never fills twice. A duplicate is
+    // the same order, so it adds no journal entry. Rejections are not
+    // memoized — a corrected order may be resubmitted (section 8).
     if (clientOrderId != null && this._filledByClientId.has(clientOrderId)) {
       return { ...this._filledByClientId.get(clientOrderId), duplicate: true };
     }
-    if (this.clock === CLOCK.CLOSED) return { status: 'rejected', reason: 'day-closed' };
-    if (this.clock === CLOCK.PAUSED) return { status: 'rejected', reason: 'paused' };
-    if (this.clock === CLOCK.INTERMISSION) return { status: 'rejected', reason: 'intermission' };
-    if (!this.panelOpen) return { status: 'rejected', reason: 'panel-closed' };
-    if (side !== 'buy' && side !== 'sell') return { status: 'rejected', reason: 'invalid-side' };
+    const id = clientOrderId != null ? String(clientOrderId) : `ord-${++this.orderCount}`;
+    const reject = (reason, extra = {}) => {
+      this._journalOrder({ id, side, units, status: 'rejected', reason, price: this.currentPrice, ...extra });
+      return { status: 'rejected', reason, ...extra };
+    };
+    if (this.clock === CLOCK.CLOSED) return reject('day-closed');
+    if (this.clock === CLOCK.PAUSED) return reject('paused');
+    if (this.clock === CLOCK.INTERMISSION) return reject('intermission');
+    if (!this.panelOpen) return reject('panel-closed');
+    if (side !== 'buy' && side !== 'sell') return reject('invalid-side');
     if (!Number.isInteger(units) || units <= 0) {
-      return { status: 'rejected', reason: 'invalid-quantity' };
+      return reject('invalid-quantity');
     }
     const shares = units * this.settings.unitShares;
     const price = (this.clock === CLOCK.STOPPED && this.guaranteePrice !== null)
@@ -776,10 +885,10 @@ class TradingEngine {
     const amount = roundHalfUpYen(price * shares);
     const fee = feeYen(amount, this.settings.feeRate);
     if (side === 'buy' && amount + fee > this.cash) {
-      return { status: 'rejected', reason: 'insufficient-funds', amountYen: amount, feeYen: fee };
+      return reject('insufficient-funds', { amountYen: amount, feeYen: fee });
     }
     if (side === 'sell' && shares > this.positionShares) {
-      return { status: 'rejected', reason: 'insufficient-shares' };
+      return reject('insufficient-shares');
     }
     // Atomic acceptance: the fill below is one indivisible step computed
     // from a single snapshot of (display price, guarantee, clock) (7.11).
@@ -803,6 +912,10 @@ class TradingEngine {
       realizedPnlYen: realized, forced: false,
     });
     this._updateAggregates();
+    this._journalOrder({
+      id, side, units, status: 'filled', reason: null, price,
+      amountYen: amount, feeYen: fee, tradeSeq: trade.seq,
+    });
     // One stop, one order (7.5): a fill closes the panel and resumes the
     // clock. Rejections above deliberately skip this (section 8).
     this.panelOpen = false;
@@ -811,6 +924,28 @@ class TradingEngine {
     const result = { status: 'filled', trade };
     if (clientOrderId != null) this._filledByClientId.set(clientOrderId, result);
     return result;
+  }
+
+  _journalOrder({ id, side, units, status, reason, price, amountYen = null, feeYen = null, tradeSeq = null }) {
+    const bar = this._bar;
+    this.orders.push({
+      seq: this.orders.length + 1,
+      id,
+      day: this.dayNumber,
+      session: this.sessionIndex,
+      bar: this.globalBarIndex,
+      minute: bar.minute ?? null,
+      tickInBar: this.tickInBar,
+      side,
+      units,
+      shares: Number.isInteger(units) && units > 0 ? units * this.settings.unitShares : null,
+      status,
+      reason,
+      price,
+      amountYen,
+      feeYen,
+      tradeSeq,
+    });
   }
 
   _recordTrade({ side, shares, price, amountYen, feeYen, realizedPnlYen, forced }) {
@@ -884,7 +1019,7 @@ class TradingEngine {
 
   saveSnapshot() {
     return {
-      version: 1,
+      version: 2,
       settings: { ...this.settings },
       dayRef: this.dayData.dayRef ?? null,
       dayNumber: this.dayNumber,
@@ -898,6 +1033,8 @@ class TradingEngine {
       positionCostYen: this.positionCostYen,
       realizedPnlYen: this.realizedPnlYen,
       trades: JSON.parse(JSON.stringify(this.trades)),
+      orders: JSON.parse(JSON.stringify(this.orders)),
+      orderCount: this.orderCount,
       peakEquity: this.peakEquity,
       minUnrealizedPnl: this.minUnrealizedPnl,
       orderSeq: this.orderSeq,
@@ -914,9 +1051,16 @@ class TradingEngine {
   // Per 7.8 the restored engine starts PAUSED with the panel closed and
   // no guarantee.
   static restore(snapshot, dayData) {
-    if (!snapshot || snapshot.version !== 1) throw new Error('restore: unsupported snapshot');
+    if (!snapshot || (snapshot.version !== 1 && snapshot.version !== 2)) {
+      throw new Error('restore: unsupported snapshot');
+    }
     validateDayData(dayData);
-    const engine = new TradingEngine(dayData, snapshot.settings);
+    // Unit-size migration: saves written under an older unit rule keep
+    // their positions (possibly odd lots below the current unit size,
+    // which exit through forced liquidation), but new orders always use
+    // the current unitShares.
+    const settings = { ...snapshot.settings, unitShares: DEFAULT_SETTINGS.unitShares };
+    const engine = new TradingEngine(dayData, settings);
     if (snapshot.sessionIndex >= dayData.sessions.length ||
         snapshot.barIndex >= dayData.sessions[snapshot.sessionIndex].bars.length ||
         snapshot.tickInBar > dayData.sessions[snapshot.sessionIndex].bars[snapshot.barIndex].prices.length) {
@@ -964,6 +1108,8 @@ class TradingEngine {
     engine.positionCostYen = snapshot.positionCostYen;
     engine.realizedPnlYen = snapshot.realizedPnlYen;
     engine.trades = JSON.parse(JSON.stringify(snapshot.trades));
+    engine.orders = snapshot.orders ? JSON.parse(JSON.stringify(snapshot.orders)) : [];
+    engine.orderCount = snapshot.orderCount ?? engine.orders.length;
     engine.peakEquity = snapshot.peakEquity;
     engine.minUnrealizedPnl = snapshot.minUnrealizedPnl;
     engine.orderSeq = snapshot.orderSeq;
@@ -997,8 +1143,19 @@ const REASONS = {
   'day-closed': '本日の取引は終了しました。',
   'intermission': 'セッション間の待機中は注文できません。',
   'panel-closed': '注文パネルが開いていません。',
-  'invalid-quantity': '数量を確認してください（1単位＝10株）。',
+  'invalid-quantity': '数量を確認してください（100株単位）。',
   'invalid-side': '注文の種別が不正です。',
+};
+
+const REASON_SHORT = {
+  'insufficient-funds': '資金不足',
+  'insufficient-shares': '保有株数不足',
+  'paused': '一時停止中',
+  'day-closed': '取引終了',
+  'intermission': '待機中',
+  'panel-closed': 'パネル未表示',
+  'invalid-quantity': '数量不正',
+  'invalid-side': '種別不正',
 };
 
 const fmtY = (n) => `${Math.round(n).toLocaleString('ja-JP')}円`;
@@ -1133,6 +1290,19 @@ function render() {
   badge.classList.toggle('warn', st.clock === 'PAUSED' || st.clock === 'INTERMISSION');
   badge.classList.toggle('stop', st.clock === 'STOPPED');
 
+  // Day OHL from arrived ticks only: completed bars plus the in-progress
+  // bar are all the engine has seen, so no future information can leak in.
+  // Save/restore recomputes the same bars, so the values survive a reload.
+  {
+    let hi = G.dayData.initialPrice, lo = G.dayData.initialPrice;
+    for (const b of st.completedBars) { hi = Math.max(hi, b.high); lo = Math.min(lo, b.low); }
+    if (st.currentBar) { hi = Math.max(hi, st.currentBar.high); lo = Math.min(lo, st.currentBar.low); }
+    $('ohlOpen').textContent = `${fmtP(G.dayData.initialPrice)}円`;
+    $('ohlHigh').textContent = `${fmtP(hi)}円`;
+    $('ohlLow').textContent = `${fmtP(lo)}円`;
+    $('ohlCurrent').textContent = `${fmtP(st.currentPrice)}円`;
+  }
+
   $('statCash').textContent = fmtY(st.cash);
   $('statShares').textContent = st.positionShares > 0 ? `${st.positionShares.toLocaleString('ja-JP')}株` : 'なし';
   $('statAvg').textContent = st.averageCost != null ? `${fmtP(st.averageCost)}円` : '—';
@@ -1176,11 +1346,19 @@ function panelPrice(st) {
   return st.guaranteePrice !== null ? st.guaranteePrice : st.currentPrice;
 }
 
-function estimate(st, side, units) {
-  const shares = units * 10;
+function estimate(st, side, shares) {
   const amount = roundHalfUpYen(panelPrice(st) * shares);
   const fee = feeYen(amount, G.engine.settings.feeRate);
   return { shares, amount, fee, total: side === 'buy' ? amount + fee : amount - fee };
+}
+
+function maxBuyUnits(st) {
+  let lo = 0, hi = 100000;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (estimate(st, 'buy', mid * st.settings.unitShares).total <= st.cash) lo = mid; else hi = mid - 1;
+  }
+  return lo;
 }
 
 function renderPanel(st) {
@@ -1191,11 +1369,21 @@ function renderPanel(st) {
   $('panelPrice').textContent = `${fmtP(panelPrice(st))}円`;
   $('panelBudget').textContent = `${st.budgetRemainingSec.toFixed(1)}秒`;
   $('panelBudget').style.color = st.budgetRemainingSec < 10 ? '#f87171' : '';
-  const units = Math.max(1, parseInt($('unitsInput').value || '1', 10) || 1);
-  const b = estimate(st, 'buy', units);
-  const s = estimate(st, 'sell', units);
+  const unit = st.settings.unitShares;
+  const shares = parseInt($('sharesInput').value || '0', 10);
+  const valid = Number.isInteger(shares) && shares > 0 && shares % unit === 0;
+  const maxBuyShares = maxBuyUnits(st) * unit;
+  const maxSellShares = Math.floor(st.positionShares / unit) * unit;
+  $('buyBtn').disabled = !valid || maxBuyShares < unit;
+  $('sellBtn').disabled = !valid || maxSellShares < unit;
+  if (!valid) {
+    $('estimateText').textContent = `数量は${unit}株単位（${unit}, ${unit * 2}, ${unit * 3}…）で入力してください。買える最大 ${maxBuyShares}株 ／ 売れる最大 ${maxSellShares}株`;
+    return;
+  }
+  const b = estimate(st, 'buy', shares);
+  const s = estimate(st, 'sell', shares);
   $('estimateText').textContent =
-    `概算（${units}単位＝${b.shares}株）：買い ${fmtY(b.amount)}＋手数料 ${fmtY(b.fee)}＝${fmtY(b.total)} ／ 売り ${fmtY(s.amount)}−手数料 ${fmtY(s.fee)}＝${fmtY(s.total)}`;
+    `概算（${shares}株）：買い ${fmtY(b.amount)}＋手数料 ${fmtY(b.fee)}＝${fmtY(b.total)} ／ 売り ${fmtY(s.amount)}−手数料 ${fmtY(s.fee)}＝${fmtY(s.total)}（買える最大 ${maxBuyShares}株 ／ 売れる最大 ${maxSellShares}株）`;
 }
 
 function drawChart(st) {
@@ -1282,6 +1470,146 @@ function drawChart(st) {
   ctx.fill();
 }
 
+// ---------- result history (3 tabs, sortable, collapsible) ----------
+
+const HIST = {
+  tab: 'pnl',
+  sort: { pnl: { key: 'tkey', dir: 1 }, fills: { key: 'tkey', dir: 1 }, orders: { key: 'tkey', dir: 1 } },
+  rows: { pnl: [], fills: [], orders: [] },
+  openDetails: new Set(),
+};
+
+function timeParts(rec) {
+  const sec = (rec.minute ?? 540) * 60 + (rec.tickInBar ?? 0) * 5;
+  return {
+    tkey: (rec.session ?? 0) * 100000 + (rec.bar ?? 0) * 100 + (rec.tickInBar ?? 0),
+    time: `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`,
+  };
+}
+
+function buildHistoryRows(st) {
+  HIST.rows.fills = st.trades.map((t) => ({
+    ...timeParts(t), side: t.side, shares: t.shares, price: t.price,
+    amount: t.amountYen, fee: t.feeYen, pnl: t.realizedPnlYen, forced: t.forced,
+  }));
+  // Per-settlement P&L groups: every sell closes one group. The allocated
+  // cost is recomputed with the contract rule (supplement 12.1) purely as
+  // a cross-check; the engine's realizedPnlYen stays authoritative.
+  const groups = [];
+  let holding = 0, pooled = 0, buys = [];
+  for (const t of st.trades) {
+    if (t.side === 'buy') {
+      holding += t.shares;
+      pooled += t.amountYen + t.feeYen;
+      buys.push(t);
+    } else {
+      const allocated = t.shares === holding ? pooled : roundHalfUpYen(pooled * t.shares / holding);
+      groups.push({
+        ...timeParts(t), idx: groups.length, shares: t.shares,
+        proceeds: t.amountYen - t.feeYen, cost: allocated,
+        pnl: t.realizedPnlYen, calcPnl: t.amountYen - t.feeYen - allocated,
+        forced: t.forced,
+        buys: buys.map((b) => ({ ...timeParts(b), shares: b.shares, price: b.price, total: b.amountYen + b.feeYen })),
+      });
+      holding -= t.shares;
+      pooled -= allocated;
+      if (holding === 0) { pooled = 0; buys = []; }
+    }
+  }
+  HIST.rows.pnl = groups;
+  HIST.rows.orders = st.orders.map((o) => ({
+    ...timeParts(o), side: o.side, shares: o.shares, status: o.status,
+    price: o.price, reason: o.reason,
+  }));
+  HIST.openDetails = new Set();
+  return groups;
+}
+
+function sortedCopy(name) {
+  const { key, dir } = HIST.sort[name];
+  return [...HIST.rows[name]].sort((a, b) => {
+    const va = a[key], vb = b[key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  });
+}
+
+function renderHistTable(name) {
+  const size = parseInt($(name === 'pnl' ? 'sizePnl' : name === 'fills' ? 'sizeFills' : 'sizeOrders').value, 10);
+  const rows = sortedCopy(name);
+  const shown = size === 0 ? rows : rows.slice(0, size);
+  $(name === 'pnl' ? 'countPnl' : name === 'fills' ? 'countFills' : 'countOrders').textContent =
+    `全${rows.length}件中 ${shown.length}件を表示`;
+  const body = $(name === 'pnl' ? 'pnlBody' : name === 'fills' ? 'fillsBody' : 'ordersBody');
+  body.innerHTML = '';
+  const td = (text, cls) => {
+    const c = document.createElement('td');
+    c.textContent = text;
+    if (cls) c.className = cls;
+    return c;
+  };
+  if (shown.length === 0) {
+    const tr = document.createElement('tr');
+    const c = td('記録はありません');
+    c.colSpan = 7;
+    c.style.textAlign = 'left';
+    tr.appendChild(c);
+    body.appendChild(tr);
+    return;
+  }
+  for (const r of shown) {
+    const tr = document.createElement('tr');
+    if (name === 'pnl') {
+      tr.append(td(r.time), td(String(r.shares)), td(fmtY(r.proceeds)), td(fmtY(r.cost)),
+        td(fmtSigned(r.pnl), r.pnl > 0 ? 'pos' : r.pnl < 0 ? 'neg' : ''),
+        td(r.forced ? '強制決済' : '通常'));
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mini';
+      btn.textContent = HIST.openDetails.has(r.idx) ? '閉じる' : '明細';
+      btn.addEventListener('click', () => {
+        if (HIST.openDetails.has(r.idx)) HIST.openDetails.delete(r.idx); else HIST.openDetails.add(r.idx);
+        renderHistTable('pnl');
+      });
+      const c = document.createElement('td');
+      c.appendChild(btn);
+      tr.appendChild(c);
+      body.appendChild(tr);
+      if (HIST.openDetails.has(r.idx)) {
+        const dtr = document.createElement('tr');
+        dtr.className = 'detail';
+        const dc = td(r.buys.length
+          ? '買い明細：' + r.buys.map((b) => `${b.time} ${b.shares}株 ＠ ${fmtP(b.price)}円（代金＋手数料 ${fmtY(b.total)}）`).join(' ／ ')
+          : '対応する買い明細はありません');
+        dc.colSpan = 7;
+        dtr.appendChild(dc);
+        body.appendChild(dtr);
+      }
+    } else if (name === 'fills') {
+      tr.append(td(r.time), td(r.side === 'buy' ? '買い' : '売り'), td(String(r.shares)),
+        td(fmtP(r.price)), td(fmtY(r.amount)), td(fmtY(r.fee)),
+        td(r.pnl === null ? '—' : fmtSigned(r.pnl), r.pnl > 0 ? 'pos' : r.pnl < 0 ? 'neg' : ''),
+        td(r.forced ? '強制決済' : ''));
+      body.appendChild(tr);
+    } else {
+      tr.append(td(r.time), td(r.side === 'buy' ? '買い' : '売り'),
+        td(r.shares === null ? '—' : String(r.shares)),
+        td(r.status === 'filled' ? '約定' : '拒否'),
+        td(r.price == null ? '—' : fmtP(r.price)),
+        td(r.status === 'filled' ? '—' : (REASON_SHORT[r.reason] || r.reason || '—')));
+      body.appendChild(tr);
+    }
+  }
+}
+
+function renderAllHistory() {
+  renderHistTable('pnl');
+  renderHistTable('fills');
+  renderHistTable('orders');
+}
+
 function showResult(st) {
   showView('result');
   $('resCash').textContent = fmtY(st.cash);
@@ -1292,21 +1620,16 @@ function showResult(st) {
   $('resBudget').textContent = `${st.budgetUsedSec.toFixed(1)}秒`;
   $('resPeak').textContent = fmtY(st.peakEquity);
   $('resMaxLoss').textContent = fmtY(st.maxUnrealizedLoss);
-  const body = $('tradesBody');
-  body.innerHTML = '';
-  const minuteOf = (t) => {
-    const gen = G.dayData.sessions[t.session].bars[t.bar];
-    return gen.minute ?? null;
-  };
-  for (const t of st.trades) {
-    const m = minuteOf(t);
-    const time = m === null ? '-' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-    const tr = document.createElement('tr');
-    const pnlText = t.realizedPnlYen === null ? '—' : fmtSigned(t.realizedPnlYen);
-    tr.innerHTML = `<td>${time}${t.forced ? '（強制決済）' : ''}</td><td>${t.side === 'buy' ? '買い' : '売り'}</td>` +
-      `<td>${t.shares}</td><td>${fmtP(t.price)}</td><td>${fmtY(t.feeYen)}</td><td>${pnlText}</td>`;
-    body.appendChild(tr);
-  }
+  const groups = buildHistoryRows(st);
+  const sumPnl = groups.reduce((a, g) => a + g.pnl, 0);
+  const mismatch = groups.some((g) => g.calcPnl !== g.pnl) || sumPnl !== st.realizedPnlYen;
+  $('pnlSummary').textContent = mismatch
+    ? `決済 ${groups.length}件 ／ 合計実現損益 ${fmtSigned(sumPnl)}。警告：履歴の検算がエンジンの実現損益と一致しません。`
+    : `決済 ${groups.length}件 ／ 合計実現損益 ${fmtSigned(sumPnl)}。検算一致：最終資金 ${fmtY(st.cash)} ＝ 初期資金 ${fmtY(st.settings.initialCash)} ＋ 実現損益 ${fmtSigned(st.realizedPnlYen)}`;
+  $('ordersNote').textContent = st.orders.length === 0 && st.trades.length > 0
+    ? '注）このセーブデータ以前の注文履歴は記録されていません（注文履歴は今回の版から記録されます）。'
+    : '';
+  renderAllHistory();
   saveGame(false);
 }
 
@@ -1376,32 +1699,36 @@ $('cancelPanelBtn').addEventListener('click', () => {
   markDirty(); render();
 });
 $('minusBtn').addEventListener('click', () => {
-  $('unitsInput').value = Math.max(1, (parseInt($('unitsInput').value, 10) || 1) - 1);
+  const unit = G.engine ? G.engine.settings.unitShares : 100;
+  $('sharesInput').value = Math.max(0, (parseInt($('sharesInput').value, 10) || 0) - unit);
   render();
 });
 $('plusBtn').addEventListener('click', () => {
-  $('unitsInput').value = (parseInt($('unitsInput').value, 10) || 1) + 1;
+  const unit = G.engine ? G.engine.settings.unitShares : 100;
+  $('sharesInput').value = Math.min(100000, (parseInt($('sharesInput').value, 10) || 0) + unit);
   render();
 });
-$('unitsInput').addEventListener('input', render);
+$('sharesInput').addEventListener('input', render);
 $('maxBuyBtn').addEventListener('click', () => {
   const st = G.engine.getState();
-  let lo = 0, hi = 100000;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (estimate(st, 'buy', mid).total <= st.cash) lo = mid; else hi = mid - 1;
-  }
-  $('unitsInput').value = Math.max(1, lo);
+  $('sharesInput').value = maxBuyUnits(st) * st.settings.unitShares;
   render();
 });
 $('maxSellBtn').addEventListener('click', () => {
   const st = G.engine.getState();
-  $('unitsInput').value = Math.max(1, Math.floor(st.positionShares / 10));
+  $('sharesInput').value = Math.floor(st.positionShares / st.settings.unitShares) * st.settings.unitShares;
   render();
 });
 
 function submit(side) {
-  const units = parseInt($('unitsInput').value, 10);
+  const st = G.engine.getState();
+  const shares = parseInt($('sharesInput').value, 10);
+  if (!Number.isInteger(shares) || shares <= 0 || shares % st.settings.unitShares !== 0) {
+    $('panelMsg').textContent = `数量は${st.settings.unitShares}株単位で入力してください。`;
+    $('panelMsg').className = 'msg err';
+    return;
+  }
+  const units = shares / st.settings.unitShares;
   const r = G.engine.submitOrder({ side, units, clientOrderId: G.panelOrderId });
   if (r.status === 'filled') {
     const t = r.trade;
@@ -1440,6 +1767,38 @@ function toTitle() {
 }
 $('quitBtn').addEventListener('click', toTitle);
 $('newDayBtn').addEventListener('click', toTitle);
+
+// ---------- history tabs / sort / page size / collapse ----------
+function selectHistTab(name) {
+  HIST.tab = name;
+  for (const [tab, panel, btn] of [['pnl', 'pnlPanel', 'tabPnl'], ['fills', 'fillsPanel', 'tabFills'], ['orders', 'ordersPanel', 'tabOrders']]) {
+    $(panel).classList.toggle('hidden', tab !== name);
+    $(btn).classList.toggle('active', tab === name);
+  }
+}
+$('tabPnl').addEventListener('click', () => selectHistTab('pnl'));
+$('tabFills').addEventListener('click', () => selectHistTab('fills'));
+$('tabOrders').addEventListener('click', () => selectHistTab('orders'));
+$('historyToggle').addEventListener('click', () => {
+  const wrap = $('historyWrap');
+  const closed = wrap.classList.toggle('hidden');
+  $('historyToggle').textContent = closed ? '履歴を表示' : '履歴を閉じる';
+});
+for (const [sel, name] of [['sizePnl', 'pnl'], ['sizeFills', 'fills'], ['sizeOrders', 'orders']]) {
+  $(sel).addEventListener('change', () => renderHistTable(name));
+}
+document.querySelectorAll('th.sortable').forEach((th) => {
+  const label = th.textContent;
+  th.addEventListener('click', () => {
+    const name = th.dataset.table, key = th.dataset.key;
+    const st = HIST.sort[name];
+    if (st.key === key) st.dir = -st.dir; else { st.key = key; st.dir = 1; }
+    document.querySelectorAll(`th.sortable[data-table="${name}"]`).forEach((h) => {
+      h.textContent = h === th ? label + (st.dir === 1 ? ' ▲' : ' ▼') : h.textContent.replace(/ [▲▼]$/, '');
+    });
+    renderHistTable(name);
+  });
+});
 
 refreshSaveInfo();
 </script>
