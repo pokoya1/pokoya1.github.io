@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>デイトレゲーム試作版（工程6-2）</title>
+<style>
+  html { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0f1420; color: #e8ecf4;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 12px 14px 40px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin: 4px 0 10px; }
+  header.top h1 { font-size: 19px; margin: 0; font-weight: 700; }
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+    background: #1d2740; border: 1px solid #33415e; color: #bcd0f5;
+  }
+  .badge.warn { background: #3a2b12; border-color: #6b5320; color: #ffd98a; }
+  .badge.stop { background: #12333a; border-color: #1f5b66; color: #8ae2f0; }
+  .card {
+    background: #161e30; border: 1px solid #263350; border-radius: 12px;
+    padding: 14px; margin: 10px 0;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  label { font-size: 13px; color: #aebadd; }
+  input[type="number"], select {
+    background: #0d1322; color: #e8ecf4; border: 1px solid #33415e; border-radius: 8px;
+    padding: 8px 10px; font-size: 15px;
+  }
+  button {
+    background: #24304d; color: #e8ecf4; border: 1px solid #3a4c74; border-radius: 9px;
+    padding: 9px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { background: #2c3c5f; }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 700; }
+  button.primary:hover { background: #1d4fd0; }
+  button.buy { background: #b91c1c; border-color: #b91c1c; color: #fff; font-weight: 700; }
+  button.sell { background: #1d4ed8; border-color: #1d4ed8; color: #fff; font-weight: 700; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row.spread { justify-content: space-between; }
+  .price-big { font-size: 30px; font-weight: 800; letter-spacing: .5px; }
+  .yen { font-variant-numeric: tabular-nums; }
+  .pos { color: #f87171; } /* profit shown red-up (JP convention) */
+  .neg { color: #60a5fa; }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px;
+  }
+  .cell { background: #101828; border: 1px solid #22304e; border-radius: 9px; padding: 8px 10px; }
+  .cell .k { font-size: 11px; color: #8fa1c4; }
+  .cell .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .budgetbar { height: 10px; background: #0d1322; border: 1px solid #33415e; border-radius: 6px; overflow: hidden; }
+  .budgetbar > div { height: 100%; background: #38bdf8; transition: width .15s linear; }
+  .budgetbar.low > div { background: #f87171; }
+  canvas#chart { width: 100%; display: block; background: #0b101d; border-radius: 8px; }
+  .overlay {
+    border: 1px dashed #4b5f8a; border-radius: 12px; padding: 16px; text-align: center;
+    background: #131b2e; margin: 10px 0;
+  }
+  .hidden { display: none !important; }
+  .msg { min-height: 20px; font-size: 13px; margin-top: 8px; }
+  .msg.err { color: #fca5a5; }
+  .msg.ok { color: #86efac; }
+  table.trades { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.trades th, table.trades td { border-bottom: 1px solid #22304e; padding: 5px 6px; text-align: right; }
+  table.trades th { color: #8fa1c4; font-weight: 600; }
+  table.trades td:first-child, table.trades th:first-child { text-align: left; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper input { width: 76px; text-align: center; }
+  .note { font-size: 12px; color: #8fa1c4; line-height: 1.7; }
+  .guarantee { font-size: 22px; font-weight: 800; color: #8ae2f0; }
+  footer { margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>デイトレゲーム 試作版</h1>
+    <span class="badge">工程6-2</span>
+    <span class="badge hidden" id="retryBadge">相場記憶あり（同じ日の再挑戦）</span>
+    <span class="badge hidden" id="seedBadge"></span>
+  </header>
+
+  <!-- Start view -->
+  <section id="startView">
+    <div class="card">
+      <h2>新しい1日を始める</h2>
+      <div class="row">
+        <label>シード <input type="number" id="seedInput" value="42" style="width:110px"></label>
+        <button id="randomSeedBtn" type="button">ランダム</button>
+        <label>手数料
+          <select id="feeSelect">
+            <option value="0">0%</option>
+            <option value="0.0003" selected>0.03%（既定）</option>
+            <option value="0.0005">0.05%</option>
+          </select>
+        </label>
+      </div>
+      <p class="note">初期資金は 3,000,000円。売買単位は10株、成行のみ・買い建てと売却のみです。同じシードでは同じ1日が再現されます。</p>
+      <div class="row">
+        <button class="primary" id="startBtn" type="button">ゲーム開始</button>
+        <button id="resumeBtn" type="button" disabled>保存データから再開</button>
+        <span class="note" id="saveInfo"></span>
+      </div>
+      <div class="msg" id="startMsg"></div>
+    </div>
+    <div class="card">
+      <h2>遊び方</h2>
+      <p class="note">
+        チャートは自動で進行します。「注文パネルを開く」と時間を止めて、その瞬間の価格（保証価格）で落ち着いて注文できます。
+        ただし止められるのは1日合計60秒まで（停止予算）。予算が尽きた状態のパネルはライブ価格での注文になります。
+        前場（9:00–11:30）が終わると待機状態になり、「後場へ進む」で後場（13:00–15:25）が始まります。
+        大引けで建玉は自動的に決済されます。一時停止中はチャートが見えません（予算の迂回防止）。
+      </p>
+    </div>
+  </section>
+
+  <!-- Game view -->
+  <section id="gameView" class="hidden">
+    <div class="card">
+      <div class="row spread">
+        <div>
+          <div class="note" id="clockLabel">前場 9:00:00</div>
+          <div class="price-big yen" id="priceNow">10,000</div>
+        </div>
+        <div style="text-align:right">
+          <span class="badge stop hidden" id="stateBadge"></span>
+          <div class="note" id="dayLabel"></div>
+        </div>
+      </div>
+      <div style="position:relative">
+        <canvas id="chart" height="250"></canvas>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>速度
+          <select id="speedSelect">
+            <option value="1" selected>×1</option>
+            <option value="2">×2</option>
+            <option value="4">×4</option>
+          </select>
+        </label>
+        <button id="pauseBtn" type="button">一時停止</button>
+        <button class="primary" id="openPanelBtn" type="button">注文パネルを開く</button>
+        <button id="saveBtn" type="button">保存</button>
+        <span class="note" id="saveStatus"></span>
+      </div>
+      <div class="msg" id="gameMsg"></div>
+    </div>
+
+    <div class="overlay hidden" id="pausedOverlay">
+      <p><strong>一時停止中</strong></p>
+      <p class="note">チャートは非表示です（停止予算の迂回防止）。停止予算は消費されません。</p>
+      <button class="primary" id="resumeBtn2" type="button">再開する</button>
+    </div>
+
+    <div class="overlay hidden" id="intermissionOverlay">
+      <p><strong>前場が終了しました</strong></p>
+      <p class="note" id="intermissionSummary"></p>
+      <button class="primary" id="proceedBtn" type="button">後場へ進む</button>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="cell"><div class="k">現金</div><div class="v yen" id="statCash">-</div></div>
+        <div class="cell"><div class="k">保有株数</div><div class="v yen" id="statShares">-</div></div>
+        <div class="cell"><div class="k">平均取得価格</div><div class="v yen" id="statAvg">-</div></div>
+        <div class="cell"><div class="k">含み損益</div><div class="v yen" id="statUnreal">-</div></div>
+        <div class="cell"><div class="k">実現損益</div><div class="v yen" id="statRealized">-</div></div>
+        <div class="cell"><div class="k">純資産</div><div class="v yen" id="statEquity">-</div></div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="row spread">
+          <span class="note">停止予算の残り</span>
+          <span class="note yen" id="budgetText">60.0秒</span>
+        </div>
+        <div class="budgetbar" id="budgetBar"><div style="width:100%"></div></div>
+      </div>
+    </div>
+
+    <!-- Order panel -->
+    <div class="card hidden" id="orderPanel">
+      <div class="row spread">
+        <h2 style="margin:0">注文パネル</h2>
+        <span class="badge stop" id="panelMode">保証価格</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <div class="note" id="panelPriceLabel">保証価格（この価格で約定します）</div>
+          <div class="guarantee yen" id="panelPrice">-</div>
+        </div>
+        <div>
+          <div class="note">停止予算の残り</div>
+          <div class="yen" id="panelBudget" style="font-size:18px;font-weight:700">-</div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="note">数量（単位＝10株）</span>
+        <div class="stepper">
+          <button id="minusBtn" type="button">−</button>
+          <input type="number" id="unitsInput" value="1" min="1" step="1">
+          <button id="plusBtn" type="button">＋</button>
+        </div>
+        <button id="maxBuyBtn" type="button">買える最大</button>
+        <button id="maxSellBtn" type="button">売れる最大</button>
+      </div>
+      <p class="note" id="estimateText">概算：-</p>
+      <div class="row">
+        <button class="buy" id="buyBtn" type="button">買い注文を確定</button>
+        <button class="sell" id="sellBtn" type="button">売却を確定</button>
+        <button id="cancelPanelBtn" type="button">取消して閉じる</button>
+      </div>
+      <div class="msg" id="panelMsg"></div>
+    </div>
+
+    <div class="row">
+      <button id="retryBtn" type="button">この日をやり直す（相場記憶あり）</button>
+      <button id="quitBtn" type="button">タイトルへ戻る</button>
+    </div>
+  </section>
+
+  <!-- Result view -->
+  <section id="resultView" class="hidden">
+    <div class="card">
+      <h2>本日の結果</h2>
+      <div class="grid">
+        <div class="cell"><div class="k">最終資金（現金）</div><div class="v yen" id="resCash">-</div></div>
+        <div class="cell"><div class="k">実現損益</div><div class="v yen" id="resPnl">-</div></div>
+        <div class="cell"><div class="k">取引回数</div><div class="v yen" id="resTrades">-</div></div>
+        <div class="cell"><div class="k">停止予算の使用</div><div class="v yen" id="resBudget">-</div></div>
+        <div class="cell"><div class="k">純資産ピーク</div><div class="v yen" id="resPeak">-</div></div>
+        <div class="cell"><div class="k">最大含み損</div><div class="v yen" id="resMaxLoss">-</div></div>
+      </div>
+      <p class="note">損益と立ち回りの指標は合算せず、個別に表示しています（上位方針）。</p>
+      <div class="row">
+        <button class="primary" id="retryBtn2" type="button">同じ日を再挑戦（相場記憶あり）</button>
+        <button id="newDayBtn" type="button">タイトルへ戻る（新しい日）</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>約定履歴</h2>
+      <div style="overflow-x:auto">
+        <table class="trades">
+          <thead><tr><th>時刻</th><th>売買</th><th>株数</th><th>価格</th><th>手数料</th><th>実現損益</th></tr></thead>
+          <tbody id="tradesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="note">
+      試作版（工程6-2）：価格は価格生成エンジンの合成データです。テクニカルイベントの選別・反省ノートは後工程（6-3）で扱います。
+      取引計算は工程6-1bの取引・時計エンジン（契約 改訂4／境界テスト全48件合格）によります。
+    </p>
+  </footer>
+</div>
+
+<script type="module">
+/*__GENERATOR_BEGIN__*/
+// Synthetic market, v0.1. Time unit: trading year.
+function run(seed, options, collectTicks) {
+  const c={base:null, regimes:true, season:true, jumps:true, volume:true,
+    lambda:1, jumpSD:.008, history:500, ...options};
+  if(!Number.isInteger(c.history)||c.history<0||c.history>5000||
+    !Number.isFinite(c.lambda)||c.lambda<0||c.lambda>100||
+    !Number.isFinite(c.jumpSD)||c.jumpSD<0||c.jumpSD>.2||
+    (c.base!==null&&(!Number.isFinite(c.base)||c.base<0||c.base>3))) throw Error('Invalid settings');
+  function rng(s){return ()=>{s=(s+0x6D2B79F5)|0;let t=s;
+    t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)+.5;};}
+  const stream=k=>{const r=rng((Number(seed)^k)|0);return ()=>r()/4294967296};
+  const p=stream(11), v=stream(29), j=stream(47), w=stream(71);
+  const normal=u=>Math.sqrt(-2*Math.log(u()))*Math.cos(2*Math.PI*u());
+  const dt=1/(252*3960), h=c.lambda/3960;
+  const kappa=Math.expm1(c.jumpSD*c.jumpSD/2);
+  const days=Math.ceil(c.history/66)+1, bars=[], tickBars=collectTicks?[]:null;
+  let S=10000;
+  for(let d=0;d<days;d++){
+    const base=c.base??(.2+.6*v()); let state=1;
+    for(let b=0;b<66;b++){
+      const day=d-days+1, minute=b<30?540+5*b:750+5*(b-30);
+      let O=S,H=S,L=S,V=0,variance=0,jumps=0; const tpr=collectTicks?[]:null, tvol=collectTicks?[]:null;
+      for(let t=0;t<60;t++){
+        if(c.regimes&&v()<1-Math.exp(-5/1800)){
+          state=(state+(v()<.5?1:2))%3;
+        }
+        const x=(b*60+t)/3960;
+        const f=c.season?(.75+.65*Math.exp(-x/.065)+.5*Math.exp(-(1-x)/.065)+.25*Math.exp(-Math.abs(x-30/66)/.025)):1;
+        const sigma=base*f*(c.regimes?[.5,1,2.5][state]:1);
+        let r=-.5*sigma*sigma*dt+sigma*Math.sqrt(dt)*normal(p);
+        if(c.jumps){let n=0,prod=j(),limit=Math.exp(-h);
+          while(prod>limit){n++;prod*=j();}
+          r+=-h*kappa;for(let a=0;a<n;a++)r+=c.jumpSD*normal(j);jumps+=n;
+        }
+        S*=Math.exp(r); H=Math.max(H,S);L=Math.min(L,S);
+        variance+=sigma*sigma*dt;
+        if(c.volume){const tv=Math.round(100*f*(1+Math.min(10,Math.abs(r)/.001))*Math.exp(.3*normal(w)-.045));V+=tv;if(collectTicks)tvol.push(tv);}
+        else if(collectTicks)tvol.push(0);
+        if(collectTicks)tpr.push(S);
+      }
+      bars.push({day,minute,open:O,high:H,low:L,close:S,volume:V,
+        variance,jumps,complete:true});
+      if(collectTicks)tickBars.push({open:O,prices:tpr,volumes:tvol});
+    }
+  }
+  const out=bars.slice(-(c.history+66));
+  return {result:{seed,config:c,bars:out},
+    ticks:collectTicks?tickBars.slice(-(c.history+66)):null};
+}
+
+// Public API (stage 6-1a). generate() is the original function, unchanged:
+// its return value is byte-identical to v0.1 for every seed and options.
+// generateWithTicks() runs the identical generation (same RNG streams, same
+// update equations, same consumption order) and additionally returns the
+// 5-second tick series as a read-only structure parallel to bars:
+// ticks[i] = { open, prices, volumes } for bars[i], where open is the bar's
+// start price (= bars[i].open), prices are the 60 post-update tick prices in
+// order (prices[59] === bars[i].close), and volumes are the 60 per-tick
+// integer volumes (their sum === bars[i].volume; all zero when the volume
+// option is off). Re-aggregating a block as open / max-min of
+// {open} + prices / last price / volume sum reproduces the bar exactly.
+function generate(seed=1, options={}) {
+  return run(seed, options, false).result;
+}
+function generateWithTicks(seed=1, options={}) {
+  const { result, ticks } = run(seed, options, true);
+  for (const t of ticks) { Object.freeze(t.prices); Object.freeze(t.volumes); Object.freeze(t); }
+  Object.freeze(ticks);
+  return { ...result, ticks };
+}
+/*__GENERATOR_END__*/
+/*__ENGINE_BEGIN__*/
+// trading-engine.mjs — DOM-free trading & clock engine (Stage 6-1b).
+//
+// Implements the Stage 6-0 connection/state-transition contract rev3
+// (接続・状態遷移契約書 改訂3), section 7 (A案: display-price guarantee)
+// and section 8 (rejections). The engine consumes the read-only tick
+// series published by price-engine.mjs generateWithTicks() (Stage 6-1a)
+// through dayDataFromGenerated(), or any equivalent day data built by an
+// adapter. It never modifies the generator or the detector.
+//
+// Determinism (contract 7 preamble): the engine reads no external clock
+// and no randomness. Market time advances only through tick events;
+// real time enters only through elapse events carrying explicit seconds.
+// The same input event sequence always produces the same result, and a
+// recorded event log replays to an identical state.
+//
+// Money (contract 7.9): trade amount = round-half-up(price x shares) to
+// integer yen; fee = floor(amount x feeRate) to integer yen; cash and
+// realized P&L are kept in integer yen. Unrealized values stay floating
+// point internally and are rounded only for display.
+
+const CLOCK = Object.freeze({
+  RUNNING: 'RUNNING',
+  STOPPED: 'STOPPED',
+  PAUSED: 'PAUSED',
+  INTERMISSION: 'INTERMISSION',
+  CLOSED: 'CLOSED',
+});
+
+const EPS = 1e-9;
+// Epsilon for yen rounding: absorbs binary floating-point representation
+// error at exact .5 / integer boundaries (e.g. 10003.55 x 10 evaluates to
+// 100035.49999999999 but contract C-09 fixes the intended decimal result).
+// 1e-7 yen is far below any genuine price granularity in the inputs.
+const YEN_EPS = 1e-7;
+
+function roundHalfUpYen(x) {
+  return Math.floor(x + 0.5 + YEN_EPS);
+}
+
+function feeYen(amountYen, feeRate) {
+  if (feeRate === 0) return 0;
+  return Math.floor(amountYen * feeRate + YEN_EPS);
+}
+
+const DEFAULT_SETTINGS = Object.freeze({
+  initialCash: 3000000,
+  feeRate: 0.0003,
+  budgetSeconds: 60,
+  unitShares: 10,
+});
+
+// dayData shape (adapter output):
+// {
+//   dayRef: <opaque, e.g. { seed, config } — stored in saves per 7.8>,
+//   initialPrice: number,
+//   sessions: [ { bars: [ { open, prices: number[], minute?: number } ] } ]
+// }
+// A bar completes when all of its ticks have arrived; a session ends at
+// its last bar's last tick; the day ends at the last session's last tick.
+function dayDataFromGenerated(gen, { morningBars = 30, dayRef } = {}) {
+  if (!gen || !Array.isArray(gen.bars) || !Array.isArray(gen.ticks) ||
+      gen.bars.length !== gen.ticks.length) {
+    throw new Error('dayDataFromGenerated: expected generateWithTicks() output');
+  }
+  const mk = (i) => ({
+    open: gen.ticks[i].open,
+    prices: Array.from(gen.ticks[i].prices),
+    minute: gen.bars[i].minute,
+  });
+  const morning = [], afternoon = [];
+  for (let i = 0; i < gen.bars.length; i++) {
+    (i < morningBars ? morning : afternoon).push(mk(i));
+  }
+  const sessions = [{ bars: morning }];
+  if (afternoon.length > 0) sessions.push({ bars: afternoon });
+  return {
+    dayRef: dayRef ?? { seed: gen.seed, config: gen.config },
+    initialPrice: gen.bars[0].open,
+    sessions,
+  };
+}
+
+function validateDayData(dayData) {
+  if (!dayData || !Array.isArray(dayData.sessions) || dayData.sessions.length === 0) {
+    throw new Error('dayData: sessions must be a non-empty array');
+  }
+  for (const s of dayData.sessions) {
+    if (!s || !Array.isArray(s.bars) || s.bars.length === 0) {
+      throw new Error('dayData: each session needs at least one bar');
+    }
+    for (const b of s.bars) {
+      if (!b || !Number.isFinite(b.open) || !Array.isArray(b.prices) || b.prices.length === 0 ||
+          !b.prices.every(Number.isFinite)) {
+        throw new Error('dayData: each bar needs a finite open and >= 1 finite tick prices');
+      }
+    }
+  }
+}
+
+// Priority classes for events sharing one instant (contract 7.6):
+// (1) tick price update (forced liquidation is derived inside it),
+// (2) budget exhaustion (derived inside elapse), (3) order acceptance
+// and other operations, (4) save (acceptance precedes save, 7.5).
+const EVENT_CLASS = {
+  tick: 0, elapse: 1,
+  openPanel: 2, cancelPanel: 2, submit: 2, pause: 2, resume: 2,
+  proceed: 2, retryDay: 2, nextDay: 2,
+  save: 3,
+};
+
+class TradingEngine {
+  constructor(dayData, settings = {}) {
+    validateDayData(dayData);
+    this.settings = { ...DEFAULT_SETTINGS, ...settings };
+    this.dayData = dayData;
+    this.dayNumber = 1;
+    this._log = [];
+    this._resetDayState();
+  }
+
+  _resetDayState() {
+    const firstBar = this.dayData.sessions[0].bars[0];
+    this.clock = CLOCK.RUNNING;
+    this.panelOpen = false;
+    this.guaranteePrice = null;
+    this.sessionIndex = 0;
+    this.barIndex = 0; // index within the current session
+    this.tickInBar = 0; // ticks arrived in the current bar
+    this.currentPrice = Number.isFinite(this.dayData.initialPrice)
+      ? this.dayData.initialPrice : firstBar.open;
+    this._barAgg = { open: firstBar.open, high: firstBar.open, low: firstBar.open };
+    this.completedBars = [];
+    this.budgetUsedSec = 0;
+    this.cash = this.settings.initialCash;
+    this.positionShares = 0;
+    this.positionCostYen = 0; // acquisition cost incl. buy fees (see _fill)
+    this.realizedPnlYen = 0;
+    this.trades = [];
+    this.peakEquity = this.settings.initialCash;
+    this.minUnrealizedPnl = 0;
+    this.orderSeq = 0;
+    this._filledByClientId = new Map();
+    this.sameSeedRetry = false;
+  }
+
+  // ---------- derived values ----------
+
+  get budgetRemainingSec() {
+    return Math.max(0, this.settings.budgetSeconds - this.budgetUsedSec);
+  }
+
+  get _session() { return this.dayData.sessions[this.sessionIndex]; }
+  get _bar() { return this._session.bars[this.barIndex]; }
+
+  get globalBarIndex() {
+    let n = this.barIndex;
+    for (let i = 0; i < this.sessionIndex; i++) n += this.dayData.sessions[i].bars.length;
+    return n;
+  }
+
+  unrealizedPnl() {
+    return this.positionShares > 0
+      ? this.positionShares * this.currentPrice - this.positionCostYen : 0;
+  }
+
+  equity() {
+    return this.cash + this.positionShares * this.currentPrice;
+  }
+
+  _updateAggregates() {
+    const eq = this.equity();
+    if (eq > this.peakEquity) this.peakEquity = eq;
+    const u = this.unrealizedPnl();
+    if (u < this.minUnrealizedPnl) this.minUnrealizedPnl = u;
+  }
+
+  // ---------- state view ----------
+
+  getState() {
+    const bar = this._bar;
+    return {
+      clock: this.clock,
+      panelOpen: this.panelOpen,
+      guaranteePrice: this.guaranteePrice,
+      budgetUsedSec: this.budgetUsedSec,
+      budgetRemainingSec: this.budgetRemainingSec,
+      dayNumber: this.dayNumber,
+      dayRef: this.dayData.dayRef ?? null,
+      sameSeedRetry: this.sameSeedRetry,
+      sessionIndex: this.sessionIndex,
+      sessionCount: this.dayData.sessions.length,
+      barIndex: this.globalBarIndex,
+      minute: bar.minute ?? null,
+      tickInBar: this.tickInBar,
+      currentPrice: this.currentPrice,
+      currentBar: {
+        open: this._barAgg.open,
+        high: this._barAgg.high,
+        low: this._barAgg.low,
+        close: this.currentPrice,
+        ticksArrived: this.tickInBar,
+        tickCount: bar.prices.length,
+        complete: false,
+      },
+      completedBars: this.completedBars.map((b) => ({ ...b })),
+      cash: this.cash,
+      positionShares: this.positionShares,
+      positionCostYen: this.positionCostYen,
+      averageCost: this.positionShares > 0 ? this.positionCostYen / this.positionShares : null,
+      realizedPnlYen: this.realizedPnlYen,
+      unrealizedPnl: this.unrealizedPnl(),
+      equity: this.equity(),
+      peakEquity: this.peakEquity,
+      maxUnrealizedLoss: -this.minUnrealizedPnl,
+      trades: this.trades.map((t) => ({ ...t })),
+    };
+  }
+
+  // Invariants from contract 7.11; used by the test suite.
+  assertInvariants() {
+    const guaranteeShouldExist = this.clock === CLOCK.STOPPED && this.panelOpen;
+    if ((this.guaranteePrice !== null) !== guaranteeShouldExist) {
+      throw new Error(`invariant: guarantee ${this.guaranteePrice} vs clock ${this.clock}/panel ${this.panelOpen}`);
+    }
+    if (!(this.budgetUsedSec >= 0 && this.budgetUsedSec <= this.settings.budgetSeconds + EPS)) {
+      throw new Error('invariant: budget out of range');
+    }
+    if (!Number.isInteger(this.cash) || !Number.isInteger(this.realizedPnlYen) ||
+        !Number.isInteger(this.positionCostYen)) {
+      throw new Error('invariant: yen amounts must stay integer');
+    }
+    if (this.positionShares < 0 || this.positionShares % this.settings.unitShares !== 0) {
+      throw new Error('invariant: position shares');
+    }
+    if ((this.positionShares === 0) !== (this.positionCostYen === 0)) {
+      throw new Error('invariant: flat position must have zero cost');
+    }
+    return true;
+  }
+
+  // ---------- event entry points ----------
+
+  dispatch(event) {
+    if (!event || typeof event.type !== 'string') throw new Error('dispatch: event.type required');
+    let result;
+    switch (event.type) {
+      case 'tick': result = this._tick(); break;
+      case 'elapse': result = this._elapse(event.seconds); break;
+      case 'openPanel': result = this._openPanel(); break;
+      case 'cancelPanel': result = this._cancelPanel(); break;
+      case 'submit': result = this._submit(event); break;
+      case 'pause': result = this._pause(); break;
+      case 'resume': result = this._resume(); break;
+      case 'proceed': result = this._proceed(); break;
+      case 'retryDay': result = this._retryDay(); break;
+      case 'nextDay': result = this._nextDay(event.dayData); break;
+      case 'save': result = { ok: true, snapshot: this.saveSnapshot() }; break;
+      default: throw new Error(`dispatch: unknown event type ${event.type}`);
+    }
+    this._log.push(JSON.parse(JSON.stringify(event)));
+    return result;
+  }
+
+  // Applies a batch of events that share instants: events are stably
+  // sorted by (at, contract-7.6 priority class) before application, so a
+  // caller may deliver e.g. a submit and the final tick "at the same
+  // instant" in any order and the contract order still decides.
+  dispatchBatch(events) {
+    const decorated = events.map((e, i) => ({ e, i }));
+    decorated.sort((a, b) => {
+      const atA = a.e.at ?? 0, atB = b.e.at ?? 0;
+      if (atA !== atB) return atA - atB;
+      const cA = EVENT_CLASS[a.e.type] ?? 2, cB = EVENT_CLASS[b.e.type] ?? 2;
+      if (cA !== cB) return cA - cB;
+      return a.i - b.i;
+    });
+    return decorated.map(({ e }) => this.dispatch(e));
+  }
+
+  getLog() {
+    return JSON.parse(JSON.stringify(this._log));
+  }
+
+  static replay(dayData, settings, log) {
+    const engine = new TradingEngine(dayData, settings);
+    for (const event of log) engine.dispatch(event);
+    return engine;
+  }
+
+  // Convenience wrappers (each is exactly one dispatched event).
+  advanceTick() { return this.dispatch({ type: 'tick' }); }
+  advanceTicks(n) {
+    let r = null;
+    for (let i = 0; i < n; i++) r = this.advanceTick();
+    return r;
+  }
+  elapse(seconds) { return this.dispatch({ type: 'elapse', seconds }); }
+  openPanel() { return this.dispatch({ type: 'openPanel' }); }
+  cancelPanel() { return this.dispatch({ type: 'cancelPanel' }); }
+  submitOrder(order) { return this.dispatch({ type: 'submit', ...order }); }
+  pause() { return this.dispatch({ type: 'pause' }); }
+  resume() { return this.dispatch({ type: 'resume' }); }
+  proceedToNextSession() { return this.dispatch({ type: 'proceed' }); }
+  retryDay() { return this.dispatch({ type: 'retryDay' }); }
+  startNextDay(dayData) { return this.dispatch({ type: 'nextDay', dayData }); }
+
+  // ---------- market time ----------
+
+  _tick() {
+    if (this.clock !== CLOCK.RUNNING) {
+      return { ok: false, advanced: false, reason: `clock-${this.clock.toLowerCase()}` };
+    }
+    const bar = this._bar;
+    const price = bar.prices[this.tickInBar];
+    this.tickInBar += 1;
+    this.currentPrice = price;
+    if (price > this._barAgg.high) this._barAgg.high = price;
+    if (price < this._barAgg.low) this._barAgg.low = price;
+    this._updateAggregates();
+    const events = [];
+    let liquidation = null;
+    if (this.tickInBar === bar.prices.length) {
+      this.completedBars.push({
+        session: this.sessionIndex,
+        index: this.globalBarIndex,
+        minute: bar.minute ?? null,
+        open: this._barAgg.open,
+        high: this._barAgg.high,
+        low: this._barAgg.low,
+        close: price,
+        ticks: bar.prices.length,
+      });
+      events.push('bar-completed');
+      const lastBarOfSession = this.barIndex === this._session.bars.length - 1;
+      if (lastBarOfSession) {
+        const lastSession = this.sessionIndex === this.dayData.sessions.length - 1;
+        // Panel and guarantee end with the session/day in all cases.
+        this.panelOpen = false;
+        this.guaranteePrice = null;
+        if (lastSession) {
+          liquidation = this._forceLiquidate(price);
+          this.clock = CLOCK.CLOSED;
+          events.push('day-closed');
+        } else {
+          this.clock = CLOCK.INTERMISSION;
+          events.push('session-ended');
+        }
+      } else {
+        this.barIndex += 1;
+        this.tickInBar = 0;
+        const next = this._bar;
+        this._barAgg = { open: next.open, high: next.open, low: next.open };
+      }
+    }
+    return { ok: true, advanced: true, price, events, liquidation };
+  }
+
+  _forceLiquidate(price) {
+    if (this.positionShares === 0) return null;
+    const shares = this.positionShares;
+    const amount = roundHalfUpYen(price * shares);
+    const fee = feeYen(amount, this.settings.feeRate);
+    const realized = amount - fee - this.positionCostYen;
+    this.cash += amount - fee;
+    this.realizedPnlYen += realized;
+    const trade = this._recordTrade({
+      side: 'sell', shares, price, amountYen: amount, feeYen: fee,
+      realizedPnlYen: realized, forced: true,
+    });
+    this.positionShares = 0;
+    this.positionCostYen = 0;
+    this._updateAggregates();
+    return trade;
+  }
+
+  // ---------- real time / stop budget (7.3) ----------
+
+  _elapse(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return { ok: false, reason: 'invalid-seconds' };
+    }
+    if (this.clock !== CLOCK.STOPPED) {
+      return { ok: true, consumedSec: 0, exhausted: false };
+    }
+    const remaining = this.budgetRemainingSec;
+    const consumed = Math.min(seconds, remaining);
+    this.budgetUsedSec += consumed;
+    let exhausted = false;
+    if (seconds >= remaining - EPS) {
+      // Budget exhaustion (7.6 step 3): guarantee lapses, clock resumes,
+      // panel stays open in live mode.
+      this.budgetUsedSec = this.settings.budgetSeconds;
+      this.guaranteePrice = null;
+      this.clock = CLOCK.RUNNING;
+      exhausted = true;
+    }
+    return { ok: true, consumedSec: consumed, exhausted };
+  }
+
+  // ---------- panel & orders ----------
+
+  _openPanel() {
+    if (this.clock === CLOCK.PAUSED) return { ok: false, reason: 'paused' };
+    if (this.clock === CLOCK.INTERMISSION) return { ok: false, reason: 'intermission' };
+    if (this.clock === CLOCK.CLOSED) return { ok: false, reason: 'day-closed' };
+    if (this.panelOpen) return { ok: true, changed: false };
+    this.panelOpen = true;
+    if (this.clock === CLOCK.RUNNING && this.budgetRemainingSec > EPS) {
+      this.clock = CLOCK.STOPPED;
+      this.guaranteePrice = this.currentPrice;
+    }
+    return { ok: true, changed: true, guaranteePrice: this.guaranteePrice };
+  }
+
+  _cancelPanel() {
+    if (!this.panelOpen) return { ok: true, changed: false };
+    this.panelOpen = false;
+    this.guaranteePrice = null;
+    if (this.clock === CLOCK.STOPPED) this.clock = CLOCK.RUNNING;
+    return { ok: true, changed: true };
+  }
+
+  _submit({ side, units, clientOrderId }) {
+    // Double-submission lock (7.5): a clientOrderId that already filled
+    // returns its original result and never fills twice. Rejections are
+    // not memoized — a corrected order may be resubmitted (section 8).
+    if (clientOrderId != null && this._filledByClientId.has(clientOrderId)) {
+      return { ...this._filledByClientId.get(clientOrderId), duplicate: true };
+    }
+    if (this.clock === CLOCK.CLOSED) return { status: 'rejected', reason: 'day-closed' };
+    if (this.clock === CLOCK.PAUSED) return { status: 'rejected', reason: 'paused' };
+    if (this.clock === CLOCK.INTERMISSION) return { status: 'rejected', reason: 'intermission' };
+    if (!this.panelOpen) return { status: 'rejected', reason: 'panel-closed' };
+    if (side !== 'buy' && side !== 'sell') return { status: 'rejected', reason: 'invalid-side' };
+    if (!Number.isInteger(units) || units <= 0) {
+      return { status: 'rejected', reason: 'invalid-quantity' };
+    }
+    const shares = units * this.settings.unitShares;
+    const price = (this.clock === CLOCK.STOPPED && this.guaranteePrice !== null)
+      ? this.guaranteePrice : this.currentPrice;
+    const amount = roundHalfUpYen(price * shares);
+    const fee = feeYen(amount, this.settings.feeRate);
+    if (side === 'buy' && amount + fee > this.cash) {
+      return { status: 'rejected', reason: 'insufficient-funds', amountYen: amount, feeYen: fee };
+    }
+    if (side === 'sell' && shares > this.positionShares) {
+      return { status: 'rejected', reason: 'insufficient-shares' };
+    }
+    // Atomic acceptance: the fill below is one indivisible step computed
+    // from a single snapshot of (display price, guarantee, clock) (7.11).
+    let realized = null;
+    if (side === 'buy') {
+      this.cash -= amount + fee;
+      this.positionShares += shares;
+      this.positionCostYen += amount + fee;
+    } else {
+      const allocated = shares === this.positionShares
+        ? this.positionCostYen
+        : roundHalfUpYen(this.positionCostYen * shares / this.positionShares);
+      realized = amount - fee - allocated;
+      this.cash += amount - fee;
+      this.positionShares -= shares;
+      this.positionCostYen -= allocated;
+      this.realizedPnlYen += realized;
+    }
+    const trade = this._recordTrade({
+      side, shares, price, amountYen: amount, feeYen: fee,
+      realizedPnlYen: realized, forced: false,
+    });
+    this._updateAggregates();
+    // One stop, one order (7.5): a fill closes the panel and resumes the
+    // clock. Rejections above deliberately skip this (section 8).
+    this.panelOpen = false;
+    this.guaranteePrice = null;
+    if (this.clock === CLOCK.STOPPED) this.clock = CLOCK.RUNNING;
+    const result = { status: 'filled', trade };
+    if (clientOrderId != null) this._filledByClientId.set(clientOrderId, result);
+    return result;
+  }
+
+  _recordTrade({ side, shares, price, amountYen, feeYen, realizedPnlYen, forced }) {
+    const bar = this._bar;
+    const trade = {
+      seq: ++this.orderSeq,
+      day: this.dayNumber,
+      session: this.sessionIndex,
+      bar: this.globalBarIndex,
+      minute: bar.minute ?? null,
+      tickInBar: this.tickInBar,
+      side,
+      units: shares / this.settings.unitShares,
+      shares,
+      price,
+      amountYen,
+      feeYen,
+      realizedPnlYen,
+      forced,
+    };
+    this.trades.push(trade);
+    return trade;
+  }
+
+  // ---------- pause / sessions / days ----------
+
+  _pause() {
+    if (this.clock !== CLOCK.RUNNING && this.clock !== CLOCK.STOPPED) {
+      return { ok: false, reason: `clock-${this.clock.toLowerCase()}` };
+    }
+    this.panelOpen = false;
+    this.guaranteePrice = null;
+    this.clock = CLOCK.PAUSED;
+    return { ok: true };
+  }
+
+  _resume() {
+    if (this.clock !== CLOCK.PAUSED) return { ok: false, reason: 'not-paused' };
+    this.clock = CLOCK.RUNNING;
+    return { ok: true };
+  }
+
+  _proceed() {
+    if (this.clock !== CLOCK.INTERMISSION) return { ok: false, reason: 'not-intermission' };
+    this.sessionIndex += 1;
+    this.barIndex = 0;
+    this.tickInBar = 0;
+    const bar = this._bar;
+    this._barAgg = { open: bar.open, high: bar.open, low: bar.open };
+    this.currentPrice = bar.open;
+    this.clock = CLOCK.RUNNING;
+    return { ok: true };
+  }
+
+  _retryDay() {
+    this._resetDayState();
+    this.sameSeedRetry = true;
+    return { ok: true };
+  }
+
+  _nextDay(dayData) {
+    if (this.clock !== CLOCK.CLOSED) return { ok: false, reason: 'not-closed' };
+    validateDayData(dayData);
+    this.dayData = dayData;
+    this.dayNumber += 1;
+    this._resetDayState();
+    return { ok: true };
+  }
+
+  // ---------- save / restore (7.8) ----------
+
+  saveSnapshot() {
+    return {
+      version: 1,
+      settings: { ...this.settings },
+      dayRef: this.dayData.dayRef ?? null,
+      dayNumber: this.dayNumber,
+      sessionIndex: this.sessionIndex,
+      barIndex: this.barIndex,
+      tickInBar: this.tickInBar,
+      currentPrice: this.currentPrice,
+      budgetUsedSec: this.budgetUsedSec,
+      cash: this.cash,
+      positionShares: this.positionShares,
+      positionCostYen: this.positionCostYen,
+      realizedPnlYen: this.realizedPnlYen,
+      trades: JSON.parse(JSON.stringify(this.trades)),
+      peakEquity: this.peakEquity,
+      minUnrealizedPnl: this.minUnrealizedPnl,
+      orderSeq: this.orderSeq,
+      filledClientOrderIds: [...this._filledByClientId.keys()],
+      sameSeedRetry: this.sameSeedRetry,
+      savedClock: this.clock,
+    };
+  }
+
+  // Restores a saved session against the same day data. Derived state
+  // (in-progress bar aggregation, completed bars) is recomputed from the
+  // day data and the saved position, and the saved price is verified
+  // against it, so a snapshot cannot be paired with different day data.
+  // Per 7.8 the restored engine starts PAUSED with the panel closed and
+  // no guarantee.
+  static restore(snapshot, dayData) {
+    if (!snapshot || snapshot.version !== 1) throw new Error('restore: unsupported snapshot');
+    validateDayData(dayData);
+    const engine = new TradingEngine(dayData, snapshot.settings);
+    if (snapshot.sessionIndex >= dayData.sessions.length ||
+        snapshot.barIndex >= dayData.sessions[snapshot.sessionIndex].bars.length ||
+        snapshot.tickInBar > dayData.sessions[snapshot.sessionIndex].bars[snapshot.barIndex].prices.length) {
+      throw new Error('restore: saved position is outside the supplied day data');
+    }
+    engine.dayNumber = snapshot.dayNumber;
+    engine.sessionIndex = snapshot.sessionIndex;
+    engine.barIndex = snapshot.barIndex;
+    engine.tickInBar = snapshot.tickInBar;
+    // Rebuild completed bars and the in-progress aggregation.
+    engine.completedBars = [];
+    for (let s = 0; s <= snapshot.sessionIndex; s++) {
+      const bars = dayData.sessions[s].bars;
+      const upto = s === snapshot.sessionIndex ? snapshot.barIndex : bars.length;
+      for (let b = 0; b < upto; b++) {
+        const bar = bars[b];
+        let high = bar.open, low = bar.open;
+        for (const p of bar.prices) { if (p > high) high = p; if (p < low) low = p; }
+        engine.completedBars.push({
+          session: s,
+          index: engine.completedBars.length,
+          minute: bar.minute ?? null,
+          open: bar.open, high, low,
+          close: bar.prices[bar.prices.length - 1],
+          ticks: bar.prices.length,
+        });
+      }
+    }
+    const bar = engine._bar;
+    let high = bar.open, low = bar.open;
+    for (let i = 0; i < snapshot.tickInBar; i++) {
+      const p = bar.prices[i];
+      if (p > high) high = p;
+      if (p < low) low = p;
+    }
+    engine._barAgg = { open: bar.open, high, low };
+    const expectedPrice = snapshot.tickInBar > 0 ? bar.prices[snapshot.tickInBar - 1] : bar.open;
+    if (Math.abs(expectedPrice - snapshot.currentPrice) > 1e-6) {
+      throw new Error('restore: saved price does not match the supplied day data');
+    }
+    engine.currentPrice = snapshot.currentPrice;
+    engine.budgetUsedSec = snapshot.budgetUsedSec;
+    engine.cash = snapshot.cash;
+    engine.positionShares = snapshot.positionShares;
+    engine.positionCostYen = snapshot.positionCostYen;
+    engine.realizedPnlYen = snapshot.realizedPnlYen;
+    engine.trades = JSON.parse(JSON.stringify(snapshot.trades));
+    engine.peakEquity = snapshot.peakEquity;
+    engine.minUnrealizedPnl = snapshot.minUnrealizedPnl;
+    engine.orderSeq = snapshot.orderSeq;
+    engine.sameSeedRetry = snapshot.sameSeedRetry;
+    // Filled-order idempotency survives save/load (7.5); the stored
+    // results themselves are not needed, only the lock. A repeated
+    // submission after restore is reported as a duplicate rejection.
+    engine._filledByClientId = new Map(
+      snapshot.filledClientOrderIds.map((id) => [id, { status: 'filled', duplicate: true, restored: true }]),
+    );
+    engine.clock = CLOCK.PAUSED;
+    engine.panelOpen = false;
+    engine.guaranteePrice = null;
+    engine.assertInvariants();
+    return engine;
+  }
+}
+/*__ENGINE_END__*/
+// UI layer for the Stage 6-2 prototype. All trading/clock rules live in
+// TradingEngine; this layer only renders state, forwards user actions as
+// engine events, and feeds measured real elapsed time to the engine
+// while STOPPED (the engine itself reads no clock).
+
+const $ = (id) => document.getElementById(id);
+const SAVE_KEY = 'daytrade62.save.v1';
+
+const REASONS = {
+  'insufficient-funds': '資金不足です（手数料込みで余力を超えています）。数量を減らしてください。',
+  'insufficient-shares': '保有株数が不足しています。',
+  'paused': '一時停止中は注文できません。',
+  'day-closed': '本日の取引は終了しました。',
+  'intermission': 'セッション間の待機中は注文できません。',
+  'panel-closed': '注文パネルが開いていません。',
+  'invalid-quantity': '数量を確認してください（1単位＝10株）。',
+  'invalid-side': '注文の種別が不正です。',
+};
+
+const fmtY = (n) => `${Math.round(n).toLocaleString('ja-JP')}円`;
+const fmtP = (x) => x.toLocaleString('ja-JP', { maximumFractionDigits: 2 });
+const fmtSigned = (n) => `${n > 0 ? '+' : ''}${Math.round(n).toLocaleString('ja-JP')}円`;
+
+const G = {
+  engine: null,
+  dayData: null,
+  seed: null,
+  active: false,
+  speed: 1, // ticks per 100ms
+  tickAcc: 0,
+  lastFrame: 0,
+  lastSave: 0,
+  dirty: false,
+  panelOrderId: null,
+  orderSeq: 0,
+  resultShown: false,
+  lastClock: null,
+};
+
+function marketClockLabel(st) {
+  if (st.clock === 'CLOSED') return '大引け（取引終了）';
+  if (st.clock === 'INTERMISSION') return '前場終了（後場の開始待ち）';
+  const base = (st.minute ?? 540) * 60 + st.tickInBar * 5;
+  const hh = Math.floor(base / 3600), mm = Math.floor((base % 3600) / 60), ss = base % 60;
+  const session = st.sessionIndex === 0 ? '前場' : '後場';
+  return `${session} ${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+function showView(name) {
+  $('startView').classList.toggle('hidden', name !== 'start');
+  $('gameView').classList.toggle('hidden', name !== 'game');
+  $('resultView').classList.toggle('hidden', name !== 'result');
+}
+
+function startGame(seed, feeRate) {
+  const gen = generateWithTicks(seed, { history: 0 });
+  G.dayData = dayDataFromGenerated(gen);
+  G.engine = new TradingEngine(G.dayData, { feeRate });
+  G.seed = seed;
+  beginSession();
+}
+
+function beginSession() {
+  G.active = true;
+  G.resultShown = false;
+  G.tickAcc = 0;
+  G.lastFrame = performance.now();
+  showView('game');
+  $('seedBadge').textContent = `seed ${G.seed}`;
+  $('seedBadge').classList.remove('hidden');
+  $('gameMsg').textContent = '';
+  markDirty();
+}
+
+function markDirty() { G.dirty = true; }
+
+function saveGame(manual) {
+  if (!G.engine) return;
+  try {
+    const data = { v: 1, savedAt: new Date().toISOString(), snapshot: G.engine.saveSnapshot() };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    G.lastSave = performance.now();
+    G.dirty = false;
+    $('saveStatus').textContent = `保存しました（${new Date().toLocaleTimeString('ja-JP')}）`;
+    refreshSaveInfo();
+  } catch (e) {
+    if (manual) $('saveStatus').textContent = '保存できませんでした（ブラウザの保存領域が使えません）';
+  }
+}
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function refreshSaveInfo() {
+  const data = loadSave();
+  if (data && data.snapshot) {
+    $('resumeBtn').disabled = false;
+    const when = data.savedAt ? new Date(data.savedAt).toLocaleString('ja-JP') : '';
+    $('saveInfo').textContent = `保存データあり（${when}）`;
+  } else {
+    $('resumeBtn').disabled = true;
+    $('saveInfo').textContent = '';
+  }
+}
+
+function resumeGame() {
+  const data = loadSave();
+  if (!data) return;
+  const snap = data.snapshot;
+  const gen = generateWithTicks(snap.dayRef.seed, snap.dayRef.config);
+  G.dayData = dayDataFromGenerated(gen);
+  try {
+    G.engine = TradingEngine.restore(snap, G.dayData);
+  } catch (e) {
+    $('startMsg').textContent = '保存データを復元できませんでした。';
+    $('startMsg').className = 'msg err';
+    return;
+  }
+  G.seed = snap.dayRef.seed;
+  beginSession();
+  $('gameMsg').textContent = '保存データから再開しました。一時停止中です。「再開する」で進行を再開できます。';
+  $('gameMsg').className = 'msg ok';
+}
+
+// ---------- rendering ----------
+
+function setPnlClass(el, value) {
+  el.className = 'v yen' + (value > 0 ? ' pos' : value < 0 ? ' neg' : '');
+}
+
+function render() {
+  if (!G.engine) return;
+  const st = G.engine.getState();
+  $('retryBadge').classList.toggle('hidden', !st.sameSeedRetry);
+  $('clockLabel').textContent = marketClockLabel(st);
+  $('priceNow').textContent = fmtP(st.currentPrice);
+  $('dayLabel').textContent = `${st.sessionIndex === 0 ? '前場' : '後場'} ／ ${st.barIndex + 1}本目`;
+  const badge = $('stateBadge');
+  const badgeText = {
+    RUNNING: '進行中', STOPPED: '停止中（価格保証）', PAUSED: '一時停止',
+    INTERMISSION: '待機中', CLOSED: '大引け',
+  }[st.clock];
+  badge.textContent = badgeText;
+  badge.classList.remove('hidden');
+  badge.classList.toggle('warn', st.clock === 'PAUSED' || st.clock === 'INTERMISSION');
+  badge.classList.toggle('stop', st.clock === 'STOPPED');
+
+  $('statCash').textContent = fmtY(st.cash);
+  $('statShares').textContent = st.positionShares > 0 ? `${st.positionShares.toLocaleString('ja-JP')}株` : 'なし';
+  $('statAvg').textContent = st.averageCost != null ? `${fmtP(st.averageCost)}円` : '—';
+  const unrealEl = $('statUnreal');
+  unrealEl.textContent = fmtSigned(roundHalfUpYen(st.unrealizedPnl));
+  setPnlClass(unrealEl, st.unrealizedPnl);
+  const realEl = $('statRealized');
+  realEl.textContent = fmtSigned(st.realizedPnlYen);
+  setPnlClass(realEl, st.realizedPnlYen);
+  $('statEquity').textContent = fmtY(st.equity);
+
+  const remaining = st.budgetRemainingSec;
+  $('budgetText').textContent = `${remaining.toFixed(1)}秒 ／ 60秒`;
+  const bar = $('budgetBar');
+  bar.firstElementChild.style.width = `${(remaining / 60) * 100}%`;
+  bar.classList.toggle('low', remaining < 10);
+
+  $('pausedOverlay').classList.toggle('hidden', st.clock !== 'PAUSED');
+  $('intermissionOverlay').classList.toggle('hidden', st.clock !== 'INTERMISSION');
+  if (st.clock === 'INTERMISSION') {
+    $('intermissionSummary').textContent =
+      `現金 ${fmtY(st.cash)} ／ 保有 ${st.positionShares}株 ／ 実現損益 ${fmtSigned(st.realizedPnlYen)} ／ 停止予算の残り ${remaining.toFixed(1)}秒`;
+  }
+  $('openPanelBtn').disabled = !(st.clock === 'RUNNING' || st.clock === 'STOPPED') || st.panelOpen;
+  $('pauseBtn').disabled = !(st.clock === 'RUNNING' || st.clock === 'STOPPED');
+
+  if (st.panelOpen) renderPanel(st);
+  drawChart(st);
+
+  if (st.clock !== G.lastClock) {
+    G.lastClock = st.clock;
+    markDirty();
+    if (st.clock === 'CLOSED' && !G.resultShown) {
+      G.resultShown = true;
+      showResult(st);
+    }
+  }
+}
+
+function panelPrice(st) {
+  return st.guaranteePrice !== null ? st.guaranteePrice : st.currentPrice;
+}
+
+function estimate(st, side, units) {
+  const shares = units * 10;
+  const amount = roundHalfUpYen(panelPrice(st) * shares);
+  const fee = feeYen(amount, G.engine.settings.feeRate);
+  return { shares, amount, fee, total: side === 'buy' ? amount + fee : amount - fee };
+}
+
+function renderPanel(st) {
+  const guaranteed = st.guaranteePrice !== null;
+  $('panelMode').textContent = guaranteed ? '保証価格で約定' : 'ライブ価格（受付時点）で約定';
+  $('panelPriceLabel').textContent = guaranteed
+    ? '保証価格（この価格で約定します）' : '現在の表示価格（確定した瞬間の価格で約定します）';
+  $('panelPrice').textContent = `${fmtP(panelPrice(st))}円`;
+  $('panelBudget').textContent = `${st.budgetRemainingSec.toFixed(1)}秒`;
+  $('panelBudget').style.color = st.budgetRemainingSec < 10 ? '#f87171' : '';
+  const units = Math.max(1, parseInt($('unitsInput').value || '1', 10) || 1);
+  const b = estimate(st, 'buy', units);
+  const s = estimate(st, 'sell', units);
+  $('estimateText').textContent =
+    `概算（${units}単位＝${b.shares}株）：買い ${fmtY(b.amount)}＋手数料 ${fmtY(b.fee)}＝${fmtY(b.total)} ／ 売り ${fmtY(s.amount)}−手数料 ${fmtY(s.fee)}＝${fmtY(s.total)}`;
+}
+
+function drawChart(st) {
+  const canvas = $('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth, cssH = 250;
+  if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.height = `${cssH}px`;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const totalBars = G.dayData.sessions.reduce((n, s) => n + s.bars.length, 0);
+  const morningBars = G.dayData.sessions[0].bars.length;
+  const bars = st.completedBars.map((b) => ({ ...b }));
+  if (st.clock !== 'CLOSED') bars.push({ ...st.currentBar, current: true });
+  if (bars.length === 0) return;
+
+  let lo = Infinity, hi = -Infinity;
+  for (const b of bars) { lo = Math.min(lo, b.low); hi = Math.max(hi, b.high); }
+  if (st.guaranteePrice !== null) { lo = Math.min(lo, st.guaranteePrice); hi = Math.max(hi, st.guaranteePrice); }
+  if (st.averageCost != null) { lo = Math.min(lo, st.averageCost); hi = Math.max(hi, st.averageCost); }
+  const pad = (hi - lo) * 0.08 || 10;
+  lo -= pad; hi += pad;
+
+  const plotW = cssW - 52, plotH = cssH - 22;
+  const x0 = 4, y0 = 6;
+  const step = plotW / totalBars;
+  const y = (p) => y0 + (hi - p) / (hi - lo) * plotH;
+
+  ctx.strokeStyle = '#22304e';
+  ctx.fillStyle = '#8fa1c4';
+  ctx.font = '10px sans-serif';
+  ctx.beginPath(); ctx.moveTo(x0, y(hi - pad)); ctx.lineTo(x0 + plotW, y(hi - pad)); ctx.stroke();
+  ctx.fillText(fmtP(hi - pad), x0 + plotW + 4, y(hi - pad) + 3);
+  ctx.fillText(fmtP(lo + pad), x0 + plotW + 4, y(lo + pad) + 3);
+  // session divider
+  const divX = x0 + step * morningBars;
+  ctx.strokeStyle = '#33415e';
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(divX, y0); ctx.lineTo(divX, y0 + plotH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillText('前場', x0 + 2, cssH - 6);
+  ctx.fillText('後場', divX + 4, cssH - 6);
+
+  bars.forEach((b, i) => {
+    const cx = x0 + step * (i + 0.5);
+    const up = b.close >= b.open;
+    const color = up ? '#f87171' : '#60a5fa';
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, y(b.high)); ctx.lineTo(cx, y(b.low)); ctx.stroke();
+    const top = y(Math.max(b.open, b.close)), bottom = y(Math.min(b.open, b.close));
+    const w = Math.max(2, step * 0.62);
+    if (b.current) ctx.globalAlpha = 0.55;
+    ctx.fillRect(cx - w / 2, top, w, Math.max(1.5, bottom - top));
+    ctx.globalAlpha = 1;
+  });
+
+  if (st.guaranteePrice !== null) {
+    ctx.strokeStyle = '#22d3ee';
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, y(st.guaranteePrice)); ctx.lineTo(x0 + plotW, y(st.guaranteePrice)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#22d3ee';
+    ctx.fillText('保証価格', x0 + 4, y(st.guaranteePrice) - 4);
+  }
+  if (st.averageCost != null) {
+    ctx.strokeStyle = '#fbbf24';
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(x0, y(st.averageCost)); ctx.lineTo(x0 + plotW, y(st.averageCost)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText('平均取得', x0 + 4, y(st.averageCost) - 4);
+  }
+  // current price marker
+  ctx.fillStyle = '#e8ecf4';
+  ctx.beginPath();
+  ctx.arc(x0 + step * (bars.length - 0.5), y(st.currentPrice), 2.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function showResult(st) {
+  showView('result');
+  $('resCash').textContent = fmtY(st.cash);
+  const pnl = $('resPnl');
+  pnl.textContent = fmtSigned(st.realizedPnlYen);
+  setPnlClass(pnl, st.realizedPnlYen);
+  $('resTrades').textContent = `${st.trades.length}回`;
+  $('resBudget').textContent = `${st.budgetUsedSec.toFixed(1)}秒`;
+  $('resPeak').textContent = fmtY(st.peakEquity);
+  $('resMaxLoss').textContent = fmtY(st.maxUnrealizedLoss);
+  const body = $('tradesBody');
+  body.innerHTML = '';
+  const minuteOf = (t) => {
+    const gen = G.dayData.sessions[t.session].bars[t.bar];
+    return gen.minute ?? null;
+  };
+  for (const t of st.trades) {
+    const m = minuteOf(t);
+    const time = m === null ? '-' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const tr = document.createElement('tr');
+    const pnlText = t.realizedPnlYen === null ? '—' : fmtSigned(t.realizedPnlYen);
+    tr.innerHTML = `<td>${time}${t.forced ? '（強制決済）' : ''}</td><td>${t.side === 'buy' ? '買い' : '売り'}</td>` +
+      `<td>${t.shares}</td><td>${fmtP(t.price)}</td><td>${fmtY(t.feeYen)}</td><td>${pnlText}</td>`;
+    body.appendChild(tr);
+  }
+  saveGame(false);
+}
+
+// ---------- main loop ----------
+
+function loop() {
+  if (!G.active || !G.engine) return;
+  const now = performance.now();
+  let dtMs = now - G.lastFrame;
+  G.lastFrame = now;
+  if (dtMs < 0) dtMs = 0;
+  const st = G.engine.getState();
+  if (st.clock === 'RUNNING') {
+    G.tickAcc += Math.min(dtMs, 250) * G.speed;
+    while (G.tickAcc >= 100) {
+      G.tickAcc -= 100;
+      const r = G.engine.advanceTick();
+      if (!r.advanced) { G.tickAcc = 0; break; }
+    }
+  } else if (st.clock === 'STOPPED') {
+    G.engine.elapse(dtMs / 1000);
+  }
+  render();
+  if (G.dirty && now - G.lastSave > 600) saveGame(false);
+}
+setInterval(loop, 25);
+
+// ---------- wiring ----------
+
+$('randomSeedBtn').addEventListener('click', () => {
+  $('seedInput').value = Math.floor(Math.random() * 900000) + 1;
+});
+$('startBtn').addEventListener('click', () => {
+  const seed = parseInt($('seedInput').value, 10);
+  if (!Number.isInteger(seed)) {
+    $('startMsg').textContent = 'シードは整数で入力してください。';
+    $('startMsg').className = 'msg err';
+    return;
+  }
+  startGame(seed, parseFloat($('feeSelect').value));
+});
+$('resumeBtn').addEventListener('click', resumeGame);
+$('speedSelect').addEventListener('change', (e) => { G.speed = parseInt(e.target.value, 10); });
+$('pauseBtn').addEventListener('click', () => {
+  G.engine.pause();
+  $('orderPanel').classList.add('hidden');
+  markDirty(); render();
+});
+$('resumeBtn2').addEventListener('click', () => { G.engine.resume(); markDirty(); render(); });
+$('proceedBtn').addEventListener('click', () => { G.engine.proceedToNextSession(); markDirty(); render(); });
+$('saveBtn').addEventListener('click', () => saveGame(true));
+$('openPanelBtn').addEventListener('click', () => {
+  const r = G.engine.openPanel();
+  if (!r.ok) {
+    $('gameMsg').textContent = REASONS[r.reason] || 'パネルを開けませんでした。';
+    $('gameMsg').className = 'msg err';
+    return;
+  }
+  G.panelOrderId = `ui-${++G.orderSeq}-${Date.now()}`;
+  $('panelMsg').textContent = '';
+  $('orderPanel').classList.remove('hidden');
+  render();
+});
+$('cancelPanelBtn').addEventListener('click', () => {
+  G.engine.cancelPanel();
+  $('orderPanel').classList.add('hidden');
+  markDirty(); render();
+});
+$('minusBtn').addEventListener('click', () => {
+  $('unitsInput').value = Math.max(1, (parseInt($('unitsInput').value, 10) || 1) - 1);
+  render();
+});
+$('plusBtn').addEventListener('click', () => {
+  $('unitsInput').value = (parseInt($('unitsInput').value, 10) || 1) + 1;
+  render();
+});
+$('unitsInput').addEventListener('input', render);
+$('maxBuyBtn').addEventListener('click', () => {
+  const st = G.engine.getState();
+  let lo = 0, hi = 100000;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (estimate(st, 'buy', mid).total <= st.cash) lo = mid; else hi = mid - 1;
+  }
+  $('unitsInput').value = Math.max(1, lo);
+  render();
+});
+$('maxSellBtn').addEventListener('click', () => {
+  const st = G.engine.getState();
+  $('unitsInput').value = Math.max(1, Math.floor(st.positionShares / 10));
+  render();
+});
+
+function submit(side) {
+  const units = parseInt($('unitsInput').value, 10);
+  const r = G.engine.submitOrder({ side, units, clientOrderId: G.panelOrderId });
+  if (r.status === 'filled') {
+    const t = r.trade;
+    $('orderPanel').classList.add('hidden');
+    $('gameMsg').textContent =
+      `約定しました：${side === 'buy' ? '買い' : '売り'} ${t.shares}株 ＠ ${fmtP(t.price)}円（手数料 ${fmtY(t.feeYen)}）`;
+    $('gameMsg').className = 'msg ok';
+    markDirty();
+  } else {
+    $('panelMsg').textContent = REASONS[r.reason] || `注文できませんでした（${r.reason}）`;
+    $('panelMsg').className = 'msg err';
+  }
+  render();
+}
+$('buyBtn').addEventListener('click', () => submit('buy'));
+$('sellBtn').addEventListener('click', () => submit('sell'));
+
+function retry() {
+  if (!confirm('この日を最初からやり直しますか？（同じ相場の再挑戦＝相場記憶あり）')) return;
+  G.engine.retryDay();
+  G.resultShown = false;
+  $('orderPanel').classList.add('hidden');
+  showView('game');
+  $('gameMsg').textContent = '同じ日を最初からやり直しています（相場記憶あり）。';
+  $('gameMsg').className = 'msg ok';
+  markDirty(); render();
+}
+$('retryBtn').addEventListener('click', retry);
+$('retryBtn2').addEventListener('click', retry);
+
+function toTitle() {
+  G.active = false;
+  showView('start');
+  $('seedInput').value = Math.floor(Math.random() * 900000) + 1;
+  refreshSaveInfo();
+}
+$('quitBtn').addEventListener('click', toTitle);
+$('newDayBtn').addEventListener('click', toTitle);
+
+refreshSaveInfo();
+</script>
+</body>
+</html>
