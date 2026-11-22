@@ -1,0 +1,495 @@
+{
+  "schemaVersion": "h5.5-1.0",
+  "status": "H5.5 integration candidate, not visually approved",
+  "canvas": {
+    "width": 450,
+    "height": 800,
+    "aspect": "9:16",
+    "coordinates": "screen-space normalized by width/height on export",
+    "origin": "top-left"
+  },
+  "floor": {
+    "walkablePolygon": [
+      [
+        32,
+        414
+      ],
+      [
+        418,
+        414
+      ],
+      [
+        438,
+        735
+      ],
+      [
+        225,
+        784
+      ],
+      [
+        13,
+        735
+      ]
+    ],
+    "effectiveCharacterRadius": 18,
+    "projection": {
+      "type": "shallow cutaway preview",
+      "scaleBackY": 500,
+      "scaleFrontY": 760,
+      "scaleAtBack": 0.84,
+      "scaleAtFront": 1.0,
+      "zSorting": "actor footY; furniture occlusion future improvement"
+    },
+    "waypointGraph": {
+      "nodes": {
+        "hub": [
+          211,
+          642
+        ],
+        "left": [
+          173,
+          619
+        ],
+        "right": [
+          250,
+          619
+        ],
+        "north": [
+          215,
+          583
+        ]
+      },
+      "edges": [
+        [
+          "hub",
+          "left"
+        ],
+        [
+          "left",
+          "desk"
+        ],
+        [
+          "hub",
+          "right"
+        ],
+        [
+          "right",
+          "bed"
+        ],
+        [
+          "hub",
+          "north"
+        ],
+        [
+          "north",
+          "window"
+        ],
+        [
+          "hub",
+          "sofa"
+        ],
+        [
+          "hub",
+          "rug"
+        ]
+      ]
+    }
+  },
+  "furniture": [
+    {
+      "id": "desk",
+      "name": "デスク",
+      "kind": "desk",
+      "position": {
+        "x": 100,
+        "y": 520
+      },
+      "render": {
+        "source": "assets/desk.webp",
+        "width": 169,
+        "height": 173,
+        "layer": "furniture"
+      },
+      "footprintLocal": [
+        [
+          -65,
+          -76
+        ],
+        [
+          65,
+          -76
+        ],
+        [
+          65,
+          0
+        ],
+        [
+          -65,
+          0
+        ]
+      ],
+      "interaction": {
+        "spotId": "desk",
+        "approachOffset": {
+          "x": 26,
+          "y": 61
+        },
+        "face": "north",
+        "capacity": 1,
+        "action": "pc_work",
+        "slots": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "occlusion": {
+        "mode": "simple-depth",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": true
+    },
+    {
+      "id": "sofa",
+      "name": "ソファ",
+      "kind": "sofa",
+      "position": {
+        "x": 367,
+        "y": 681
+      },
+      "render": {
+        "source": "assets/sofa.webp",
+        "width": 145,
+        "height": 106,
+        "layer": "furniture"
+      },
+      "footprintLocal": [
+        [
+          -58,
+          -101
+        ],
+        [
+          58,
+          -101
+        ],
+        [
+          58,
+          0
+        ],
+        [
+          -58,
+          0
+        ]
+      ],
+      "interaction": {
+        "spotId": "sofa",
+        "approachOffset": {
+          "x": -94,
+          "y": 42
+        },
+        "face": "east",
+        "capacity": 1,
+        "action": "relax",
+        "slots": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "occlusion": {
+        "mode": "simple-depth",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": true
+    },
+    {
+      "id": "bed",
+      "name": "ベッド",
+      "kind": "bed",
+      "position": {
+        "x": 358,
+        "y": 514
+      },
+      "render": {
+        "source": "assets/bed.webp",
+        "width": 150,
+        "height": 123,
+        "layer": "furniture"
+      },
+      "footprintLocal": [
+        [
+          -71,
+          -70
+        ],
+        [
+          71,
+          -70
+        ],
+        [
+          71,
+          0
+        ],
+        [
+          -71,
+          0
+        ]
+      ],
+      "interaction": {
+        "spotId": "bed",
+        "approachOffset": {
+          "x": -98,
+          "y": 58
+        },
+        "face": "east",
+        "capacity": 1,
+        "action": "sleep",
+        "slots": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "occlusion": {
+        "mode": "simple-depth",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": true
+    },
+    {
+      "id": "rug",
+      "name": "丸いラグ",
+      "kind": "rug",
+      "position": {
+        "x": 207,
+        "y": 714
+      },
+      "render": {
+        "source": "assets/rug.webp",
+        "width": 239,
+        "height": 126,
+        "layer": "floor"
+      },
+      "footprintLocal": [],
+      "interaction": {
+        "spotId": "rug",
+        "approachOffset": {
+          "x": -1,
+          "y": 7
+        },
+        "face": "north",
+        "capacity": 2,
+        "action": "greet",
+        "slots": [
+          [
+            -24,
+            0
+          ],
+          [
+            24,
+            0
+          ]
+        ]
+      },
+      "occlusion": {
+        "mode": "floor",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": true
+    },
+    {
+      "id": "window",
+      "name": "窓辺",
+      "kind": "window",
+      "position": {
+        "x": 108,
+        "y": 293
+      },
+      "render": null,
+      "footprintLocal": [],
+      "interaction": {
+        "spotId": "window",
+        "approachOffset": {
+          "x": 82,
+          "y": 253
+        },
+        "face": "north",
+        "capacity": 1,
+        "action": "read_news",
+        "slots": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "occlusion": {
+        "mode": "background"
+      },
+      "rearrangeable": false,
+      "fixture": true
+    },
+    {
+      "id": "lamp",
+      "name": "ランプ",
+      "kind": "lamp",
+      "position": {
+        "x": 407,
+        "y": 465
+      },
+      "render": {
+        "source": "assets/lamp.webp",
+        "width": 51,
+        "height": 100,
+        "layer": "furniture"
+      },
+      "footprintLocal": [
+        [
+          -10,
+          -14
+        ],
+        [
+          10,
+          -14
+        ],
+        [
+          10,
+          -2
+        ],
+        [
+          -10,
+          -2
+        ]
+      ],
+      "interaction": {
+        "spotId": null,
+        "approachOffset": null,
+        "face": null,
+        "capacity": 0,
+        "action": "toggle_light",
+        "slots": []
+      },
+      "occlusion": {
+        "mode": "simple-depth",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": true
+    },
+    {
+      "id": "news",
+      "name": "相場掲示板",
+      "kind": "board",
+      "position": {
+        "x": 303,
+        "y": 240
+      },
+      "render": {
+        "source": "assets/news.webp",
+        "width": 119,
+        "height": 96,
+        "layer": "wall"
+      },
+      "footprintLocal": [],
+      "interaction": {
+        "spotId": null,
+        "approachOffset": null,
+        "face": null,
+        "capacity": 0,
+        "action": "view_market",
+        "slots": []
+      },
+      "occlusion": {
+        "mode": "background",
+        "frontSplitStatus": "not-implemented"
+      },
+      "rearrangeable": false
+    }
+  ],
+  "actors": [
+    {
+      "id": "hamster",
+      "name": "ハムスター",
+      "image": "assets/hamster_original.webp",
+      "nominalWidth": 121,
+      "nativeAspect": 1.0326975476839237,
+      "spawn": {
+        "x": 158,
+        "y": 713
+      },
+      "animationBaseline": "B initial hybrid ③; H1 static preview only",
+      "speed": 74,
+      "idleSeconds": [
+        4,
+        10
+      ],
+      "motionAdapter": "hybrid_v1"
+    },
+    {
+      "id": "penguin",
+      "name": "ペンギン",
+      "image": "assets/penguin.webp",
+      "nominalWidth": 102,
+      "nativeAspect": 0.8096947935368043,
+      "spawn": {
+        "x": 265,
+        "y": 730
+      },
+      "animationBaseline": "H4: adapt legacy hybrid API, with penguin-specific sprite rendering",
+      "speed": 55,
+      "idleSeconds": [
+        4,
+        10
+      ],
+      "motionAdapter": "penguin_simple"
+    }
+  ],
+  "reservedSpotsPolicy": {
+    "spotCapacity": "single except rug allows two",
+    "multiActorCollision": "H4 to implement 2-actor spot reservation and avoid overlap",
+    "tapPreemption": "H3/H4: tap overrides autonomous walking"
+  },
+  "futureRearrangement": {
+    "requiresSceneUpdate": [
+      "position",
+      "footprintLocal placement",
+      "interaction approach offsets",
+      "occlusion bounds"
+    ],
+    "requiresPathGraphRebuild": true,
+    "furnitureAssetsIndependentFromBackground": true
+  },
+  "activities": {
+    "pc_work": {
+      "name": "PC作業",
+      "icon": "⌨",
+      "seconds": 5.5
+    },
+    "relax": {
+      "name": "休憩",
+      "icon": "♥",
+      "seconds": 6
+    },
+    "sleep": {
+      "name": "睡眠",
+      "icon": "Zzz",
+      "seconds": 7
+    },
+    "greet": {
+      "name": "挨拶",
+      "icon": "♪",
+      "seconds": 4
+    },
+    "read_news": {
+      "name": "ニュースを読む",
+      "icon": "!",
+      "seconds": 5
+    }
+  },
+  "ui": {
+    "title": "H5.5 家具・予約・生活リズム",
+    "sceneDisplay": "prototype",
+    "marketData": "mock-only"
+  }
+}
