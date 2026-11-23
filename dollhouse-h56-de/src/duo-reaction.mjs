@@ -33,7 +33,7 @@ export class DuoReactionController {
   if(this.enabled&&!this.togetherLatch&&!this.active&&this.cooldownRemaining<=0){
    const started=this.begin('greet',sim);return {started,canceled:false};
   }
-  if(this.active||this.cooldownRemaining<=0)this.togetherLatch=true;
+  if(this.enabled&&(this.active||this.cooldownRemaining<=0))this.togetherLatch=true;
   return {started:false,canceled:false};
  }
  step(dt){
