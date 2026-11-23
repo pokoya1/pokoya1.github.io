@@ -14,6 +14,16 @@ export function determineHamsterPose(a,spots){
  }
  return {view:'three',direction:a.face,reason:a.mode==='waiting'?'待機':'通常待機'};
 }
+// D-6: the penguin follows the hamster's two-second north-facing rear cameo.
+// There is no approved front-facing penguin sprite; greet stays on the existing F0.
+export function determinePenguinPose(a, spots){
+ const desired=determineHamsterPose(a,spots);
+ if(desired.view==='front')return {...desired,view:'three',reason:'挨拶：既存3/4姿勢'};
+ // Keep the direction at the end of the approach path: the left/right rear sprites are distinct.
+ // This changes visual orientation only; simulation facing, pathing and reservations remain untouched.
+ if(desired.view==='rear')return {...desired,direction:a.face===-1?-1:1,reason:'北向き：斜め背面（'+(a.face===-1?'左':'右')+'）／冒頭2秒'};
+ return desired;
+}
 export function createPoseController({duration=.20}={}){
  if(!Number.isFinite(duration)||duration<=0)throw new RangeError('duration');
  let view='three',from='three',goal='three',elapsed=duration,lastDir=1,reason='通常待機';
