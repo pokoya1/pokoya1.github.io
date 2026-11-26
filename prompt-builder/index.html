@@ -34,6 +34,10 @@
       <input type="checkbox" id="useReference" checked>
       <span>参照画像を添付して使う（顔・髪型・画風を維持）</span>
     </label>
+    <label class="switch">
+      <input type="checkbox" id="cornerIconToggle">
+      <span>左下のアイコンを表示</span>
+    </label>
   </section>
 
   <section class="card">
@@ -61,6 +65,7 @@
 </main>
 
 <footer><p>完全オフライン動作 ・ データは prompts.json で編集できます</p></footer>
+<div id="cornerIcon" hidden aria-hidden="true">⭐</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="./app.js"></script>
 </body>
