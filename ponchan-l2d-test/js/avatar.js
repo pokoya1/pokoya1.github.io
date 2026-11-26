@@ -322,6 +322,8 @@ class PonchanAvatar {
     this.options = options;
     this.fixes = { ...DEFAULT_FIXES, ...(options.fixes || {}) };
     this.onStatus = options.onStatus || (() => {});
+    this.onExpression = options.onExpression || (() => {});
+    this._random = null; // {names:[...], minS, maxS, elapsed, nextIn}
     this.state = zeroParams();
     this.shape = 0;
     this.playing = false;
@@ -407,13 +409,26 @@ class PonchanAvatar {
   }
   setZoom(z) { this.zoom = !!z; this.renderOnce(); }
 
-  setExpression(name) {
+  setExpression(name, internal = false) {
+    if (!internal) this.stopRandomExpressions();
     this.expression.select(name, this.playing || this.expression.transitioning ? null : this.state, this.shape);
-    if (!this.playing) {
-      // v0.4同様、停止中でも遷移は tick で進む。ここでは即時に1フレーム進めておく
-    }
     this.onStatus("expression:" + name);
+    this.onExpression(name);
   }
+
+  /* ランダム表情切替: 指定した表情リストから、minS〜maxS秒のランダム間隔でランダムに選んで切り替える。
+     待機中・発話中・停止中のいずれでも動く。手動の表情変更や stopRandomExpressions() で終了する。 */
+  startRandomExpressions(names, minS = 3.5, maxS = 8) {
+    const list = (names || []).filter((n) => EXPRESSIONS[n]);
+    if (!list.length) throw new Error("no valid expressions");
+    this._random = { names: list, minS, maxS, elapsed: 0, nextIn: minS + Math.random() * (maxS - minS) };
+    this.onStatus("random:start");
+    return this._random;
+  }
+  stopRandomExpressions() {
+    if (this._random) { this._random = null; this.onStatus("random:stop"); }
+  }
+  get randomActive() { return !!this._random; }
   getExpression() { return this.expression.name; }
 
   setMode(mode) {
@@ -437,6 +452,7 @@ class PonchanAvatar {
     this.onStatus(mode === "talk" ? "talk" : "idle");
   }
   stop() {
+    this.stopRandomExpressions();
     this.playing = false;
     this.expression.trans = null;
     this.onStatus("stopped");
@@ -471,6 +487,7 @@ class PonchanAvatar {
     return {
       ready: this.ready, destroyed: this.destroyed, playing: this.playing, mode: this.mode,
       expression: this.expression.name, transitioning: this.expression.transitioning,
+      random: this._random ? { names: [...this._random.names], nextIn: this._random.nextIn } : null,
       frames: this.renderer ? this.renderer.frames : 0, fps: Math.round(fps * 10) / 10,
       clockTime: this.clock.t, blinkCount: this.clock.blinkTimes.length, gazeCount: this.clock.gazeTimes.length,
       params: this.getParameters(),
@@ -478,6 +495,7 @@ class PonchanAvatar {
   }
   destroy() {
     this.destroyed = true;
+    this._random = null;
     this.playing = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
@@ -492,6 +510,16 @@ class PonchanAvatar {
     if (this.destroyed) return;
     const dt = this.last ? clamp((t - this.last) / 1000, 0, 0.1) : 0;
     this.last = t;
+    if (this._random && !this.hidden && dt > 0) {
+      const r = this._random;
+      r.elapsed += dt;
+      if (r.elapsed >= r.nextIn) {
+        r.elapsed = 0;
+        r.nextIn = r.minS + Math.random() * (r.maxS - r.minS);
+        const name = r.names[Math.floor(Math.random() * r.names.length)];
+        this.setExpression(name, true);
+      }
+    }
     if (this.ready && !this.hidden && (this.playing || this.expression.transitioning)) {
       const wasTransitioning = this.expression.transitioning;
       this.expression.update(dt);
