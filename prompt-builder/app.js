@@ -150,6 +150,9 @@ if (typeof document !== 'undefined') {
     var ch0 = findItem(data.characters, cs.value); if (ch0 && ch0.note) $('charNote').textContent = ch0.note;
 
     ['useReference','bokeh','noText','noSnow'].forEach(function (id) { $(id).addEventListener('change', function () { manualEdit = false; refresh(); }); });
+    $('cornerIconToggle').addEventListener('change', function () {
+      $('cornerIcon').hidden = !$('cornerIconToggle').checked;
+    });
     document.querySelectorAll('input[name="ai"]').forEach(function (r) { r.addEventListener('change', function () { manualEdit = false; refresh(); }); });
     $('theme').addEventListener('input', function () { manualEdit = false; refresh(); });
     $('preview').addEventListener('input', function () { manualEdit = true; });
@@ -175,6 +178,7 @@ if (typeof document !== 'undefined') {
       ['expressions','poses','gestures','outfits','angles','distances','aspectRatios','backgrounds'].forEach(function (cat) { setVal(cat, def[cat]); });
       setChk('useReference', def.useReference); setChk('bokeh', def.bokeh); setChk('noText', def.noText); setChk('noSnow', def.noSnow);
       $('theme').value = def.theme || '';
+      $('cornerIconToggle').checked = false; $('cornerIcon').hidden = true;
       if (def.ai) { var r = document.querySelector('input[name="ai"][value="' + def.ai + '"]'); if (r) r.checked = true; }
     }
 
