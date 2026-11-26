@@ -60,7 +60,7 @@ class MotionClock {
     this.blinkClose = 0; this.blinkHold = 0; this.blinkOpen = 0;
     this.gazeAt = rand(0.9, 2.2); this.gazeStart = 0; this.gazeEnd = 0; this.gazeFrom = 0; this.gazeTo = 0; this.gaze = 0;
     this.tiltAt = rand(1.5, 3.0); this.tiltStart = 0; this.tiltEnd = 0; this.tiltFrom = 0; this.tiltTo = 0; this.tilt = 0;
-    this.talkAt = 0.25; this.talkStart = 0; this.talkEnd = 0; this.talkPeak = 0; this.talkCount = 0;
+    this.talkAt = 0.25; this.talkStart = 0; this.talkEnd = 0; this.talkPeak = 0; this.talkCount = 0; this.talkRest = 0;
     this.blinkTimes = []; this.gazeTimes = []; this.talkTimes = [];
     this.breathPhase = 0;
     this.hairLagValue = 0;
@@ -94,13 +94,16 @@ class MotionClock {
     if (t >= this.talkAt) {
       this.talkTimes.push(t); if (this.talkTimes.length > 4096) this.talkTimes.shift();
       this.talkStart = t;
-      // 口パクのテンポ: ユーザーの所感で2段階遅くした（2026-11-27、当初比で持続・間隔とも約1.8倍）
-      const dur = rand(0.29, 0.56);
-      this.talkEnd = t + dur; this.talkPeak = rand(0.28, 0.87); this.talkCount++;
-      this.talkAt = this.talkEnd + (this.talkCount % 5 === 0 ? rand(0.65, 1.30) : rand(0.03, 0.17));
+      // 口パク: ゆっくりめ＋「毎回閉じ切らない」方式（2026-11-27）。実際の発話では口は
+      // 音節ごとに全開閉しないため、短い間隔では小さな開きを残し、文節の区切りでのみ閉じる。
+      const dur = rand(0.32, 0.60);
+      this.talkEnd = t + dur; this.talkPeak = rand(0.24, 0.72); this.talkCount++;
+      const phraseBreak = this.talkCount % 5 === 0;
+      this.talkRest = phraseBreak ? 0 : rand(0.10, 0.20);
+      this.talkAt = this.talkEnd + (phraseBreak ? rand(0.70, 1.40) : rand(0.04, 0.19));
     }
     const u = clamp((t - this.talkStart) / Math.max(0.01, this.talkEnd - this.talkStart), 0, 1);
-    const m = this.talkPeak * Math.sin(Math.PI * u) ** 2;
+    const m = Math.max(this.talkPeak * Math.sin(Math.PI * u) ** 2, t > this.talkEnd ? this.talkRest : 0);
     this.breathPhase += dt * (2 * Math.PI / (4.7 + 0.35 * Math.sin(t * 0.17)));
     const breath = 0.72 * Math.sin(this.breathPhase);
     let hair = clamp(0.36 * Math.sin(this.breathPhase - 0.62) + 0.19 * this.tilt + 0.11 * Math.sin(t * 0.77), -1, 1);
@@ -396,7 +399,7 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127h")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127i")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
     // 1枚の失敗・停滞で全体が止まらないよう、失敗時は null（欠け素材）として続行する。
