@@ -12,6 +12,9 @@
   button { font-size:15px; padding:8px 14px; }
   #demoStatus { font-size:13px; color:#bbb; min-height:1.2em; }
   p.note { font-size:12px; color:#999; max-width:560px; }
+
+  #recordPanel { max-width:440px; box-sizing:border-box; margin:12px auto; padding:10px; border:1px solid #aeb7c3; border-radius:8px; background:#fff; color:#222; }
+  #recordPanel legend {font-weight:600;} #recStatus {font-size:13px; min-height:1.2em;} #recSave {display:inline-block; padding:9px; color:#204d79;} #recSave[hidden] {display:none;}
 </style>
 </head>
 <body>
@@ -21,9 +24,11 @@
   <button id="demoStart">デモ再生（30秒）</button>
   <button id="demoStop">停止</button>
 </div>
+<fieldset id="recordPanel"><legend>動画切り出し（操作UIなし）</legend><label for="recFormat">形式 <select id="recFormat"><option value="mp4">MP4（優先）</option><option value="webm">WebM（変換用）</option></select></label><button id="recStart">30秒デモを録画</button><button id="recStop" disabled>録画終了</button><div id="recStatus" aria-live="polite">無音・30fps目標</div><a id="recSave" hidden>動画を保存</a><p>録画中は画面を表示したままにしてください。1080×1920。</p></fieldset>
 <div id="demoStatus">待機中</div>
-<p class="note">F-01 技術試作：UIを含まない縦9:16ステージに、固定タイムラインで待機・視線・表情・模擬発話を自動再生します。喜びはD-05で正式採用された案Aです（大喜びは一旦外しました）。</p>
-<script src="js/avatar.js?v=20261127i"></script>
-<script src="js/demo.js?v=20261127i"></script>
+<p class="note">F-01 技術試作：UIを含まない縦9:16ステージに、固定タイムラインで待機・視線・表情・模擬発話を自動再生します。D-06の喜び再調整案・自然発話演出を使用（大喜びなし）。D-06 v0.4では全編を顔拡大とし、全身場面を表情変化と自然発話に置き換えた。</p>
+<script src="js/avatar.js?v=d06v04"></script>
+<script src="js/record.js?v=d06v04"></script>
+<script src="js/demo.js?v=d06v04"></script>
 </body>
 </html>
