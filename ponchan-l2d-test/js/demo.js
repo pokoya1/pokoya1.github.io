@@ -34,13 +34,13 @@
     return frameCur;
   }
 
-  // 固定タイムライン（秒）。喜び・大喜びは D-05 案A（未承認候補）。
+  // 固定タイムライン（秒）。喜びは D-05 案A（正式採用）。大喜びは一旦外した。
   const TIMELINE = [
     { t: 0.0,  run: (a) => { a.setMode("idle"); a.setExpression("neutral"); } },
     { t: 6.0,  run: (a) => a.setExpression("happy") },     // 微笑
     { t: 10.0, run: (a) => a.setExpression("joy") },       // 喜び
-    { t: 15.0, run: (a) => a.setExpression("excited") },   // 大喜び
-    { t: 18.0, run: (a) => a.setExpression("joy") },       // 喜びへ復帰
+    { t: 15.0, run: (a) => a.setExpression("happy") },     // 微笑
+    { t: 18.0, run: (a) => a.setExpression("joy") },       // 喜び
     { t: 20.0, run: (a) => a.setExpression("surprised") },
     { t: 21.4, run: (a) => a.setExpression("concerned") },
     { t: 22.8, run: (a) => a.setExpression("relaxed") },
