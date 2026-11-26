@@ -41,7 +41,7 @@ async function createAvatar() {
     basePath: "assets/",
     onExpression: (name) => { exprSel.value = name; },
     onStatus: (s) => {
-      if (s === "random:stop") randToggle.textContent = "ランダム開始";
+      if (s === "random:stop" || s === "random:start") syncRandomButtons();
       if (s.startsWith("expression:")) {
         const name = s.slice("expression:".length);
         setStatus("表情遷移中：" + name);
@@ -119,18 +119,35 @@ exprSel.addEventListener("change", (e) => {
 });
 document.getElementById("destroy").addEventListener("click", () => { if (avatar) { avatar.destroy(); avatar = null; window.avatar = null; } });
 const randToggle = document.getElementById("randToggle");
+const randAllToggle = document.getElementById("randAllToggle");
+function syncRandomButtons() {
+  const active = avatar && avatar.randomActive;
+  randToggle.textContent = active && randMode === "pair" ? "ランダム停止" : "ランダム開始";
+  randAllToggle.textContent = active && randMode === "all" ? "全表情ランダム停止" : "全表情ランダム開始";
+  if (!active) randMode = null;
+}
+let randMode = null;
 randToggle.addEventListener("click", () => {
   if (!avatar) return;
-  if (avatar.randomActive) {
-    avatar.stopRandomExpressions();
-    randToggle.textContent = "ランダム開始";
-  } else {
+  if (avatar.randomActive) { avatar.stopRandomExpressions(); }
+  else {
     const a = document.getElementById("randA").value;
     const b = document.getElementById("randB").value;
+    randMode = "pair";
     avatar.startRandomExpressions([a, b], 3.5, 8);
-    randToggle.textContent = "ランダム停止";
     setStatus("ランダム切替中（3.5〜8秒間隔）");
   }
+  syncRandomButtons();
+});
+randAllToggle.addEventListener("click", () => {
+  if (!avatar) return;
+  if (avatar.randomActive) { avatar.stopRandomExpressions(); }
+  else {
+    randMode = "all";
+    avatar.startRandomExpressions(["neutral", "happy", "concerned", "surprised", "relaxed"], 3.5, 8);
+    setStatus("全表情ランダム切替中（3.5〜8秒間隔）");
+  }
+  syncRandomButtons();
 });
 document.getElementById("recreate").addEventListener("click", async () => {
   if (!avatar) await createAvatar();
