@@ -36,7 +36,7 @@ const EXPRESSIONS = {
   relaxed:   { mouth: 0,    brow: 0.12, blink: 1,    shape: 0 },
   // D-05 正式統合（案A）。大喜びはユーザーの違和感により一旦外した（2026-11-27）。
   // 喜びの頬は元画像の肌に寄せた柔らかい版（52_cheek-joy-soft）に差し替え。
-  joy:       { mouth: 0, brow: 0.50, blink: 0, shape: 0, closedMouth: 33, cheek: 34 },
+  joy:       { mouth: 0, brow: 0.30, blink: 0.15, shape: 0, closedMouth: 33, cheek: 34 },
 };
 function extrasOf(name) {
   const p = EXPRESSIONS[name] || {};
@@ -60,7 +60,7 @@ class MotionClock {
     this.blinkClose = 0; this.blinkHold = 0; this.blinkOpen = 0;
     this.gazeAt = rand(0.9, 2.2); this.gazeStart = 0; this.gazeEnd = 0; this.gazeFrom = 0; this.gazeTo = 0; this.gaze = 0;
     this.tiltAt = rand(1.5, 3.0); this.tiltStart = 0; this.tiltEnd = 0; this.tiltFrom = 0; this.tiltTo = 0; this.tilt = 0;
-    this.talkAt = 0.25; this.talkStart = 0; this.talkEnd = 0; this.talkPeak = 0; this.talkCount = 0; this.talkRest = 0;
+    this.talkAt = 0.25; this.talkStart = 0; this.talkEnd = 0; this.talkPeak = 0; this.talkCount = 0;
     this.blinkTimes = []; this.gazeTimes = []; this.talkTimes = [];
     this.breathPhase = 0;
     this.hairLagValue = 0;
@@ -94,16 +94,12 @@ class MotionClock {
     if (t >= this.talkAt) {
       this.talkTimes.push(t); if (this.talkTimes.length > 4096) this.talkTimes.shift();
       this.talkStart = t;
-      // 口パク: ゆっくりめ＋「毎回閉じ切らない」方式（2026-11-27）。実際の発話では口は
-      // 音節ごとに全開閉しないため、短い間隔では小さな開きを残し、文節の区切りでのみ閉じる。
-      const dur = rand(0.32, 0.60);
-      this.talkEnd = t + dur; this.talkPeak = rand(0.24, 0.72); this.talkCount++;
-      const phraseBreak = this.talkCount % 5 === 0;
-      this.talkRest = phraseBreak ? 0 : rand(0.10, 0.20);
-      this.talkAt = this.talkEnd + (phraseBreak ? rand(0.70, 1.40) : rand(0.04, 0.19));
+      const dur = rand(0.16, 0.31);
+      this.talkEnd = t + dur; this.talkPeak = rand(0.28, 0.87); this.talkCount++;
+      this.talkAt = this.talkEnd + (this.talkCount % 5 === 0 ? rand(0.35, 0.72) : rand(0.015, 0.09));
     }
     const u = clamp((t - this.talkStart) / Math.max(0.01, this.talkEnd - this.talkStart), 0, 1);
-    const m = Math.max(this.talkPeak * Math.sin(Math.PI * u) ** 2, t > this.talkEnd ? this.talkRest : 0);
+    const m = this.talkPeak * Math.sin(Math.PI * u) ** 2;
     this.breathPhase += dt * (2 * Math.PI / (4.7 + 0.35 * Math.sin(t * 0.17)));
     const breath = 0.72 * Math.sin(this.breathPhase);
     let hair = clamp(0.36 * Math.sin(this.breathPhase - 0.62) + 0.19 * this.tilt + 0.11 * Math.sin(t * 0.77), -1, 1);
@@ -134,6 +130,41 @@ class MotionClock {
       peaks.mouth = Math.max(peaks.mouth, v.mouth);
     }
     return { seconds, invalid, bounds, peaks, blinkTimes: c.blinkTimes, gazeTimes: c.gazeTimes, talkTimes: c.talkTimes };
+  }
+}
+
+/* D-06: phrase-based silent performance. Not audio synchronization. Independent from idle motion. */
+class SpeechPerformance {
+  constructor(rng) { this.rng = rng; this.t = 0; this.start = 0; this.phrase = null; this.phraseCount = 0; }
+  rand(a,b) { return lerp(a,b,this.rng()); }
+  nextPhrase() {
+    const syllables = [], n = 3 + Math.floor(this.rng()*3), accent = 1 + Math.floor(this.rng()*(n-1));
+    let t = 0;
+    for(let i=0;i<n;i++) {
+      const dur = this.rand(.32,.56), peak = i===accent ? this.rand(.52,.72) : this.rand(.20,.50);
+      syllables.push({at:t,dur,peak}); t+=dur+this.rand(.06,.15);
+    }
+    const pause=this.rand(.62,1.35), direction=this.rng()<.5?-1:1;
+    this.phrase = {syllables, accent, end:t, total:t+pause, direction, sideGaze:this.rand(.25,.65)*direction, blink: this.rng()<.65};
+    this.phraseCount++;
+  }
+  advance(dt) {
+    this.t+=clamp(dt,0,.1);
+    if (!this.phrase) { this.start=this.t; this.nextPhrase(); }
+    if (this.t-this.start>=this.phrase.total) {this.start+=this.phrase.total; this.nextPhrase();}
+    const p=this.phrase, t=this.t-this.start, a=p.syllables[p.accent];
+    let mouth=0;
+    for(const q of p.syllables) if(t>=q.at && t<q.at+q.dur) {
+      const u=(t-q.at)/q.dur;
+      mouth=q.peak*(u<.33?smooth(u/.33):u<.62?1:1-smooth((u-.62)/.38));
+      break;
+    }
+    // A small, timed head tilt emphasizes a syllable; gaze returns before the next phrase.
+    const pulse=(at,dur)=> {const u=(t-at)/dur;return u<=0||u>=1?0:Math.sin(Math.PI*u)**2;};
+    const accent=pulse(a.at-.18,a.dur+.65), pause=t>=p.end;
+    const glance=pulse(p.end-.28,Math.min(1.1,p.total-p.end+.28));
+    const blink=p.blink?pulse(p.end+.08,.25):0;
+    return {mouth,tilt: p.direction*.48*accent,brow:.24*accent,gaze:p.sideGaze*glance,blink,breath:.25*pulse(p.end,.6),pause,accent,phrase:this.phraseCount};
   }
 }
 
@@ -373,6 +404,8 @@ class PonchanAvatar {
     this.destroyed = false;
     this.hidden = document.hidden;
     this.clock = new MotionClock(options.rng || Math.random);
+    this.speech = new SpeechPerformance(options.speechRng || seededRng(82731));
+    this.speechHair = 0; this.speechState = null;
     this.expression = new ExpressionController();
     this.motionGain = 0; this.talkGain = 0;
     this.entryState = zeroParams();
@@ -399,7 +432,7 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127i")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=d06v02")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
     // 1枚の失敗・停滞で全体が止まらないよう、失敗時は null（欠け素材）として続行する。
@@ -463,10 +496,10 @@ class PonchanAvatar {
 
   /* ランダム表情切替: 指定した表情リストから、minS〜maxS秒のランダム間隔でランダムに選んで切り替える。
      待機中・発話中・停止中のいずれでも動く。手動の表情変更や stopRandomExpressions() で終了する。 */
-  startRandomExpressions(names, minS = 3.5, maxS = 8) {
-    const list = (names || []).filter((n) => EXPRESSIONS[n]);
+  startRandomExpressions(names, minS = 8, maxS = 15) {
+    const list = [...new Set((names || []).filter((n) => EXPRESSIONS[n]))];
     if (!list.length) throw new Error("no valid expressions");
-    this._random = { names: list, minS, maxS, elapsed: 0, nextIn: minS + Math.random() * (maxS - minS) };
+    this._random = { names: list, bag: [], minS, maxS, elapsed: 0, nextIn: minS + Math.random() * (maxS - minS) };
     this.onStatus("random:start");
     return this._random;
   }
@@ -491,6 +524,9 @@ class PonchanAvatar {
       this.clock = new MotionClock(this.options.rng || Math.random);
       this.last = 0;
       this.talkGain = 0;
+    }
+    if (mode === "talk" && (!this.playing || this.mode !== "talk")) {
+      this.speech = new SpeechPerformance(this.options.speechRng || Math.random); this.speechHair = 0; this.speechState=null;
     }
     this.mode = mode;
     this.playing = true;
@@ -540,7 +576,7 @@ class PonchanAvatar {
   }
   destroy() {
     this.destroyed = true;
-    this._random = null;
+    this.stopRandomExpressions();
     this.playing = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
@@ -561,7 +597,19 @@ class PonchanAvatar {
       if (r.elapsed >= r.nextIn) {
         r.elapsed = 0;
         r.nextIn = r.minS + Math.random() * (r.maxS - r.minS);
-        const name = r.names[Math.floor(Math.random() * r.names.length)];
+        // Shuffle bag: each selected expression once per cycle; avoid repeat at boundary.
+        if (!r.bag.length) {
+          r.bag = [...r.names];
+          for (let i = r.bag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [r.bag[i], r.bag[j]] = [r.bag[j], r.bag[i]];
+          }
+          if (r.bag.length > 1 && r.bag[0] === this.getExpression()) {
+            const j = 1 + Math.floor(Math.random() * (r.bag.length - 1));
+            [r.bag[0], r.bag[j]] = [r.bag[j], r.bag[0]];
+          }
+        }
+        const name = r.bag.shift();
         this.setExpression(name, true);
       }
     }
@@ -573,19 +621,22 @@ class PonchanAvatar {
         this.motionGain = clamp(this.motionGain + dt * 2, 0, 1);
         const m = this.clock.advance(dt, this.fixes.hairLag);
         const gain = smooth(this.motionGain);
-        this.talkGain = clamp(this.talkGain + dt * (this.mode === "talk" ? 4 : -4), 0, 1);
-        const mouth = base.shape === 0
-          ? lerp(base.mouth, Math.max(base.mouth * 0.35, m.mouth), smooth(this.talkGain))
-          : base.mouth;
+        this.talkGain = clamp(this.talkGain + dt * (this.mode === "talk" ? 2.5 : -2.5), 0, 1);
+        const speech = this.mode === "talk" ? this.speech.advance(dt) : (this.speechState || {mouth:0,tilt:0,gaze:0,brow:0,blink:0,breath:0,pause:true});
+        this.speechState = speech;
+        const sg = smooth(this.talkGain);
+        const speechMouth = speech.pause ? base.mouth : Math.max(base.mouth*.18, speech.mouth);
+        const mouth = base.shape === 0 ? lerp(base.mouth, speechMouth, sg) : base.mouth;
+        this.speechHair += (speech.tilt*.28*sg-this.speechHair)*(1-Math.exp(-dt/.28));
         const e = this.entryState;
         this.state = {
-          blink: lerp(e.blink, Math.max(base.blink, m.blink), gain),
-          gaze: lerp(e.gaze, m.gaze, gain),
-          breath: lerp(e.breath, m.breath, gain),
-          hair: lerp(e.hair, m.hair, gain),
-          tilt: lerp(e.tilt, m.tilt, gain),
+          blink: lerp(e.blink, Math.max(base.blink, m.blink*(1-.45*sg), speech.blink*sg), gain),
+          gaze: lerp(e.gaze, clamp(m.gaze*(1-.65*sg)+speech.gaze*sg,-1,1), gain),
+          breath: lerp(e.breath, clamp(m.breath+speech.breath*sg,-1,1), gain),
+          hair: lerp(e.hair, clamp(m.hair+this.speechHair,-1,1), gain),
+          tilt: lerp(e.tilt, clamp(m.tilt*(1-.45*sg)+speech.tilt*sg,-1,1), gain),
           mouth: lerp(e.mouth, mouth, gain),
-          brow: lerp(e.brow, base.brow, gain),
+          brow: lerp(e.brow, clamp(base.brow+speech.brow*sg,-1,1), gain),
         };
       } else {
         this.state = { ...this.state, blink: base.blink, brow: base.brow, mouth: base.mouth };
@@ -601,5 +652,6 @@ class PonchanAvatar {
 
 window.PonchanAvatar = PonchanAvatar;
 window.PonchanMotionClock = MotionClock;
+window.PonchanSpeechPerformance = SpeechPerformance;
 window.PONCHAN_EXPRESSIONS = Object.keys(EXPRESSIONS);
 window.PONCHAN_DEFAULT_FIXES = { ...DEFAULT_FIXES };
