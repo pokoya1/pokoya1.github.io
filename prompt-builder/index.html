@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#b5651d">
+<title>キャラクター画像生成プロンプトビルダー</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="stylesheet" href="./style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭐</text></svg>">
+</head>
+<body>
+<header>
+  <h1>⭐ キャラクター画像生成<br>プロンプトビルダー</h1>
+  <p class="sub">選ぶだけで、Gemini / GPT / Muse 向けの英語プロンプトを合成します</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>出力先AI</h2>
+    <div class="ai-tabs" role="radiogroup" aria-label="出力先AI">
+      <label><input type="radio" name="ai" value="gemini" checked><span>Gemini</span></label>
+      <label><input type="radio" name="ai" value="gpt"><span>GPT</span></label>
+      <label><input type="radio" name="ai" value="muse"><span>Muse</span></label>
+    </div>
+
+    <label class="field">
+      <span>キャラクター</span>
+      <select id="character"></select>
+    </label>
+    <p id="charNote" class="note"></p>
+
+    <label class="switch">
+      <input type="checkbox" id="useReference" checked>
+      <span>参照画像を添付して使う（顔・髪型・画風を維持）</span>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>表情・ポーズ・服装・構図・背景</h2>
+    <div id="selects"></div>
+    <label class="switch"><input type="checkbox" id="bokeh" checked><span>背景ぼかし</span></label>
+    <label class="switch"><input type="checkbox" id="noText" checked><span>文字・透かし除去（no text 等）</span></label>
+    <label class="switch"><input type="checkbox" id="noSnow"><span>雪モチーフ禁止</span></label>
+  </section>
+
+  <section class="card">
+    <h2>テーマ・コンテンツ指示（日本語のまま出力）</h2>
+    <textarea id="theme" rows="3" placeholder="例：記事の扉絵。野球の魅力を楽しく伝える雰囲気"></textarea>
+  </section>
+
+  <section class="card">
+    <h2>生成プロンプト（直接編集もできます）</h2>
+    <textarea id="preview" rows="14" aria-label="生成プロンプト"></textarea>
+    <div class="actions">
+      <button id="copyBtn" type="button" class="primary">📋 コピーする</button>
+      <button id="resetBtn" type="button">リセット</button>
+    </div>
+    <p class="note">選択を変えるとプレビューは再合成されます。コピー先のAIに、参照画像と一緒に貼ってください。</p>
+  </section>
+</main>
+
+<footer><p>完全オフライン動作 ・ データは prompts.json で編集できます</p></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="./app.js"></script>
+</body>
+</html>
