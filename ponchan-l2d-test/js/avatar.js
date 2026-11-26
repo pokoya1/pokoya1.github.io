@@ -395,13 +395,15 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127e")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127f")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
-    const images = await Promise.all(layers.map((l) => new Promise((res, rej) => {
+    // 1枚の失敗・停滞で全体が止まらないよう、失敗時は null（欠け素材）として続行する。
+    const images = await Promise.all(layers.map((l) => new Promise((res) => {
       const img = new Image();
-      img.onload = () => res(img);
-      img.onerror = () => rej(new Error("failed to load " + l.file));
+      const timer = setTimeout(() => res(null), 20000);
+      img.onload = () => { clearTimeout(timer); res(img); };
+      img.onerror = () => { clearTimeout(timer); res(null); };
       img.src = this.basePath + "parts/" + encodeURIComponent(l.file);
     })));
     return this._finishLoad(images, layers);
@@ -414,7 +416,10 @@ class PonchanAvatar {
     const parts = layers.map((l, idx) => {
       const [x1, y1, x2, y2] = l.bbox;
       const c = document.createElement("canvas");
-      if (preTrimmed) {
+      if (!images[idx]) {
+        // 読み込み失敗した素材は透明のプレースホルダにする（全体は止めない）
+        c.width = 1; c.height = 1;
+      } else if (preTrimmed) {
         // 埋め込みモード: 読み込んだ画像が既にbboxサイズなので、そのまま使う
         c.width = images[idx].naturalWidth; c.height = images[idx].naturalHeight;
         c.getContext("2d").drawImage(images[idx], 0, 0);
