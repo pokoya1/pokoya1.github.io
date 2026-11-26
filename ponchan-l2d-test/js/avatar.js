@@ -94,9 +94,10 @@ class MotionClock {
     if (t >= this.talkAt) {
       this.talkTimes.push(t); if (this.talkTimes.length > 4096) this.talkTimes.shift();
       this.talkStart = t;
-      const dur = rand(0.16, 0.31);
+      // 口パクのテンポ: ユーザーの所感でワンテンポ遅くした（2026-11-27、持続・間隔とも約1.4倍）
+      const dur = rand(0.22, 0.43);
       this.talkEnd = t + dur; this.talkPeak = rand(0.28, 0.87); this.talkCount++;
-      this.talkAt = this.talkEnd + (this.talkCount % 5 === 0 ? rand(0.35, 0.72) : rand(0.015, 0.09));
+      this.talkAt = this.talkEnd + (this.talkCount % 5 === 0 ? rand(0.50, 1.00) : rand(0.02, 0.13));
     }
     const u = clamp((t - this.talkStart) / Math.max(0.01, this.talkEnd - this.talkStart), 0, 1);
     const m = this.talkPeak * Math.sin(Math.PI * u) ** 2;
@@ -395,7 +396,7 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127f")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127g")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
     // 1枚の失敗・停滞で全体が止まらないよう、失敗時は null（欠け素材）として続行する。
