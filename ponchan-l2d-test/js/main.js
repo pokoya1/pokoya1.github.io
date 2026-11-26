@@ -26,7 +26,7 @@ function syncSliders() {
 }
 function setStatus(text) { statusEl.textContent = text; }
 const STATUS_TEXT = {
-  ready: "素材39枚読み込み完了",
+  ready: "素材35枚読み込み完了",
   idle: "自然待機中",
   talk: "模擬発話中（音声なし）",
   stopped: "手動／停止",
@@ -134,8 +134,8 @@ randToggle.addEventListener("click", () => {
     const a = document.getElementById("randA").value;
     const b = document.getElementById("randB").value;
     randMode = "pair";
-    avatar.startRandomExpressions([a, b], 3.5, 8);
-    setStatus("ランダム切替中（3.5〜8秒間隔）");
+    avatar.startRandomExpressions([a, b], 8, 15);
+    setStatus("ランダム切替中（8〜15秒間隔）");
   }
   syncRandomButtons();
 });
@@ -144,8 +144,8 @@ randAllToggle.addEventListener("click", () => {
   if (avatar.randomActive) { avatar.stopRandomExpressions(); }
   else {
     randMode = "all";
-    avatar.startRandomExpressions(["neutral", "happy", "joy", "excited", "concerned", "surprised", "relaxed"], 3.5, 8);
-    setStatus("全表情ランダム切替中（3.5〜8秒間隔）");
+    avatar.startRandomExpressions(["neutral", "happy", "joy", "concerned", "surprised", "relaxed"], 8, 15);
+    setStatus("全表情ランダム切替中（8〜15秒間隔）");
   }
   syncRandomButtons();
 });
