@@ -34,9 +34,9 @@ const EXPRESSIONS = {
   concerned: { mouth: 0,    brow: -0.8, blink: 0.13, shape: 1 },
   surprised: { mouth: 0.8,  brow: 0.85, blink: 0,    shape: 2 },
   relaxed:   { mouth: 0,    brow: 0.12, blink: 1,    shape: 0 },
-  // D-05 正式統合（ユーザー美術承認済み・案A）
-  joy:       { mouth: 0, brow: 0.50, blink: 0, shape: 0, closedMouth: 33, cheek: 37 },
-  excited:   { mouth: 0, brow: 0.65, blink: 0, shape: 0, closedMouth: 34, cheek: 38, smileEyes: [35, 36] },
+  // D-05 正式統合（案A）。大喜びはユーザーの違和感により一旦外した（2026-11-27）。
+  // 喜びの頬は元画像の肌に寄せた柔らかい版（52_cheek-joy-soft）に差し替え。
+  joy:       { mouth: 0, brow: 0.50, blink: 0, shape: 0, closedMouth: 33, cheek: 34 },
 };
 function extrasOf(name) {
   const p = EXPRESSIONS[name] || {};
@@ -360,7 +360,6 @@ class PonchanAvatar {
     this.onStatus = options.onStatus || (() => {});
     this.onExpression = options.onExpression || (() => {});
     this._random = null; // {names:[...], minS, maxS, elapsed, nextIn}
-    this._excitedTimer = null; // 大喜び→喜び 自動復帰の経過秒（nullで無効）
     this.state = zeroParams();
     this.shape = 0;
     this.playing = false;
@@ -396,7 +395,7 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127d")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127e")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
     const images = await Promise.all(layers.map((l) => new Promise((res, rej) => {
@@ -448,7 +447,6 @@ class PonchanAvatar {
 
   setExpression(name, internal = false) {
     if (!internal) this.stopRandomExpressions();
-    this._excitedTimer = name === "excited" ? 0 : null;
     this.expression.select(name, this.playing || this.expression.transitioning ? null : this.state, this.shape);
     this.onStatus("expression:" + name);
     this.onExpression(name);
@@ -490,7 +488,6 @@ class PonchanAvatar {
     this.onStatus(mode === "talk" ? "talk" : "idle");
   }
   stop() {
-    this._excitedTimer = null;
     this.stopRandomExpressions();
     this.playing = false;
     this.expression.trans = null;
@@ -535,7 +532,6 @@ class PonchanAvatar {
   destroy() {
     this.destroyed = true;
     this._random = null;
-    this._excitedTimer = null;
     this.playing = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
@@ -550,13 +546,6 @@ class PonchanAvatar {
     if (this.destroyed) return;
     const dt = this.last ? clamp((t - this.last) / 1000, 0, 0.1) : 0;
     this.last = t;
-    if (this._excitedTimer != null && !this.hidden && dt > 0) {
-      this._excitedTimer += dt;
-      if (this._excitedTimer >= 3.0) {
-        this._excitedTimer = null;
-        this.setExpression("joy", true);
-      }
-    }
     if (this._random && !this.hidden && dt > 0) {
       const r = this._random;
       r.elapsed += dt;
