@@ -424,62 +424,14 @@
    ]
   },
   {
-   "file": "42_mouth-excited-a.png",
-   "layer": "mouthExcited",
+   "file": "52_cheek-joy-soft.png",
+   "layer": "cheekJoy",
    "index": 34,
    "visible": true,
    "bbox": [
-    494,
-    136,
-    528,
-    149
-   ]
-  },
-  {
-   "file": "44_smile-eye-r-a.png",
-   "layer": "smileEyeR",
-   "index": 35,
-   "visible": true,
-   "bbox": [
-    463,
-    98,
-    499,
-    115
-   ]
-  },
-  {
-   "file": "45_smile-eye-l-a.png",
-   "layer": "smileEyeL",
-   "index": 36,
-   "visible": true,
-   "bbox": [
-    518,
-    94,
-    554,
-    111
-   ]
-  },
-  {
-   "file": "48_cheek-joy-a.png",
-   "layer": "cheekJoy",
-   "index": 37,
-   "visible": true,
-   "bbox": [
-    458,
-    113,
-    559,
-    141
-   ]
-  },
-  {
-   "file": "50_cheek-excited-a.png",
-   "layer": "cheekExcited",
-   "index": 38,
-   "visible": true,
-   "bbox": [
-    457,
-    113,
-    560,
+    448,
+    111,
+    569,
     141
    ]
   }
