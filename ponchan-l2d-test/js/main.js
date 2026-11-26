@@ -28,7 +28,7 @@ function setStatus(text) { statusEl.textContent = text; }
 const STATUS_TEXT = {
   ready: "素材35枚読み込み完了",
   idle: "自然待機中",
-  talk: "模擬発話中（音声なし）",
+  talk: "自然発話演出中（音声なし）",
   stopped: "手動／停止",
   reset: "静止画（通常）",
   destroyed: "破棄済み（再生成できます）",
@@ -51,11 +51,13 @@ async function createAvatar() {
   window.avatar = avatar; // 検証・他アプリ連携用
   try {
     await avatar.load();
+    avatar.setZoom(true); // D-06 v0.4: 初期表示は顔拡大
   } catch (err) {
     setStatus("素材読み込み失敗: " + err.message);
     console.error(err);
   }
   syncSliders();
+  syncRandomButtons();
 }
 
 /* スライダー（手動調整） */
@@ -117,38 +119,42 @@ document.getElementById("bg").addEventListener("change", (e) => { canvas.style.b
 exprSel.addEventListener("change", (e) => {
   if (avatar && e.target.value !== "custom") avatar.setExpression(e.target.value);
 });
-document.getElementById("destroy").addEventListener("click", () => { if (avatar) { avatar.destroy(); avatar = null; window.avatar = null; } });
+document.getElementById("destroy").addEventListener("click", () => { if (avatar) { avatar.destroy(); avatar = null; window.avatar = null; syncRandomButtons(); } });
 const randToggle = document.getElementById("randToggle");
-const randAllToggle = document.getElementById("randAllToggle");
+const randChoices = document.getElementById("randChoices");
+const randInterval = document.getElementById("randInterval");
+const randInfo = document.getElementById("randInfo");
+const randAll = document.getElementById("randAll");
+const randClear = document.getElementById("randClear");
+const randOptions = Array.from(exprSel.options).filter(o => !o.disabled && window.PONCHAN_EXPRESSIONS.includes(o.value));
+const randChecks = randOptions.map(o => {
+  const label = document.createElement("label"), cb = document.createElement("input");
+  cb.type = "checkbox"; cb.value = o.value; cb.checked = true;
+  cb.addEventListener("change", syncRandomButtons);
+  label.append(cb, document.createTextNode(o.textContent)); randChoices.append(label); return cb;
+});
+function selectedRandom() { return randChecks.filter(c => c.checked).map(c => c.value); }
 function syncRandomButtons() {
-  const active = avatar && avatar.randomActive;
-  randToggle.textContent = active && randMode === "pair" ? "ランダム停止" : "ランダム開始";
-  randAllToggle.textContent = active && randMode === "all" ? "全表情ランダム停止" : "全表情ランダム開始";
-  if (!active) randMode = null;
+  const active = !!(avatar && avatar.randomActive);
+  const names = selectedRandom();
+  randToggle.disabled = !avatar || !avatar.ready || (!active && names.length < 2);
+  randToggle.textContent = active ? "ランダム停止" : `ランダム開始（${names.length}種類）`;
+  randChecks.forEach(c => c.disabled = active); randAll.disabled = active; randClear.disabled = active; randInterval.disabled = active;
+  randInfo.textContent = active ? `切替中：${names.length}種類・${randInterval.selectedOptions[0].textContent}間隔` : names.length < 2 ? "2種類以上を選択してください。" : "選択した表情を順不同で一巡します。同じ表情は連続しません。";
 }
-let randMode = null;
+randAll.addEventListener("click", () => { randChecks.forEach(c => c.checked = true); syncRandomButtons(); });
+randClear.addEventListener("click", () => { randChecks.forEach(c => c.checked = false); syncRandomButtons(); });
 randToggle.addEventListener("click", () => {
-  if (!avatar) return;
-  if (avatar.randomActive) { avatar.stopRandomExpressions(); }
+  if (!avatar || !avatar.ready) return;
+  if (avatar.randomActive) avatar.stopRandomExpressions();
   else {
-    const a = document.getElementById("randA").value;
-    const b = document.getElementById("randB").value;
-    randMode = "pair";
-    avatar.startRandomExpressions([a, b], 8, 15);
-    setStatus("ランダム切替中（8〜15秒間隔）");
+    const names = selectedRandom(); if (names.length < 2) return;
+    const [lo,hi] = randInterval.value.split(",").map(Number);
+    avatar.startRandomExpressions(names, lo, hi);
   }
   syncRandomButtons();
 });
-randAllToggle.addEventListener("click", () => {
-  if (!avatar) return;
-  if (avatar.randomActive) { avatar.stopRandomExpressions(); }
-  else {
-    randMode = "all";
-    avatar.startRandomExpressions(["neutral", "happy", "joy", "concerned", "surprised", "relaxed"], 8, 15);
-    setStatus("全表情ランダム切替中（8〜15秒間隔）");
-  }
-  syncRandomButtons();
-});
+syncRandomButtons();
 document.getElementById("recreate").addEventListener("click", async () => {
   if (!avatar) await createAvatar();
 });
@@ -162,3 +168,6 @@ setInterval(() => {
 }, 500);
 
 createAvatar();
+
+attachPawnRecorder({source:canvas,background:()=>document.getElementById('bg').value,ready:()=>!!(avatar?.ready && avatar.images.every(Boolean)),onState:(rec)=>{const zb=document.getElementById('zoom');if(rec){if(avatar)avatar.setZoom(true);zb.disabled=true;}else{zb.disabled=false;}}});
+document.getElementById('destroy').addEventListener('click',()=>window.pawnRecorder?.stop(),{capture:true});
