@@ -34,7 +34,14 @@ const EXPRESSIONS = {
   concerned: { mouth: 0,    brow: -0.8, blink: 0.13, shape: 1 },
   surprised: { mouth: 0.8,  brow: 0.85, blink: 0,    shape: 2 },
   relaxed:   { mouth: 0,    brow: 0.12, blink: 1,    shape: 0 },
+  // D-05 正式統合（ユーザー美術承認済み・案A）
+  joy:       { mouth: 0, brow: 0.50, blink: 0, shape: 0, closedMouth: 33, cheek: 37 },
+  excited:   { mouth: 0, brow: 0.65, blink: 0, shape: 0, closedMouth: 34, cheek: 38, smileEyes: [35, 36] },
 };
+function extrasOf(name) {
+  const p = EXPRESSIONS[name] || {};
+  return { closedMouth: p.closedMouth ?? null, cheek: p.cheek ?? null, smileEyes: p.smileEyes ?? null };
+}
 const DEFAULT_FIXES = { irisOcclusion: true, neckFeather: true, browBoost: true, mouthCrossfade: true, hairLag: true };
 
 function clamp(x, a, b) { return Math.min(b, Math.max(a, x)); }
@@ -132,6 +139,7 @@ class ExpressionController {
     this.name = "neutral";
     this.base = { ...EXPRESSIONS.neutral };
     this.trans = null;
+    this.extra = extrasOf("neutral");
   }
   select(name, currentParams, shape) {
     if (!EXPRESSIONS[name]) throw new Error("unknown expression: " + name);
@@ -140,7 +148,7 @@ class ExpressionController {
     let from;
     if (currentParams) from = { mouth: currentParams.mouth, brow: currentParams.brow, blink: currentParams.blink, shape };
     else from = { ...this.base };
-    this.trans = { from, to: target, elapsed: 0 };
+    this.trans = { from, to: target, elapsed: 0, fromExtra: this.extra, toExtra: extrasOf(name) };
   }
   update(dt) {
     if (!this.trans) return false;
@@ -153,10 +161,26 @@ class ExpressionController {
       else { sh = b.shape; mouth = lerp(0, b.mouth, smooth((u - 0.5) * 2)); }
     }
     this.base = { mouth, brow: lerp(a.brow, b.brow, e), blink: lerp(a.blink, b.blink, e), shape: sh };
-    if (u >= 1) { this.base = { ...b }; this.trans = null; }
+    const fe = tr.fromExtra, te = tr.toExtra, pick = u < 0.5 ? fe : te;
+    this.extra = {
+      closedMouth: pick.closedMouth,
+      smileEyes: pick.smileEyes,
+      cheeks: fe.cheek === te.cheek
+        ? (te.cheek != null ? [{ index: te.cheek, alpha: 1 }] : [])
+        : [
+            ...(fe.cheek != null ? [{ index: fe.cheek, alpha: 1 - e }] : []),
+            ...(te.cheek != null ? [{ index: te.cheek, alpha: e }] : []),
+          ],
+    };
+    if (u >= 1) { this.base = { ...b }; this.extra = { ...te, cheeks: te.cheek != null ? [{ index: te.cheek, alpha: 1 }] : [] }; this.trans = null; }
     return true;
   }
-  reset() { this.name = "neutral"; this.base = { ...EXPRESSIONS.neutral }; this.trans = null; }
+  currentExtras() {
+    if (this.trans) return this.extra;
+    const e = extrasOf(this.name);
+    return { closedMouth: e.closedMouth, smileEyes: e.smileEyes, cheeks: e.cheek != null ? [{ index: e.cheek, alpha: 1 }] : [] };
+  }
+  reset() { this.name = "neutral"; this.base = { ...EXPRESSIONS.neutral }; this.trans = null; this.extra = extrasOf("neutral"); }
   get shape() { return this.base.shape; }
   get transitioning() { return !!this.trans; }
 }
@@ -181,7 +205,7 @@ class Renderer {
   drawPart(i, dx = 0) { const p = this.parts[i]; this.ctx.drawImage(p.img, p.x + dx, p.y); }
   drawPartOn(c, i, dx = 0) { const p = this.parts[i]; c.drawImage(p.img, p.x + dx, p.y); }
 
-  render(v, shape, zoom = false) {
+  render(v, shape, zoom = false, extras = null) {
     const { ctx, sc } = this;
     const b = clamp(v.blink, 0, 1);
     const closed = smooth((b - 0.68) / 0.28);
@@ -203,7 +227,12 @@ class Renderer {
         this.pivot(bx, by, (i === 7 ? -1 : 1) * (v.brow || 0) * 5 * gain * Math.PI / 180);
       }
       if (i === 5 && this.fixes.neckFeather) { this.drawNeckFeathered(); ctx.restore(); continue; }
-      if (i === 10) { this.drawMouth(v, shape); ctx.restore(); continue; }
+      if (i === 10) { this.drawMouth(v, shape, extras); ctx.restore(); continue; }
+      if (extras && extras.smileEyes && (i === 14 || i === 15 || i === 18 || i === 19)) { ctx.restore(); continue; }
+      if (extras && extras.smileEyes && (i === 16 || i === 17)) {
+        this.drawPart(extras.smileEyes[i === 16 ? 0 : 1]);
+        ctx.restore(); continue;
+      }
       const e = EYE_MAP[i];
       if (e) {
         if (i === 16 || i === 17) {
@@ -232,6 +261,11 @@ class Renderer {
         }
       } else {
         this.drawPart(i);
+      }
+      if (i === 8 && extras && extras.cheeks) {
+        for (const ch of extras.cheeks) {
+          if (ch.alpha > 0.003) { ctx.save(); ctx.globalAlpha = ch.alpha; this.drawPart(ch.index); ctx.restore(); }
+        }
       }
       ctx.restore();
     }
@@ -278,17 +312,18 @@ class Renderer {
     ctx.drawImage(this.scratch, 0, 0);
   }
 
-  drawMouth(v, shape) {
+  drawMouth(v, shape, extras = null) {
     const { ctx } = this;
     const sh = v.shape ?? shape;
     const op = clamp(v.mouth || 0, 0, 1);
+    const closedIdx = extras && extras.closedMouth != null ? extras.closedMouth : 10;
     if (sh === 1) { this.drawPart(31); return; }
     if (sh === 2) {
       this.pivot(511, 141, 0, Math.max(0.18, op));
       this.drawPart(32);
       return;
     }
-    if (op < 0.10) { this.drawPart(10); return; }
+    if (op < 0.10) { this.drawPart(closedIdx); return; }
     if (!this.fixes.mouthCrossfade) {
       const mi = 24 + Math.max(0, Math.min(6, Math.round((op - 0.18) / 0.82 * 6)));
       this.drawPart(mi);
@@ -297,6 +332,7 @@ class Renderer {
     // クロスフェード: 閉口→初段、および隣接フレーム間を補間
     if (op < 0.18) {
       const t = smooth((op - 0.10) / 0.08);
+      if (closedIdx !== 10) { ctx.globalAlpha = 1 - t; this.drawPart(closedIdx); ctx.globalAlpha = t; this.drawPart(24); ctx.globalAlpha = 1; return; }
       ctx.globalAlpha = 1 - t; this.drawPart(10);
       ctx.globalAlpha = t; this.drawPart(24);
       ctx.globalAlpha = 1;
@@ -324,6 +360,7 @@ class PonchanAvatar {
     this.onStatus = options.onStatus || (() => {});
     this.onExpression = options.onExpression || (() => {});
     this._random = null; // {names:[...], minS, maxS, elapsed, nextIn}
+    this._excitedTimer = null; // 大喜び→喜び 自動復帰の経過秒（nullで無効）
     this.state = zeroParams();
     this.shape = 0;
     this.playing = false;
@@ -332,7 +369,7 @@ class PonchanAvatar {
     this.ready = false;
     this.destroyed = false;
     this.hidden = document.hidden;
-    this.clock = new MotionClock(Math.random);
+    this.clock = new MotionClock(options.rng || Math.random);
     this.expression = new ExpressionController();
     this.motionGain = 0; this.talkGain = 0;
     this.entryState = zeroParams();
@@ -399,7 +436,7 @@ class PonchanAvatar {
 
   renderOnce() {
     if (!this.ready || this.destroyed) return;
-    this.renderer.render(this.state, this.shape, this.zoom);
+    this.renderer.render(this.state, this.shape, this.zoom, this.expression.currentExtras());
   }
 
   setFixes(fixes) {
@@ -411,6 +448,7 @@ class PonchanAvatar {
 
   setExpression(name, internal = false) {
     if (!internal) this.stopRandomExpressions();
+    this._excitedTimer = name === "excited" ? 0 : null;
     this.expression.select(name, this.playing || this.expression.transitioning ? null : this.state, this.shape);
     this.onStatus("expression:" + name);
     this.onExpression(name);
@@ -443,7 +481,7 @@ class PonchanAvatar {
     if (!this.playing) {
       this.motionGain = 0;
       this.entryState = { ...this.state };
-      this.clock = new MotionClock(Math.random);
+      this.clock = new MotionClock(this.options.rng || Math.random);
       this.last = 0;
       this.talkGain = 0;
     }
@@ -452,6 +490,7 @@ class PonchanAvatar {
     this.onStatus(mode === "talk" ? "talk" : "idle");
   }
   stop() {
+    this._excitedTimer = null;
     this.stopRandomExpressions();
     this.playing = false;
     this.expression.trans = null;
@@ -496,6 +535,7 @@ class PonchanAvatar {
   destroy() {
     this.destroyed = true;
     this._random = null;
+    this._excitedTimer = null;
     this.playing = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
@@ -510,6 +550,13 @@ class PonchanAvatar {
     if (this.destroyed) return;
     const dt = this.last ? clamp((t - this.last) / 1000, 0, 0.1) : 0;
     this.last = t;
+    if (this._excitedTimer != null && !this.hidden && dt > 0) {
+      this._excitedTimer += dt;
+      if (this._excitedTimer >= 3.0) {
+        this._excitedTimer = null;
+        this.setExpression("joy", true);
+      }
+    }
     if (this._random && !this.hidden && dt > 0) {
       const r = this._random;
       r.elapsed += dt;
