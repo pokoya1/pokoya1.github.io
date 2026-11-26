@@ -1,0 +1,31 @@
+:root{--accent:#b5651d;--accent2:#e8930c;--bg:#fff8f0;--card:#fff;--text:#2b2118;--muted:#7a6a5c;--border:#ead9c8}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);line-height:1.55}
+header{padding:20px 16px 6px;text-align:center}
+h1{font-size:1.35rem;margin:0 0 6px}
+.sub{color:var(--muted);margin:0;font-size:.9rem}
+main{max-width:760px;margin:0 auto;padding:10px 14px 24px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(120,72,20,.06)}
+h2{font-size:1rem;margin:0 0 12px;color:var(--accent)}
+.ai-tabs{display:flex;gap:8px;margin-bottom:14px}
+.ai-tabs label{flex:1}
+.ai-tabs input{position:absolute;opacity:0}
+.ai-tabs span{display:block;text-align:center;padding:10px 4px;border:1.5px solid var(--border);border-radius:10px;font-weight:600;cursor:pointer}
+.ai-tabs input:checked+span{background:var(--accent);border-color:var(--accent);color:#fff}
+.ai-tabs input:focus-visible+span{outline:2px solid var(--accent2);outline-offset:2px}
+.field{display:block;margin-bottom:12px}
+.field span{display:block;font-size:.85rem;font-weight:600;margin-bottom:5px}
+select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fffdfa;color:var(--text)}
+textarea{resize:vertical}
+.switch{display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;font-size:.95rem}
+.switch input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.note{color:var(--muted);font-size:.82rem;margin:6px 0 0}
+.actions{display:flex;gap:10px;margin-top:12px}
+button{flex:1;font:inherit;font-weight:700;padding:13px;border-radius:11px;border:1.5px solid var(--border);background:#fff;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:active{transform:scale(.98)}
+#preview{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86rem;line-height:1.6}
+footer{text-align:center;color:var(--muted);font-size:.8rem;padding:0 16px 28px}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#2b2118;color:#fff;padding:11px 22px;border-radius:999px;opacity:0;pointer-events:none;transition:.25s;font-size:.92rem;z-index:10}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (min-width:640px){h1{font-size:1.6rem}#selects{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}}
