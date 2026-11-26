@@ -44,6 +44,24 @@
   <button id="destroy">破棄</button>
   <button id="recreate">再生成</button>
 </div>
+<div class="row">
+  <span>ランダム切替：</span>
+  <select id="randA" aria-label="ランダム表情A">
+    <option value="neutral">通常</option>
+    <option value="happy" selected>喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+  </select>
+  <select id="randB" aria-label="ランダム表情B">
+    <option value="neutral" selected>通常</option>
+    <option value="happy">喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+  </select>
+  <button id="randToggle">ランダム開始</button>
+</div>
 <div id="controls"></div>
 <details id="fixesBox">
   <summary>補正オプション（Muse E-02）</summary>
