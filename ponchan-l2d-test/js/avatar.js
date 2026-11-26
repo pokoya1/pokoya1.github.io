@@ -202,8 +202,8 @@ class Renderer {
     c.translate(x, y); c.rotate(rot); c.scale(1, sy); c.translate(-x, -y);
   }
   static pivotOn(c, x, y, rot, sy = 1) { c.translate(x, y); c.rotate(rot); c.scale(1, sy); c.translate(-x, -y); }
-  drawPart(i, dx = 0) { const p = this.parts[i]; this.ctx.drawImage(p.img, p.x + dx, p.y); }
-  drawPartOn(c, i, dx = 0) { const p = this.parts[i]; c.drawImage(p.img, p.x + dx, p.y); }
+  drawPart(i, dx = 0) { const p = this.parts[i]; if (!p) return; this.ctx.drawImage(p.img, p.x + dx, p.y); }
+  drawPartOn(c, i, dx = 0) { const p = this.parts[i]; if (!p) return; c.drawImage(p.img, p.x + dx, p.y); }
 
   render(v, shape, zoom = false, extras = null) {
     const { ctx, sc } = this;
@@ -396,7 +396,7 @@ class PonchanAvatar {
       })));
       return this._finishLoad(images, layers, true);
     }
-    const manifest = await (await fetch(this.basePath + "manifest.json")).json();
+    const manifest = await (await fetch(this.basePath + "manifest.json?v=20261127d")).json();
     this.manifest = manifest;
     const layers = manifest.layers;
     const images = await Promise.all(layers.map((l) => new Promise((res, rej) => {
