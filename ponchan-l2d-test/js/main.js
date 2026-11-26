@@ -37,8 +37,11 @@ const STATUS_TEXT = {
 
 async function createAvatar() {
   avatar = new PonchanAvatar(canvas, {
+    ...(window.PONCHAN_EMBEDDED ? { embedded: window.PONCHAN_EMBEDDED } : {}),
     basePath: "assets/",
+    onExpression: (name) => { exprSel.value = name; },
     onStatus: (s) => {
+      if (s === "random:stop") randToggle.textContent = "ランダム開始";
       if (s.startsWith("expression:")) {
         const name = s.slice("expression:".length);
         setStatus("表情遷移中：" + name);
@@ -115,6 +118,20 @@ exprSel.addEventListener("change", (e) => {
   if (avatar && e.target.value !== "custom") avatar.setExpression(e.target.value);
 });
 document.getElementById("destroy").addEventListener("click", () => { if (avatar) { avatar.destroy(); avatar = null; window.avatar = null; } });
+const randToggle = document.getElementById("randToggle");
+randToggle.addEventListener("click", () => {
+  if (!avatar) return;
+  if (avatar.randomActive) {
+    avatar.stopRandomExpressions();
+    randToggle.textContent = "ランダム開始";
+  } else {
+    const a = document.getElementById("randA").value;
+    const b = document.getElementById("randB").value;
+    avatar.startRandomExpressions([a, b], 3.5, 8);
+    randToggle.textContent = "ランダム停止";
+    setStatus("ランダム切替中（3.5〜8秒間隔）");
+  }
+});
 document.getElementById("recreate").addEventListener("click", async () => {
   if (!avatar) await createAvatar();
 });
