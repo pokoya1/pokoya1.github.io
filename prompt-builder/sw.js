@@ -1,6 +1,6 @@
 /* キャラクター画像生成プロンプトビルダー Service Worker
    prompts.json は Network First（更新を即反映）、静的アセットは Stale-While-Revalidate */
-const CACHE = 'prompt-builder-v1';
+const CACHE = 'prompt-builder-v2';
 const STATIC_ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
