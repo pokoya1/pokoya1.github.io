@@ -1,0 +1,596 @@
+{
+  "canvas": [
+    1024,
+    1024
+  ],
+  "layers": [
+    {
+      "file": "00_back hair.png",
+      "layer": "back hair",
+      "index": 0,
+      "visible": true,
+      "bbox": [
+        411,
+        11,
+        608,
+        192
+      ]
+    },
+    {
+      "file": "01_handwear-l.png",
+      "layer": "handwear-l",
+      "index": 1,
+      "visible": true,
+      "bbox": [
+        555,
+        200,
+        704,
+        525
+      ]
+    },
+    {
+      "file": "02_handwear-r.png",
+      "layer": "handwear-r",
+      "index": 2,
+      "visible": true,
+      "bbox": [
+        319,
+        199,
+        468,
+        525
+      ]
+    },
+    {
+      "file": "03_footwear.png",
+      "layer": "footwear",
+      "index": 3,
+      "visible": true,
+      "bbox": [
+        424,
+        890,
+        599,
+        993
+      ]
+    },
+    {
+      "file": "04_legwear.png",
+      "layer": "legwear",
+      "index": 4,
+      "visible": true,
+      "bbox": [
+        420,
+        343,
+        602,
+        981
+      ]
+    },
+    {
+      "file": "05_neck.png",
+      "layer": "neck",
+      "index": 5,
+      "visible": true,
+      "bbox": [
+        490,
+        125,
+        535,
+        191
+      ]
+    },
+    {
+      "file": "06_topwear.png",
+      "layer": "topwear",
+      "index": 6,
+      "visible": true,
+      "bbox": [
+        412,
+        171,
+        610,
+        465
+      ]
+    },
+    {
+      "file": "07_eyebrow-r.png",
+      "layer": "eyebrow-r",
+      "index": 7,
+      "visible": true,
+      "bbox": [
+        466,
+        84,
+        492,
+        93
+      ]
+    },
+    {
+      "file": "08_face.png",
+      "layer": "face",
+      "index": 8,
+      "visible": true,
+      "bbox": [
+        459,
+        37,
+        559,
+        165
+      ]
+    },
+    {
+      "file": "09_nose.png",
+      "layer": "nose",
+      "index": 9,
+      "visible": true,
+      "bbox": [
+        506,
+        122,
+        513,
+        129
+      ]
+    },
+    {
+      "file": "10_mouth.png",
+      "layer": "mouth",
+      "index": 10,
+      "visible": true,
+      "bbox": [
+        500,
+        138,
+        522,
+        145
+      ]
+    },
+    {
+      "file": "11_ears-r.png",
+      "layer": "ears-r",
+      "index": 11,
+      "visible": true,
+      "bbox": [
+        453,
+        105,
+        477,
+        139
+      ]
+    },
+    {
+      "file": "12_ears-l.png",
+      "layer": "ears-l",
+      "index": 12,
+      "visible": true,
+      "bbox": [
+        544,
+        99,
+        573,
+        136
+      ]
+    },
+    {
+      "file": "13_eyebrow-l.png",
+      "layer": "eyebrow-l",
+      "index": 13,
+      "visible": true,
+      "bbox": [
+        517,
+        79,
+        548,
+        87
+      ]
+    },
+    {
+      "file": "14_eyewhite-r.png",
+      "layer": "eyewhite-r",
+      "index": 14,
+      "visible": true,
+      "bbox": [
+        472,
+        100,
+        496,
+        123
+      ]
+    },
+    {
+      "file": "15_eyewhite-l.png",
+      "layer": "eyewhite-l",
+      "index": 15,
+      "visible": true,
+      "bbox": [
+        522,
+        96,
+        547,
+        119
+      ]
+    },
+    {
+      "file": "16_eyelash-r.png",
+      "layer": "eyelash-r",
+      "index": 16,
+      "visible": true,
+      "bbox": [
+        466,
+        96,
+        496,
+        119
+      ]
+    },
+    {
+      "file": "17_eyelash-l.png",
+      "layer": "eyelash-l",
+      "index": 17,
+      "visible": true,
+      "bbox": [
+        521,
+        92,
+        552,
+        112
+      ]
+    },
+    {
+      "file": "18_irides-r.png",
+      "layer": "irides-r",
+      "index": 18,
+      "visible": true,
+      "bbox": [
+        477,
+        101,
+        495,
+        123
+      ]
+    },
+    {
+      "file": "19_irides-l.png",
+      "layer": "irides-l",
+      "index": 19,
+      "visible": true,
+      "bbox": [
+        524,
+        97,
+        542,
+        119
+      ]
+    },
+    {
+      "file": "20_front hair.png",
+      "layer": "front hair",
+      "index": 20,
+      "visible": true,
+      "bbox": [
+        443,
+        18,
+        573,
+        193
+      ]
+    },
+    {
+      "file": "21_headwear.png",
+      "layer": "headwear",
+      "index": 21,
+      "visible": true,
+      "bbox": [
+        536,
+        44,
+        571,
+        92
+      ]
+    },
+    {
+      "file": "22_closed-eyelid-r.png",
+      "layer": "closed-eyelid-r",
+      "index": 22,
+      "visible": false,
+      "bbox": [
+        465,
+        109,
+        497,
+        118
+      ],
+      "derived": true
+    },
+    {
+      "file": "23_closed-eyelid-l.png",
+      "layer": "closed-eyelid-l",
+      "index": 23,
+      "visible": false,
+      "bbox": [
+        520,
+        105,
+        554,
+        114
+      ],
+      "derived": true
+    },
+    {
+      "file": "24_mouth-smile-0.18.png",
+      "layer": "mouth-smile-0.18",
+      "index": 24,
+      "visible": false,
+      "bbox": [
+        500,
+        137,
+        522,
+        146
+      ],
+      "derived": true
+    },
+    {
+      "file": "25_mouth-smile-0.32.png",
+      "layer": "mouth-smile-0.32",
+      "index": 25,
+      "visible": false,
+      "bbox": [
+        499,
+        136,
+        523,
+        147
+      ],
+      "derived": true
+    },
+    {
+      "file": "26_mouth-smile-0.46.png",
+      "layer": "mouth-smile-0.46",
+      "index": 26,
+      "visible": false,
+      "bbox": [
+        499,
+        136,
+        523,
+        148
+      ],
+      "derived": true
+    },
+    {
+      "file": "27_mouth-smile-0.60.png",
+      "layer": "mouth-smile-0.60",
+      "index": 27,
+      "visible": false,
+      "bbox": [
+        498,
+        136,
+        524,
+        149
+      ],
+      "derived": true
+    },
+    {
+      "file": "28_mouth-smile-0.74.png",
+      "layer": "mouth-smile-0.74",
+      "index": 28,
+      "visible": false,
+      "bbox": [
+        498,
+        136,
+        524,
+        150
+      ],
+      "derived": true
+    },
+    {
+      "file": "29_mouth-smile-0.88.png",
+      "layer": "mouth-smile-0.88",
+      "index": 29,
+      "visible": false,
+      "bbox": [
+        498,
+        136,
+        525,
+        151
+      ],
+      "derived": true
+    },
+    {
+      "file": "30_mouth-smile-1.00.png",
+      "layer": "mouth-smile-1.00",
+      "index": 30,
+      "visible": false,
+      "bbox": [
+        497,
+        136,
+        525,
+        152
+      ],
+      "derived": true
+    },
+    {
+      "file": "31_mouth-frown-0.00.png",
+      "layer": "mouth-frown-0.00",
+      "index": 31,
+      "visible": false,
+      "bbox": [
+        498,
+        136,
+        524,
+        146
+      ],
+      "derived": true
+    },
+    {
+      "file": "32_mouth-o-1.00.png",
+      "layer": "mouth-o-1.00",
+      "index": 32,
+      "visible": false,
+      "bbox": [
+        504,
+        134,
+        518,
+        150
+      ],
+      "derived": true
+    }
+  ],
+  "version": "0.4",
+  "draw_order_back_to_front": [
+    0,
+    1,
+    2,
+    4,
+    3,
+    6,
+    5,
+    11,
+    12,
+    8,
+    7,
+    13,
+    9,
+    10,
+    14,
+    15,
+    18,
+    19,
+    16,
+    17,
+    20,
+    21
+  ],
+  "source_sha256": "dec10f361b2f28764447c2ce4331d9de3d630d6dd8fac5765204152cd8e95e41",
+  "pivots": {
+    "head": [
+      512,
+      159
+    ],
+    "hair": [
+      512,
+      32
+    ],
+    "breath": [
+      512,
+      410
+    ],
+    "eye_r": [
+      484,
+      112
+    ],
+    "eye_l": [
+      535,
+      108
+    ]
+  },
+  "notes": [
+    "元PNG22枚は変更なし。閉じ目22/23は描画順リストに常時追加せず、16/17の位置で条件描画。",
+    "回転中心は仮設定。複合動作は上半身→頭→髪→目の順で変換。",
+    "motion_engine.jsは試験HTML内のJSを抽出した参考コード。単独起動不可。",
+    "口の派生9枚は10の位置で排他的に描画。眉は既存画像の微小回転・移動。表情プリセットは仮設定。",
+    "C03: 既存33枚変更なし。口形切替は閉口付近で排他的切替、連続変形ではない。"
+  ],
+  "revision": "v0.4",
+  "parent": "Pawn_BCD_v03",
+  "blink": {
+    "closed_layers": [
+      22,
+      23
+    ],
+    "eye_sets": [
+      [
+        14,
+        18,
+        16,
+        22
+      ],
+      [
+        15,
+        19,
+        17,
+        23
+      ]
+    ],
+    "anchors": [
+      [
+        484,
+        114
+      ],
+      [
+        535,
+        110
+      ]
+    ],
+    "method": "vertical compression toward lid anchors, closed lid crossfade near full closure"
+  },
+  "motion_limits": {
+    "gaze_px": 2,
+    "breath_scale_y": 0.004,
+    "hair_front_deg": 1.0,
+    "hair_back_deg": 0.55,
+    "tilt_deg": 2.5
+  },
+  "mouth": {
+    "closed": 10,
+    "open_frames": [
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30
+    ],
+    "frown": 31,
+    "surprised": 32,
+    "method": "discrete sampled mouth geometry; neutral original retained; no audio input"
+  },
+  "expressions": {
+    "neutral": {
+      "mouth": 0,
+      "brow": 0,
+      "blink": 0,
+      "shape": 0
+    },
+    "happy": {
+      "mouth": 0.55,
+      "brow": 0.35,
+      "blink": 0.12,
+      "shape": 0
+    },
+    "concerned": {
+      "mouth": 0,
+      "brow": -0.8,
+      "blink": 0.13,
+      "shape": 1
+    },
+    "surprised": {
+      "mouth": 0.8,
+      "brow": 0.85,
+      "blink": 0,
+      "shape": 2
+    },
+    "relaxed": {
+      "mouth": 0,
+      "brow": 0.12,
+      "blink": 1,
+      "shape": 0
+    }
+  },
+  "runtime": {
+    "blink_interval_s": [
+      2.4,
+      6.2
+    ],
+    "blink_close_s": [
+      0.075,
+      0.115
+    ],
+    "blink_hold_s": [
+      0.035,
+      0.065
+    ],
+    "blink_open_s": [
+      0.11,
+      0.18
+    ],
+    "gaze_interval_s": [
+      1.25,
+      4.5
+    ],
+    "gaze_transition_s": [
+      0.17,
+      0.32
+    ],
+    "tilt_interval_s": [
+      2.8,
+      6.4
+    ],
+    "expression_transition_s": 0.48,
+    "talk_syllable_s": [
+      0.16,
+      0.31
+    ],
+    "talk_pause_every": 5,
+    "dt_cap_s": 0.1,
+    "ui_sync_hz_max": 10,
+    "hidden_pause": true
+  }
+}
