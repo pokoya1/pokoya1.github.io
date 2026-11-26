@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ポーンちゃん L2D風アバター｜Muse E-02 完成候補</title>
+<style>
+  body { font: 15px system-ui, sans-serif; margin: 12px; text-align: center; background: #f3f4f6; color: #222; }
+  canvas { width: min(94vw, 440px); height: auto; border: 1px solid #bbb; border-radius: 8px; background: #fff; }
+  button, select { font: inherit; padding: 8px; margin: 3px; }
+  #controls, #fixes { max-width: 440px; margin: auto; text-align: left; }
+  label { display: flex; align-items: center; gap: 8px; margin: 6px; }
+  label span { width: 92px; text-align: left; flex: none; }
+  input[type=range] { flex: 1; min-width: 0; }
+  output { width: 44px; }
+  h2 { margin: 6px; }
+  p, #stats { font-size: 13px; }
+  #stats { font-variant-numeric: tabular-nums; color: #444; min-height: 1.2em; }
+  .row { margin: 4px 0; }
+</style>
+<h2>ポーンちゃん L2D風アバター（Muse E-02 完成候補）</h2>
+<div id="status">素材読み込み中</div>
+<canvas id="stage" width="1024" height="1024"></canvas>
+<div class="row">
+  <button id="play">自然待機</button>
+  <button id="talk">模擬発話</button>
+  <button id="stop">停止</button>
+  <button id="reset">静止に戻す</button>
+  <button id="zoom">顔拡大／全身</button>
+</div>
+<div class="row">
+  <select id="expression" aria-label="表情">
+    <option value="neutral">通常</option>
+    <option value="happy">微笑</option>
+    <option value="joy">喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+    <option value="custom" disabled>手動調整</option>
+  </select>
+  <select id="bg" aria-label="背景">
+    <option value="#ffffff">白背景</option>
+    <option value="#292c35">暗色背景</option>
+    <option value="#cddccf">淡緑背景</option>
+  </select>
+  <button id="destroy">破棄</button>
+  <button id="recreate">再生成</button>
+</div>
+<div class="row">
+  <span>ランダム切替：</span>
+  <select id="randA" aria-label="ランダム表情A">
+    <option value="neutral">通常</option>
+    <option value="happy" selected>微笑</option>
+    <option value="joy">喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+  </select>
+  <select id="randB" aria-label="ランダム表情B">
+    <option value="neutral" selected>通常</option>
+    <option value="happy">微笑</option>
+    <option value="joy">喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+  </select>
+  <button id="randToggle">ランダム開始</button>
+  <button id="randAllToggle">全表情ランダム開始</button>
+</div>
+<div id="controls"></div>
+<details id="fixesBox">
+  <summary>補正オプション（Muse E-02）</summary>
+  <div id="fixes"></div>
+  <p>全部OFFで v0.4 基準と同一描画になります。ON/OFFの比較がそのまま前後比較です。</p>
+</details>
+<div id="stats"></div>
+<p>待機中にも表情変更可能。模擬発話は音声非連動。停止は現在の姿勢を保持。iPhone実機は未検証（要ユーザー確認）。</p>
+<script src="js/avatar.js?v=20261127f"></script>
+<script src="js/main.js?v=20261127f"></script>
+</html>
