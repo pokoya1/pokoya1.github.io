@@ -15,8 +15,7 @@
 
   const BG = "#f7f2e9";
   // 画角: アバター元キャンバス(1024)上の切り出し矩形 [x, y, w, h]
-  const FRAME_FACE = [421, 0, 180, 320];   // バストアップ（顔中心）
-  const FRAME_FULL = [309, 0, 406, 722];   // 全身（頭と靴を切らない）
+  const FRAME_FACE = [397, 0, 230, 409];   // バストアップ（顔中心）。D-06 v0.4: 全編この画角のみ
   let frameCur = [...FRAME_FACE];
   let frameFrom = [...FRAME_FACE];
   let frameTo = [...FRAME_FACE];
@@ -34,19 +33,19 @@
     return frameCur;
   }
 
-  // 固定タイムライン（秒）。喜びは D-05 案A（正式採用）。大喜びは一旦外した。
+  // 固定タイムライン（秒）。喜びは D-06 再調整案。大喜びは一旦外した。
   const TIMELINE = [
     { t: 0.0,  run: (a) => { a.setMode("idle"); a.setExpression("neutral"); } },
     { t: 6.0,  run: (a) => a.setExpression("happy") },     // 微笑
     { t: 10.0, run: (a) => a.setExpression("joy") },       // 喜び
     { t: 15.0, run: (a) => a.setExpression("happy") },     // 微笑
     { t: 18.0, run: (a) => a.setExpression("joy") },       // 喜び
-    { t: 20.0, run: (a) => a.setExpression("surprised") },
-    { t: 21.4, run: (a) => a.setExpression("concerned") },
-    { t: 22.8, run: (a) => a.setExpression("relaxed") },
-    { t: 24.2, run: (a) => { a.setExpression("neutral"); a.setMode("talk"); } }, // 模擬発話
-    { t: 27.0, run: (a) => a.setMode("idle") },
-    { t: 25.0, frame: FRAME_FULL },
+    { t: 18.8, run: (a) => a.setExpression("surprised") },
+    { t: 20.0, run: (a) => a.setExpression("concerned") },
+    { t: 21.0, run: (a) => a.setExpression("relaxed") },
+    { t: 22.0, run: (a) => { a.setExpression("neutral"); a.setMode("talk"); } }, // 自然発話
+    { t: 25.0, run: (a) => a.setExpression("joy") },       // 発話のまま喜びへ（旧・全身場面の置き換え）
+    { t: 27.0, run: (a) => { a.setMode("idle"); a.setExpression("happy"); } },
     { t: 30.0, run: () => {} },
   ];
   TIMELINE.sort((a, b) => a.t - b.t);
@@ -60,34 +59,35 @@
   let cueIdx = 0;
 
   function drawStage(now) {
-    const t = playing ? (now - startAt) / 1000 : 0;
+    const t = playing ? Math.min(DURATION,(now - startAt) / 1000) : cueIdx === TIMELINE.length ? DURATION : 0;
     if (playing) {
       while (cueIdx < TIMELINE.length && TIMELINE[cueIdx].t <= t) {
         const cue = TIMELINE[cueIdx++];
         if (cue.run) cue.run(avatar);
         if (cue.frame) setFrame(cue.frame, t);
       }
-      if (t >= DURATION) { stopDemo("デモ終了"); }
+      if (t >= DURATION) { playing=false; avatar.stop(); statusEl.textContent="デモ終了"; }
     }
     const [fx, fy, fw, fh] = frameAt(t);
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.fillStyle = BG;
     sctx.fillRect(0, 0, stage.width, stage.height);
     sctx.imageSmoothingEnabled = true;
-    sctx.imageSmoothingQuality = "high";
+    // 録画中は拡大スムージングを軽くし、実効フレームレートを優先する（v0.4）
+    sctx.imageSmoothingQuality = (window.pawnRecorder && window.pawnRecorder.isRecording()) ? "medium" : "high";
     sctx.drawImage(avatarCanvas, fx, fy, fw, fh, 0, 0, stage.width, stage.height);
-    if (playing && t >= TITLE_AT) {
+    if (t >= TITLE_AT) {
       const a = Math.min(1, (t - TITLE_AT) / 1.2);
       sctx.save();
       sctx.globalAlpha = a;
       sctx.fillStyle = "rgba(247,242,233,0.82)";
-      sctx.fillRect(0, stage.height - 300, stage.width, 300);
+      sctx.fillRect(0, stage.height - 200, stage.width, 200);
       sctx.fillStyle = "#5a4632";
       sctx.font = "600 64px system-ui, sans-serif";
       sctx.textAlign = "center";
-      sctx.fillText("ポーンちゃん", stage.width / 2, stage.height - 190);
+      sctx.fillText("ポーンちゃん", stage.width / 2, stage.height - 116);
       sctx.font = "400 40px system-ui, sans-serif";
-      sctx.fillText("L2D風アバター", stage.width / 2, stage.height - 110);
+      sctx.fillText("L2D風アバター", stage.width / 2, stage.height - 45);
       sctx.restore();
     }
     statusEl.textContent = playing ? `デモ再生中 ${t.toFixed(1)}s / 表情: ${avatar ? avatar.getExpression() : "-"}` : statusEl.textContent;
@@ -97,7 +97,9 @@
   async function init() {
     avatar = new PonchanAvatar(avatarCanvas, {
       basePath: "assets/",
+      ...(window.PONCHAN_EMBEDDED ? { embedded: window.PONCHAN_EMBEDDED } : {}),
       rng: seededRng(20261127),
+      speechRng: seededRng(16206),
       onStatus: () => {},
     });
     window.demoAvatar = avatar;
@@ -128,5 +130,7 @@
   document.getElementById("demoStart").addEventListener("click", startDemo);
   document.getElementById("demoStop").addEventListener("click", () => stopDemo("停止"));
   window.demoControl = { start: startDemo, stop: stopDemo, isPlaying: () => playing };
+  attachPawnRecorder({source:stage,background:()=>BG,ready:()=>!!(avatar?.ready && avatar.images.every(Boolean)),demo:true,direct:true,startDemo:()=>{if(playing)stopDemo("再開始");startDemo();},stopDemo:()=>stopDemo("録画終了")});
+  document.getElementById("demoStop").addEventListener("click",()=>window.pawnRecorder?.stop());
   init().catch((e) => { statusEl.textContent = "読み込み失敗: " + e.message; console.error(e); });
 })();
