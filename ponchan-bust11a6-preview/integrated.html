@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ポーンちゃん L2D風アバター｜BUST-11a-6 統合試験</title>
+<style>
+  body { font: 15px system-ui, sans-serif; margin: 12px; text-align: center; background: #f3f4f6; color: #222; }
+  canvas { width: min(94vw, 440px); height: auto; border: 1px solid #bbb; border-radius: 8px; background: #fff; }
+  button, select { font: inherit; padding: 8px; margin: 3px; }
+  #controls, #fixes { max-width: 440px; margin: auto; text-align: left; }
+  label { display: flex; align-items: center; gap: 8px; margin: 6px; }
+  label span { width: 92px; text-align: left; flex: none; }
+  input[type=range] { flex: 1; min-width: 0; }
+  output { width: 44px; }
+  h2 { margin: 6px; }
+  p, #stats { font-size: 13px; }
+  #stats { font-variant-numeric: tabular-nums; color: #444; min-height: 1.2em; }
+  .row { margin: 4px 0; }
+  #randomPanel { box-sizing:border-box; max-width:440px; margin:12px auto; padding:10px; border:1px solid #aeb7c3; border-radius:8px; background:#fff; }
+  #randomPanel legend { font-weight:600; text-align:left; }
+  .random-actions { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; }
+  .random-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); text-align:left; margin:4px 0; }
+  .random-choices label { margin:3px; padding:4px; }
+  .random-choices input { width:18px;height:18px; }
+  .random-start { width:95%; background:#375a79; color:white; border:1px solid #375a79; border-radius:5px; }
+  .random-start:disabled { opacity:.45; }
+  #randInfo { font-size:12px; padding:4px; color:#444; }
+
+
+  #recordPanel { max-width:440px; box-sizing:border-box; margin:12px auto; padding:10px; border:1px solid #aeb7c3; border-radius:8px; background:#fff; color:#222; }
+  #recordPanel legend {font-weight:600;} #recStatus {font-size:13px; min-height:1.2em;} #recSave {display:inline-block; padding:9px; color:#204d79;} #recSave[hidden] {display:none;}
+</style>
+<h2>ポーンちゃん L2D風アバター（BUST-11a-6 統合試験）</h2>
+<div id="status">素材読み込み中</div>
+<canvas id="stage" width="1024" height="1024"></canvas>
+<section style="max-width:440px;margin:12px auto;padding:12px;border:1px solid #aeb7c3;border-radius:8px;background:white">
+<button id="enableMixer">新しい動作制御に切替</button> <button id="disableMixer" hidden>従来制御へ戻す</button>
+<div id="integratedPanel" hidden>
+<p>11a-5統合試験・切替時は通常姿勢に初期化</p>
+<button id="iPlay">自然待機</button><button id="iTalk">連続模擬発話</button><button id="iStop">一時停止</button><button id="iReset">初期化</button>
+<div><button data-gesture="wave">手振り</button><button data-gesture="point">指差し</button><button data-gesture="explain">説明</button><button id="iCancel">動作を解除</button></div>
+<div><select id="iExpression" aria-label="表情"><option value="neutral">通常</option><option value="happy">微笑</option><option value="joy">喜び</option><option value="concerned">困惑</option><option value="surprised">驚き</option><option value="relaxed">閉じ目</option></select><select id="iCostume" aria-label="衣装"><option value="hoodie">パーカー</option><option value="cardigan">カーディガン</option></select><select id="iZoom" aria-label="画角"><option value="gesture">広角</option><option value="upper">上半身</option><option value="face">顔</option></select></div>
+<div><button id="iBlink">瞬き</button><button id="iLook">視線</button><button id="iStep">1コマ</button></div><div id="iStatus" aria-live="polite"></div>
+</div></section><div id="legacyControls">
+<div class="row">
+  <button id="play">自然待機</button>
+  <button id="talk">自然発話（無音）</button>
+  <button id="stop">停止</button>
+  <button id="reset">静止に戻す</button>
+  <button id="zoom">バストアップ／全身</button><button id="upperView">上半身（腕確認）</button><button id="faceView">顔アップ</button><button id="gestureView">動作用広角</button>
+</div>
+<div class="row"><label style="justify-content:center"><input type="checkbox" id="faceHD" checked>顔の高精細素材（OFFで旧版比較）</label></div>
+<div class="row">
+  <select id="expression" aria-label="表情">
+    <option value="neutral">通常</option>
+    <option value="happy">微笑</option>
+    <option value="joy">喜び</option>
+    <option value="concerned">困り顔</option>
+    <option value="surprised">驚き</option>
+    <option value="relaxed">穏やかな閉じ目</option>
+    <option value="custom" disabled>手動調整</option>
+  </select>
+  <select id="costume" aria-label="衣装"><option value="hoodie">基本パーカー</option><option value="cardigan">青灰カーディガン＋ロングスカート</option></select><select id="bg" aria-label="背景">
+    <option value="#ffffff">白背景</option>
+    <option value="#292c35">暗色背景</option>
+    <option value="#cddccf">淡緑背景</option>
+  </select>
+  <button id="destroy">破棄</button>
+  <button id="recreate">再生成</button>
+</div>
+<fieldset style="max-width:420px;margin:12px auto;background:white;border:1px solid #aeb7c3;border-radius:8px"><legend>解説用の身振り（キャラ右腕・試験）</legend><select id="gesture" aria-label="身振り"><option value="neutral">通常姿勢</option><option value="wave">手を振る</option><option value="point">画面左を指す</option><option value="explain">手のひらで説明</option></select><button id="gesturePlay">動作を再生</button><button id="gestureOnce">一連の動作を再生（自動復帰）</button><button id="gestureReset">通常に戻す</button><label><input type="checkbox" id="smoothGesture" checked> 腕の連続遷移（試験）</label><label>動作演出 <select id="gestureStyle"><option value="expressive" selected>表現重視（08b）</option><option value="classic">従来（08a）</option></select></label><p>表現重視では身振りごとに緩急・首と視線の小さな演出を加えます。通常姿勢から腕を上げ、戻します。別の身振りへは通常姿勢を経由。身振り選択時は指先が切れない広角表示に移行。再生ボタンで手首動作も追加。一連の動作は最後に自動で腕を下ろします。連続遷移OFFで旧版の即時切替。指の形は差分切替です。右腕の手動微動は身振り中は無効です。</p></fieldset><fieldset style="max-width:420px;margin:12px auto;background:white;border:1px solid #aeb7c3;border-radius:8px"><legend>二次動作（09a）</legend><label><input type="checkbox" id="secondaryEnabled" checked> 髪・身体・袖の追従と余韻</label><label>強さ <input type="range" id="secondaryStrength" min="0" max="1" step="0.05" value="1"><output id="secondaryValue">100%</output></label><p>身振りの速度に合わせて微動。OFFで08bの表示に戻ります。停止後は余韻のみ収束し、静止に戻すボタンでは即時初期化。</p></fieldset><fieldset style="max-width:420px;margin:12px auto;background:white;border:1px solid #aeb7c3;border-radius:8px"><legend>衣装小物の揺れ（09b）</legend><label><input type="checkbox" id="accessoriesEnabled" checked> 紐・リボン・ペンダントの追従</label><label>強さ <input type="range" id="accessoryStrength" min="0" max="1" step="0.05" value="1"><output id="accessoryValue">100%</output></label><p>身振り時に留め点を保ちながら小物が揺れます。二次動作ON時のみ有効。OFFで09aの小物描画。</p></fieldset><fieldset id="directionPanel" style="max-width:420px;margin:12px auto;background:white;border:1px solid #aeb7c3;border-radius:8px"><legend>統合演出（10b）</legend><button id="directionStart">解説デモを再生</button><button id="directionStop" disabled>演出を終了</button><div id="directionStatus" aria-live="polite">約23秒・無音・8場面</div><p>挨拶、解説、指差し、困惑、驚き、喜び、余韻から通常待機へ。表情を先に決め、身振りが終わってから次の場面へ進みます。手動の表情・発話・身振り操作で自動演出を解除。衣装切替は継続できます。</p></fieldset><fieldset id="randomPanel">
+  <legend>ランダム表情切替</legend>
+  <div class="random-actions"><button id="randAll">全6表情を選択</button><button id="randClear">選択解除</button></div>
+  <div id="randChoices" class="random-choices"></div>
+  <div class="random-actions"><label for="randInterval">切替間隔</label><select id="randInterval"><option value="3,5">3〜5秒</option><option value="5,9" selected>5〜9秒</option><option value="8,15">8〜15秒（従来）</option></select></div>
+  <button id="randToggle" class="random-start">ランダム開始（6種類）</button>
+  <div id="randInfo" aria-live="polite">選択した表情を順不同で一巡します。同じ表情は連続しません。</div>
+</fieldset>
+<p>基本パーカーと青灰カーディガンで動作を試験。半袖と旧ニットは保留。手首の動きは小角度（±8°）の検証用。<label style="max-width:440px;margin:auto"><span>腕の微動</span><input id="armTest" type="range" min="-1" max="1" step="0.01" value="0"><output id="armValue">0.00</output></label></p><fieldset id="wristPanel" style="max-width:420px;margin:12px auto;background:white;border:1px solid #aeb7c3;border-radius:8px"><legend>手首と時計（上半身表示推奨）</legend><label><span>左手首</span><input id="wristL" type="range" min="-1" max="1" step=".01" value="0"><output id="wristLVal">0°</output></label><label><span>右手首</span><input id="wristR" type="range" min="-1" max="1" step=".01" value="0"><output id="wristRVal">0°</output></label><label><input type="checkbox" id="watchVisible" checked> 時計を表示</label><button id="wristNeutral">手首を戻す</button></fieldset><fieldset id="recordPanel"><legend>動画切り出し（操作UIなし）</legend><label for="recSeconds">長さ <select id="recSeconds"><option>10</option><option>20</option><option selected>30</option><option>45</option><option>60</option></select> 秒</label><label for="recFormat">形式 <select id="recFormat"><option value="mp4">MP4（優先）</option><option value="webm">WebM（変換用）</option></select></label><button id="recStart">録画開始</button><button id="recStop" disabled>録画終了</button><div id="recStatus" aria-live="polite">無音・30fps目標</div><a id="recSave" hidden>動画を保存</a><p>録画中は画面を表示したままにしてください。1024×1024・現在の画角と背景を反映。</p></fieldset>
+<p>喜びは再調整案。自然発話は文節・休止・頭の傾き・眉・視線が連動します。</p><div id="controls"></div>
+<details id="fixesBox">
+  <summary>補正オプション（Muse E-02）</summary>
+  <div id="fixes"></div>
+  <p>補正機能のON/OFFのみ比較します。元版との比較は別途比較画像を参照。</p>
+</details>
+<div id="stats"></div>
+<p>待機中にも表情変更可能。模擬発話は音声非連動。停止は現在の姿勢を保持。iPhone実機は未検証（要ユーザー確認）。</p>
+</div><script src="js/avatar-bust.js"></script>
+<script src="js/pose-lab.js"></script>
+<script src="js/wave-study.js"></script>
+<script src="js/motion-mixer.js"></script>
+<script src="js/idle-mixer.js"></script>
+<script src="js/integrated-avatar.js"></script>
+
+<script src="js/record.js?v=d06v03"></script>
+<script src="js/main-integrated.js"></script>
+<script src="js/integrated-ui.js"></script>
+</html>
